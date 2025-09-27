@@ -1,20 +1,13 @@
 # n8n-Raspberry-PI-Workflow-Backup
 
-## Latest Backup: 2025-09-27 23:01
+## Latest Backup: 2025-09-28 00:00
 
 ### Backup URL
-https://github.com/alexxx55555/n8n-Raspberry-PI-Workflow-Backup/tree/main/PI%20workflows%20backup%202025-09-27%2023-01
+https://github.com/alexxx55555/n8n-Raspberry-PI-Workflow-Backup/tree/main/PI%20workflows%20backup%202025-09-28%2000-00
 
-### Workflows Backed Up (10 total)
-- Create New JC User
-- Slack Summary
-- Disable AD & JumpCloud User
+### Workflows Backed Up (3 total)
 - Disable JCUser
-- DNS Update
-- LG TV C3 Remote
-- PI workflows backup to Google Drive & GitHub
-- Create new AD account
-- Automatic User Creation AD/JC
+- Slack Web Summary
 - AD Disable Workflow
 
 ---
