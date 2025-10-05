@@ -1,0 +1,703 @@
+{
+  "createdAt": "2025-09-02T14:14:42.893Z",
+  "updatedAt": "2025-10-05T12:43:21.000Z",
+  "id": "GzAlS0kt9q4YI0n7",
+  "name": "Slack Summary",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "// Process each input item\nreturn items.map((item, index) => {\n  const body = item.json.body || item.json;\n  const event = body.event || {};\n  const headers = item.json.headers || {};\n\n  console.log('Received event type:', body.type);\n  console.log('Event details:', JSON.stringify(event, null, 2));\n\n  // 1) Handle URL verification challenge\n  if (body.type === 'url_verification') {\n    console.log('URL verification challenge');\n    return {\n      json: { challenge: body.challenge },\n      pairedItem: { item: index }\n    };\n  }\n\n  // 2) Skip Slack retries\n  if (headers['x-slack-retry-num'] || headers['x-slack-retry-reason']) {\n    console.log('Skipping Slack retry');\n    return null;\n  }\n\n  // 3) Skip if not a message event or if it's a bot message\n  if (event.type !== 'message' || event.subtype === 'bot_message' || event.bot_id) {\n    console.log('Not a user message, skipping');\n    return null;\n  }\n\n  // 4) Skip messages without text\n  if (!event.text) {\n    console.log('No text in message');\n    return null;\n  }\n\n  // 5) Skip messages from your bot\n  const BOT_USER_ID = 'U07K8QJ9XYZ';\n  if (BOT_USER_ID && event.user === BOT_USER_ID) {\n    console.log('Ignoring message from bot');\n    return null;\n  }\n\n  // 6) IMPROVED URL EXTRACTION - Works with mobile\n  const text = event.text || \"\";\n  const urls = new Set();\n  \n  console.log('Raw message text:', text);\n  \n  // Decode URL-encoded text (mobile often sends encoded URLs)\n  let decodedText = text;\n  try {\n    decodedText = decodeURIComponent(text);\n  } catch (e) {\n    decodedText = text;\n  }\n  \n  // Pattern 1: Slack format <http://example.com|label> or <http://example.com>\n  const slackUrlRegex = /<(https?:\\/\\/[^>|]+)(\\|[^>]+)?>/g;\n  let match;\n  while ((match = slackUrlRegex.exec(decodedText)) !== null) {\n    urls.add(match[1]);\n  }\n  \n  // Pattern 2: URL-encoded Slack format (mobile)\n  const encodedSlackRegex = /%3C(https?:\\/\\/[^%>|]+)(%7C[^%>]+)?%3E/gi;\n  while ((match = encodedSlackRegex.exec(text)) !== null) {\n    try {\n      urls.add(decodeURIComponent(match[1]));\n    } catch (e) {\n      urls.add(match[1]);\n    }\n  }\n  \n  // Pattern 3: Plain URLs\n  const plainUrlRegex = /https?:\\/\\/[^\\s<>\"'()[\\]{}]+/g;\n  while ((match = plainUrlRegex.exec(decodedText)) !== null) {\n    urls.add(match[0]);\n  }\n  \n  // Pattern 4: Fully encoded URLs\n  const encodedUrlRegex = /https?%3A%2F%2F[^\\s<>\"'()[\\]{}]+/gi;\n  while ((match = encodedUrlRegex.exec(text)) !== null) {\n    try {\n      urls.add(decodeURIComponent(match[0]));\n    } catch (e) {\n      urls.add(match[0]);\n    }\n  }\n  \n  console.log('All URLs found:', Array.from(urls));\n  \n  // Clean and validate\n  const cleanUrls = new Set();\n  for (const url of urls) {\n    let cleanUrl = url.trim().replace(/[.,;:)]+$/, '');\n    if (cleanUrl.match(/^https?:\\/\\/.+\\..+/)) {\n      cleanUrls.add(cleanUrl);\n    }\n  }\n  \n  const firstUrl = Array.from(cleanUrls)[0] || '';\n  \n  if (!firstUrl) {\n    console.log('No valid URL found in message:', text);\n    return null;\n  }\n  \n  console.log('Selected URL:', firstUrl);\n  \n  // 7) DEDUPLICATION - Check URL instead of event_id\n  const staticData = $getWorkflowStaticData('global');\n  \n  if (!staticData.processedUrls) {\n    staticData.processedUrls = {};\n  }\n  \n  const hourAgo = Date.now() - 3600000; // 1 hour\n  \n  // Check if this URL was processed recently\nif (staticData.processedUrls[firstUrl] && staticData.processedUrls[firstUrl] > hourAgo) {\n  console.log('URL already processed recently, sending duplicate notice');\n  return {\n    json: {\n      isDuplicate: true,\n      text: `ℹ️ This URL was already summarized recently.\\n\\n<${firstUrl}|${firstUrl}>`\n    },\n    pairedItem: { item: index }\n  };\n}\n  \n  // Mark URL as processed\n  staticData.processedUrls[firstUrl] = Date.now();\n  \n  // Clean old entries (older than 24 hours)\n  const dayAgo = Date.now() - 86400000;\n  Object.keys(staticData.processedUrls).forEach(url => {\n    if (staticData.processedUrls[url] < dayAgo) {\n      delete staticData.processedUrls[url];\n    }\n  });\n  \n  return {\n    json: {\n      url: firstUrl,\n      text: text,\n      slack_channel: event.channel,\n      slack_user: event.user,\n      slack_ts: event.ts,\n      slack_thread_ts: event.thread_ts,\n      event_id: body.event_id || `${event.ts}-${Date.now()}`\n    },\n    pairedItem: { item: index }\n  };\n}).filter(item => item !== null);"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -67568,
+        -23008
+      ],
+      "id": "d0ea7ac4-1635-4c44-9cc4-584c19a2de28",
+      "name": "Extract Slack URL",
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        -66704,
+        -23024
+      ],
+      "id": "33337fef-da3c-4e18-a909-8cf008d8fa6d",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [\n  {\n    json: { challenge: $json.body.challenge }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -66960,
+        -23024
+      ],
+      "id": "68dfb7b4-b700-4c8a-90c6-fa822286d608",
+      "name": "Return Slack Challenge"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Log input for debugging\nconst inputData = $input.first().json;\nconsole.log(\"HTML Extract input fields:\", Object.keys(inputData));\n\nconst html = inputData.data || inputData.html || inputData.body || inputData.content || inputData.response || \"\";\nconsole.log(\"HTML length:\", html.length, \"Sample:\", html.slice(0, 500));\n\nif (!html) {\n  console.log(\"No HTML content found\");\n  return { error: \"No HTML content found\", url: inputData.url || \"unknown\" };\n}\n\nconst MAX_LENGTH = 200000;\nlet text = \"\";\n\n// --- Step 1: Try <article> tag FIRST (most reliable for main content) ---\nconsole.log(\"Trying <article> tag\");\ntry {\n  const articleMatch = html.match(/<article[^>]*>([\\s\\S]*?)<\\/article>/i);\n  if (articleMatch) {\n    text = articleMatch[1]\n      .replace(/<script[^>]*>[\\s\\S]*?<\\/script>/gi, \"\")\n      .replace(/<style[^>]*>[\\s\\S]*?<\\/style>/gi, \"\")\n      .replace(/<nav[^>]*>[\\s\\S]*?<\\/nav>/gi, \"\")\n      .replace(/<aside[^>]*>[\\s\\S]*?<\\/aside>/gi, \"\")\n      .replace(/<header[^>]*>[\\s\\S]*?<\\/header>/gi, \"\")\n      .replace(/<footer[^>]*>[\\s\\S]*?<\\/footer>/gi, \"\")\n      .replace(/<[^>]+>/g, \" \")\n      .replace(/\\s+/g, \" \")\n      .trim();\n    \n    if (text.length > 500) {\n      console.log(\"Found content in <article>\");\n    } else {\n      text = \"\";\n    }\n  }\n} catch (e) {\n  console.log(\"Article tag error:\", e.message);\n}\n\n// --- Step 2: Try main content divs ---\nif (text.length < 500) {\n  console.log(\"Trying main content divs\");\n  const contentPatterns = [\n    /<div[^>]*class=\"[^\"]*(?:article-body|post-content|entry-content|main-content|article-content)[^\"]*\"[^>]*>([\\s\\S]*?)<\\/div>/i,\n    /<main[^>]*>([\\s\\S]*?)<\\/main>/i\n  ];\n  \n  for (const pattern of contentPatterns) {\n    const match = html.match(pattern);\n    if (match) {\n      const extracted = match[1]\n        .replace(/<script[^>]*>[\\s\\S]*?<\\/script>/gi, \"\")\n        .replace(/<style[^>]*>[\\s\\S]*?<\\/style>/gi, \"\")\n        .replace(/<[^>]+>/g, \" \")\n        .replace(/\\s+/g, \" \")\n        .trim();\n      \n      if (extracted.length > text.length) {\n        text = extracted;\n        console.log(\"Found content in main div\");\n      }\n    }\n  }\n}\n\n// --- Step 3: Try <p> tags (as fallback) ---\nif (text.length < 500) {\n  console.log(\"Trying <p> tags\");\n  try {\n    const matches = html.match(/<p[^>]*>(.*?)<\\/p>/gis);\n    if (matches) {\n      text = matches\n        .map(m => m.replace(/<[^>]+>/g, \"\").trim())\n        .filter(t => t.length > 50 && !t.match(/\\{|\\}|function\\s*\\(/))\n        .join(\"\\n\\n\");\n      console.log(\"Found content in paragraphs\");\n    }\n  } catch (e) {\n    console.log(\"Paragraph extraction error:\", e.message);\n  }\n}\n\n// --- Step 4: Check if we got CSS/JS instead of content ---\nconst cssJsIndicators = /\\{[\\s\\S]*?\\}|function\\s*\\(|\\.css|@media|var\\(--/;\nif (cssJsIndicators.test(text)) {\n  console.log(\"Detected CSS/JS code instead of article content\");\n  return { \n    error: \"Failed to extract content. Site appears to be JavaScript-rendered or mobile-optimized.\", \n    url: inputData.url || \"unknown\"\n  };\n}\n\n// --- Step 5: Filter out author/bio text ---\ntext = text\n  .replace(/is a (writer|journalist|author|reporter|editor).*?(\\.|$)/gi, \"\")\n  .replace(/writes? (about|for|on).*?(\\.|$)/gi, \"\")\n  .replace(/based in.*?(\\.|$)/gi, \"\")\n  .trim();\n\n// --- Final validation ---\nif (!text || text.length < 500) {\n  console.log(\"Article body not found or too short\");\n  return { \n    error: \"Failed to extract content. Site may be: JavaScript-heavy, paywalled, or blocking automated access.\", \n    url: inputData.url || \"unknown\"\n  };\n}\n\nconsole.log(\"Extracted text length:\", text.length, \"Sample:\", text.slice(0, 300));\n\nif (text.length > MAX_LENGTH) {\n  text = text.substring(0, MAX_LENGTH) + \"... [truncated]\";\n}\n\nreturn { \n  article: text, \n  url: inputData.url || \"\",\n  originalLength: html.length, \n  extractedLength: text.length \n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -67632,
+        -22688
+      ],
+      "id": "fa398ca8-bcb2-4ab5-ac5c-987fa18bd404",
+      "name": "HTML Extract"
+    },
+    {
+      "parameters": {
+        "jsCode": "// === HELPER FUNCTION - AT TOP ===\nfunction cleanBullets(bullets, language = \"en\") {\n  return bullets\n    .map(b => {\n      let cleaned = String(b).trim();\n      \n      // Remove workflow text\n      cleaned = cleaned.replace(/\\*Automated with this n8n workflow\\*/gi, \"\");\n      cleaned = cleaned.replace(/Automated with this n8n workflow/gi, \"\");\n      \n      // Remove ALL bullets/dashes from start\n      cleaned = cleaned.replace(/^[•\\-\\s]+/g, \"\").trim();\n      \n      // Fix multiple periods\n      cleaned = cleaned.replace(/\\.{2,}/g, \".\");\n      \n      // Fix period-bullet patterns\n      cleaned = cleaned.replace(/\\.\\s*•+\\s*/g, \". \");\n      \n      // Remove duplicate spaces\n      cleaned = cleaned.replace(/\\s{2,}/g, \" \");\n      \n      // Remove quotes\n      cleaned = cleaned.replace(/^[\"']|[\"']$/g, \"\");\n      \n      return cleaned.trim();\n    })\n    .filter(b => b && b.length > 20); // Filter short/empty bullets\n}\n\n// Log input\nconsole.log(\"Validator input:\", JSON.stringify($json, null, 2));\n\nlet raw = $json.output || $json.text || $json.content || \"\";\nif (typeof raw !== \"string\") raw = JSON.stringify(raw);\n\n// Get language from input\nconst language = $json.language || \"en\";\nconsole.log(\"Language in Validator:\", language);\n\n// Aggressive cleaning\nlet s = raw\n  .replace(/```json\\s*/gi, \"\")\n  .replace(/```\\s*/g, \"\")\n  .replace(/\\*Automated with.*$/gim, \"\")\n  .replace(/^[^{]*/, \"\")  // Remove before {\n  .replace(/[^}]*$/, \"\")  // Remove after }\n  .replace(/-/g, \"-\")\n  .replace(/[\\r\\n]+/g, \" \")\n  .replace(/[\\u2018\\u2019]/g, \"'\")\n  .replace(/[\\u201C\\u201D]/g, '\"')\n  .replace(/\\s+/g, \" \")\n  .trim();\n\nconsole.log(\"Cleaned string:\", s.slice(0, 300));\n\nlet obj = null;\ntry {\n  obj = JSON.parse(s);\n  if (typeof obj === \"string\") obj = JSON.parse(obj);\n} catch (e) {\n  console.log(\"JSON parse failed:\", e.message);\n}\n\n// Try regex salvage if parse failed\nif (!obj || typeof obj !== \"object\") {\n  const titleMatch = s.match(/\"title\"\\s*:\\s*\"([^\"]+)\"/);\n  const bulletsMatch = s.match(/\"bullets\"\\s*:\\s*\\[([\\s\\S]*?)\\]/);\n  \n  if (titleMatch && bulletsMatch) {\n    const title = titleMatch[1];\n    const bullets = [...bulletsMatch[1].matchAll(/\"([^\"]+)\"/g)]\n      .map(m => m[1])\n      .filter(b => b.length > 10);\n    \n    return [{\n      json: {\n        title,\n        bullets: cleanBullets(bullets, language),\n        url: $json.url || null,\n        language: language,  // ✅ PASS LANGUAGE\n        source: $json.source || \"Local\"\n      }\n    }];\n  }\n  \n  return [{\n    json: {\n      error: \"Failed to parse AI output into JSON\",\n      raw: s.slice(0, 500),\n      url: $json.url || null,\n      language: language  // ✅ PASS LANGUAGE\n    }\n  }];\n}\n\n// Normal success path\nlet title = obj.title || \"Summary\";\nlet bullets = Array.isArray(obj.bullets) ? obj.bullets : [];\n\n// Clean bullets\nbullets = cleanBullets(bullets, language);\n\n// Ensure exactly 5 bullets\nif (bullets.length > 5) bullets = bullets.slice(0, 5);\n\nconst defaultBullet = language === \"he\" \n  ? \"לא נמצאו פרטים נוספים.\" \n  : \"No further details available.\";\n\nwhile (bullets.length < 5) {\n  bullets.push(defaultBullet);\n}\n\nreturn [{\n  json: {\n    title,\n    bullets,\n    url: $json.url || null,\n    language: language,  // ✅ PASS LANGUAGE\n    source: $json.source || \"Local\"\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -65600,
+        -22672
+      ],
+      "id": "82f9572e-575b-488e-86af-921c5a4f8825",
+      "name": "Validator"
+    },
+    {
+      "parameters": {
+        "jsCode": "const { \n  title = \"Summary\", \n  bullets = [], \n  error = null, \n  raw = \"\", \n  url = \"\",\n  language = \"en\"\n} = $json || {};\n\n// --- Error case ---\nif (error) {\n  const errorMsg = language === \"he\" ? \"שגיאה בעיבוד המאמר\" : \"Error processing article\";\n  const sourceText = language === \"he\" ? \"מקור:\" : \"Source:\";\n  \n  return [{\n    json: {\n      text: `⚠️ ${errorMsg}\\n\\n${sourceText} ${url ? `<${url}|${url}>` : (language === \"he\" ? \"לא ידוע\" : \"Unknown\")}`\n    }\n  }];\n}\n\n// --- Clean title ---\nlet cleanTitle = String(title)\n  .replace(/^[^{\"]*\"?title[\"']?\\s*[:=–-]\\s*/i, \"\")\n  .replace(/^[\"']|[\"']$/g, \"\")\n  .replace(/[.,\"]+$/, \"\")\n  .replace(/automated with this n8n workflow/i, \"\")\n  .replace(/\\*Automated with.*$/i, \"\")\n  .replace(/^תקציר[:\\s]+/i, \"\")\n  .replace(/^סיכום[:\\s]+/i, \"\")\n  .replace(/^summary[:\\s]+/i, \"\")\n  .trim();\n\n// --- Clean bullets ---\nlet cleanBullets = (Array.isArray(bullets) ? bullets : [])\n  .map(b => String(b).trim())\n  .filter(b => {\n    // Filter out ALL English default bullets for Hebrew articles\n    if (language === \"he\" && (\n      b === \"No further details available.\" || \n      b === \"No further details available\"\n    )) {\n      return false;\n    }\n    return b && b.length > 25;\n  })\n  .map(b => {\n    let cleaned = b\n      .replace(/^[\"']|[\"']$/g, \"\")\n      .replace(/automated with this n8n workflow/i, \"\")\n      .replace(/\\*Automated with.*$/i, \"\")\n      .replace(/^[•\\-\\s]+/, \"\")\n      .replace(/\\.{2,}/g, \".\")\n      .replace(/\\s+/g, \" \")\n      .trim();\n    \n    return cleaned;\n  })\n  .filter(Boolean)\n  .slice(0, 5);\n\nconst defaultBullet = language === \"he\" \n  ? \"לא נמצאו פרטים נוספים בנושא זה\" \n  : \"No further details available\";\n\nwhile (cleanBullets.length < 5) {\n  cleanBullets.push(defaultBullet);\n}\n\n// --- Track metrics BEFORE return ---\nconst metrics = $getWorkflowStaticData('global').metrics || { total: 0, success: 0 };\nmetrics.total++;\nmetrics.success++;\n$getWorkflowStaticData('global').metrics = metrics;\nconsole.log(`Success rate: ${(metrics.success/metrics.total*100).toFixed(1)}%`);\n\n// --- Build Slack message ---\nconst RTL = \"\\u200F\";\n\nif (language === \"he\") {\n  const titleLine = url \n    ? `:brain: Summary: <${url}|${cleanTitle}>` \n    : `:brain: Summary: ${cleanTitle}`;\n  \n  const bulletLines = cleanBullets.map(b => `${RTL}• ${b}${RTL}`);\n  \n  return [{ \n    json: { \n      text: [titleLine, \"\", ...bulletLines, \"\"].join(\"\\n\")\n    } \n  }];\n  \n} else {\n  const titleLine = url \n    ? `:brain: Summary: <${url}|${cleanTitle}>` \n    : `:brain: Summary: ${cleanTitle}`;\n  \n  const bulletLines = cleanBullets.map(b => `• ${b}`);\n  \n  return [{ \n    json: { \n      text: [titleLine, \"\", ...bulletLines, \"\"].join(\"\\n\")\n    } \n  }];\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -65344,
+        -22672
+      ],
+      "id": "9d9f0861-7c99-4bd4-933f-278b2874e04a",
+      "name": "Formatter"
+    },
+    {
+      "parameters": {
+        "url": "={{$json[\"url\"]}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -67856,
+        -22688
+      ],
+      "id": "9455bb97-07b9-4735-be04-20d086c28215",
+      "name": "HTTP Request",
+      "retryOnFail": false,
+      "executeOnce": false,
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are an expert summarization tool that creates accurate, fact-based summaries.\n\nLanguage: {{$json[\"language\"]}}\n\nCRITICAL: You MUST summarize in the language specified by the \"Language\" parameter above.\n- If language is \"he\" → summarize in Hebrew\n- If language is \"en\" → summarize in English (EVEN IF the source text is in Russian, Cyrillic, or another language)\n\nThe source text may be in Hebrew, English, Russian, or other languages, but you MUST write your summary in the language specified above.\n\nTASK: Summarize the text into exactly 5 detailed bullet points IN THE LANGUAGE SPECIFIED ABOVE.\n\nACCURACY RULES:\n- ONLY use information explicitly stated in the source text\n- NEVER invent, assume, or add names, facts, or details not in the source\n- Use names and facts exactly as written in the source\n- Do NOT add context or background not present in the text\n\nBULLET REQUIREMENTS:\n- Each bullet: 3-5 complete sentences (40-60 words)\n- Start each bullet with • (bullet character)\n- Include only specific information from the source\n- Write in clear, journalistic style\n- Every sentence must be complete\n\nOUTPUT RULES:\n- Output ONLY valid JSON\n- NO markdown (no ```), NO extra text\n- Start with { and end with }\n\nRequired format:\n{\"title\":\"Title in the language specified above\",\"bullets\":[\"• First detailed bullet.\",\"• Second detailed bullet.\",\"• Third detailed bullet.\",\"• Fourth detailed bullet.\",\"• Fifth detailed bullet.\"]}\n\nText to summarize:\n{{ $json[\"chunk\"] }}\n\nCRITICAL: Write the summary in {{$json[\"language\"]}} language. If the parameter is \"en\", write in English. If \"he\", write in Hebrew.",
+        "needsFallback": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        -66400,
+        -22672
+      ],
+      "id": "34ca356c-530a-434d-bc6f-d4fe1f6f1b48",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "slack-events",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -67808,
+        -23008
+      ],
+      "id": "3e66a8cf-0cd3-40ee-9779-962d9e8840df",
+      "name": "Webhook",
+      "webhookId": "d63266c1-1b49-4fc1-8530-cbdb5e8fb27f"
+    },
+    {
+      "parameters": {
+        "jsCode": "console.log(\"Chunker input article length:\", $json.article?.length || 0, \"Sample:\", $json.article?.slice(0, 500));\n\nconst CHUNK_SIZE = 5000;   // smaller than before\nconst OVERLAP = 150;\nconst MAX_CHUNKS = 10;\n\nconst text = $json.article || \"\";\nconst url = $json.url || \"\";\nconst chunks = [];\n\nfor (let i = 0; i < text.length && chunks.length < MAX_CHUNKS; i += (CHUNK_SIZE - OVERLAP)) {\n  chunks.push({ json: { url, chunk: text.slice(i, i + CHUNK_SIZE), index: chunks.length + 1 } });\n}\n\nconsole.log(\"Generated chunks:\", chunks.length, \"Sample chunk:\", chunks[0]?.json.chunk.slice(0, 500));\nreturn chunks;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -67152,
+        -22672
+      ],
+      "id": "5e498db8-fa13-49c3-a2c0-f6311d007068",
+      "name": "Chunker",
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "jsCode": "console.log(\"AI Agent output:\", JSON.stringify($json, null, 2));\nreturn [$json];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -65888,
+        -22672
+      ],
+      "id": "67f69db1-b9b7-4500-8309-52267a73facb",
+      "name": "Debug logger",
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "jsCode": "// LANGUAGE DETECTOR NODE\nconst text = $json.article || $json.chunk || \"\";\nif (!text) {\n  return [{\n    json: { \n      language: \"en\",  // Default fallback\n      chunk: $json.chunk || \"\", \n      url: $json.url || \"\" \n    }\n  }];\n}\n\n// Count Hebrew characters\nconst hebrewMatches = text.match(/[\\u0590-\\u05FF]/g) || [];\nconst hebrewChars = hebrewMatches.length;\n\n// Count Cyrillic characters (Russian)\nconst cyrillicMatches = text.match(/[\\u0400-\\u04FF]/g) || [];\nconst cyrillicChars = cyrillicMatches.length;\n\nconst totalChars = text.length;\nconst hebrewRatio = hebrewChars / totalChars;\nconst cyrillicRatio = cyrillicChars / totalChars;\n\n// Detect language - treat Russian as English for summarization\nlet language = \"en\";\nif (hebrewRatio > 0.2 && totalChars > 200) {\n  language = \"he\";\n} else if (cyrillicRatio > 0.2 && totalChars > 200) {\n  language = \"en\";  // Russian articles will be summarized in English\n}\n\nconsole.log(`Language detected: ${language}, Hebrew: ${hebrewChars}, Cyrillic: ${cyrillicChars}, Total: ${totalChars}`);\n\nreturn [{\n  json: {\n    language,\n    chunk: $json.chunk || \"\",\n    url: $json.url || \"\"\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -66896,
+        -22672
+      ],
+      "id": "27b1cbdd-524c-4c44-90bd-714cd8d86c38",
+      "name": "Language Detector"
+    },
+    {
+      "parameters": {
+        "jsCode": "const error = $json.error || {};\nconst url = $json.url || 'Unknown URL';  // Get URL from current node (HTML Extract passes it)\n\n// Default to English for errors since language detection hasn't happened yet\nconst language = 'en';\n\nconst errorMsg = `⚠️ Failed to summarize article`;\nconst detailMsg = `Reason: ${error || 'Unable to extract article content'}`;\n\nreturn [{\n  json: {\n    text: `${errorMsg}\\n${detailMsg}\\n\\nURL: <${url}|${url}>`\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -66256,
+        -23008
+      ],
+      "id": "25536def-e8e7-4ede-87fe-0b3830cc8867",
+      "name": "Format Error Message"
+    },
+    {
+      "parameters": {
+        "amount": 2
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -66688,
+        -22672
+      ],
+      "id": "3bcc3aff-11af-4174-8da2-3d42fc2eb65f",
+      "name": "Wait",
+      "webhookId": "10236448-b9ab-466e-b2f5-cbe1633592d1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "0fbb258e-e797-4ea7-ade1-c268ad5ec88c",
+              "leftValue": "={{$json[\"body\"][\"type\"]}}",
+              "rightValue": "url_verification",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -67232,
+        -23008
+      ],
+      "id": "21b6f324-5afa-4aba-ad6a-77ec10d66718",
+      "name": "Check URL Verification"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a8b1824d-7f4a-44b2-9117-e9ffce906f69",
+              "leftValue": "={{ $json.isDuplicate }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -67408,
+        -23344
+      ],
+      "id": "a5337a05-576d-489d-99ce-1290a8e834e1",
+      "name": "Check Duplicate"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "5e3db3e5-dc18-47c5-9c94-1086878f8f31",
+              "leftValue": "={{ $json.error }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -67408,
+        -22688
+      ],
+      "id": "6d2bab09-b54b-450e-8104-ca5e845a21f6",
+      "name": "Check Extract Error"
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C09BFKKCMQ8",
+          "mode": "list",
+          "cachedResultName": "n8n-sammarize"
+        },
+        "text": "={{$json[\"text\"]}}",
+        "otherOptions": {
+          "includeLinkToWorkflow": "={{ false }}"
+        }
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        -65536,
+        -23360
+      ],
+      "id": "40e6849b-6546-4357-8efe-a52e415168f6",
+      "name": "Send Summary",
+      "webhookId": "babdd094-eea0-4a29-997a-dec4a42ed237",
+      "executeOnce": false,
+      "credentials": {
+        "slackApi": {
+          "id": "I5astSkOODZZU76Y",
+          "name": "n8n Summery"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C09BFKKCMQ8",
+          "mode": "list",
+          "cachedResultName": "n8n-sammarize"
+        },
+        "text": "={{$json[\"text\"]}}",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        -66208,
+        -23360
+      ],
+      "id": "0d45cc79-1579-4a54-a47b-2e1d76d9e337",
+      "name": "Send Duplicate Notice",
+      "webhookId": "214e8692-2d7d-4ade-9ec1-77708747f604",
+      "credentials": {
+        "slackApi": {
+          "id": "I5astSkOODZZU76Y",
+          "name": "n8n Summery"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "google/gemma-3-12b",
+          "mode": "list",
+          "cachedResultName": "google/gemma-3-12b"
+        },
+        "options": {
+          "maxTokens": 1500,
+          "temperature": 0.1
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -66464,
+        -22432
+      ],
+      "id": "879a71c2-d1a5-4fe6-96b3-6513cfc7d39a",
+      "name": "Gemma 3 12B",
+      "credentials": {
+        "openAiApi": {
+          "id": "tPLXnEcJzshXrwfS",
+          "name": "Mac-AI"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "openai/gpt-oss-20b",
+          "mode": "list",
+          "cachedResultName": "openai/gpt-oss-20b"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -66304,
+        -22432
+      ],
+      "id": "1d06fa92-fdd3-4b7a-8479-12f4e7b9b20c",
+      "name": "ChatGPT 20B",
+      "credentials": {
+        "openAiApi": {
+          "id": "tPLXnEcJzshXrwfS",
+          "name": "Mac-AI"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Extract Slack URL": {
+      "main": [
+        [
+          {
+            "node": "Check Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return Slack Challenge": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTML Extract": {
+      "main": [
+        [
+          {
+            "node": "Check Extract Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validator": {
+      "main": [
+        [
+          {
+            "node": "Formatter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatter": {
+      "main": [
+        [
+          {
+            "node": "Send Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "HTML Extract",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Debug logger",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Extract Slack URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chunker": {
+      "main": [
+        [
+          {
+            "node": "Language Detector",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Debug logger": {
+      "main": [
+        [
+          {
+            "node": "Validator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Language Detector": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Error Message": {
+      "main": [
+        [
+          {
+            "node": "Send Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check URL Verification": {
+      "main": [
+        [
+          {
+            "node": "Return Slack Challenge",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Duplicate": {
+      "main": [
+        [
+          {
+            "node": "Send Duplicate Notice",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check URL Verification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Extract Error": {
+      "main": [
+        [
+          {
+            "node": "Format Error Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Chunker",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemma 3 12B": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ChatGPT 20B": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 1
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Jerusalem",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": {
+    "global": {
+      "metrics": {
+        "total": 20,
+        "success": 20
+      },
+      "processedUrls": {
+        "https://gizmodo.com/amazon-delivery-drones-crash-into-a-crane-in-arizona-feds-investigating-2000667298": 1759655443590,
+        "https://gizmodo.com/philips-hue-play-wall-washer-review-2000638106": 1759655926590,
+        "https://gizmodo.com/forget-every-macbook-this-2tb-hp-laptop-is-2600-off-for-prime-members-on-amazon-2000667708": 1759667796487,
+        "https://www.ynet.co.il/sport/article/sjohdxj6gg?utm_source=ynet.app.ios&amp;utm_term=sjohdxj6gg&amp;utm_campaign=general_share&amp;utm_medium=social&amp;utm_content=Header": 1759657280035,
+        "https://sports.walla.co.il/item/3785072": 1759657668295,
+        "https://e.walla.co.il/item/3784971": 1759657887373,
+        "https://e.walla.co.il/item/3784011": 1759658218995,
+        "https://tech.walla.co.il/item/3784837": 1759658667631,
+        "https://sports.walla.co.il/item/3785165": 1759665364978,
+        "https://food.walla.co.il/item/3783815": 1759665497379,
+        "https://finance.walla.co.il/item/3783895": 1759665973614,
+        "https://tech.walla.co.il/item/3784611": 1759666258144,
+        "https://detaly.co.il/netaniyagu-hamas-budet-razoruzhen-zalozhniki-vernutsya-do-kontsa-sukkota/": 1759667677135,
+        "https://detaly.co.il/byvshie-glavy-shabaka-obratilis-v-bagats-s-prosboj-otmenit-naznachenie-davida-zini/": 1759667920906,
+        "https://news.walla.co.il/item/3785163": 1759668008250
+      },
+      "processedEvents": {
+        "Ev09KMRSSM08": 1759655642156
+      }
+    }
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "cfcb048e-e432-4977-9246-853171da191b",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "createdAt": "2025-09-02T14:14:42.897Z",
+      "updatedAt": "2025-09-02T14:14:42.897Z",
+      "role": "workflow:owner",
+      "workflowId": "GzAlS0kt9q4YI0n7",
+      "projectId": "NptNxIUgBjUJaRfd"
+    }
+  ],
+  "tags": []
+}
