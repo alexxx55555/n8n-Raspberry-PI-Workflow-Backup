@@ -1,0 +1,228 @@
+{
+  "createdAt": "2025-10-08T17:08:51.909Z",
+  "updatedAt": "2025-10-08T17:08:51.909Z",
+  "id": "d5ivvIczyaUVrpm3",
+  "name": "WhatsApp Notification Test",
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "test-whatsapp",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "cfa4fb31-abc4-4546-8ad1-ec1f67eb320a",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        560,
+        -656
+      ],
+      "webhookId": "test-whatsapp-webhook"
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "phone",
+              "value": "972545580431"
+            },
+            {
+              "name": "workflowName",
+              "value": "={{ $workflow.name }}"
+            },
+            {
+              "name": "status",
+              "value": "={{ $json.status || 'completed' }}"
+            },
+            {
+              "name": "timestamp",
+              "value": "={{ $now.format('YYYY-MM-DD HH:mm:ss') }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a8f246c9-ee38-4bd0-b236-600f4de513b4",
+      "name": "Set Variables",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        752,
+        -656
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format the WhatsApp message\nconst phone = $input.item.json.phone;\nconst workflowName = $input.item.json.workflowName;\nconst status = $input.item.json.status;\nconst timestamp = $input.item.json.timestamp;\n\nconst message = `🔔 *n8n Workflow Notification*\n\n📋 *Workflow:* ${workflowName}\n✅ *Status:* ${status}\n⏰ *Time:* ${timestamp}\n\n---\nThis is a test message from your n8n workflow!`;\n\nreturn {\n  phone: phone,\n  message: message\n};"
+      },
+      "id": "632760e1-ff3e-4c9a-b0a8-84bccaece16a",
+      "name": "Format Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        -656
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:3000/send",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"phone\": \"{{ $json.phone }}\",\n  \"message\": \"{{ $json.message }}\"\n}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "df393833-0663-4fd6-b8d9-36184fc88e3e",
+      "name": "Send WhatsApp Message",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1152,
+        -656
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.success }}",
+              "value2": "true"
+            }
+          ]
+        }
+      },
+      "id": "2480610c-17e7-41e9-a984-e16fa7a198a7",
+      "name": "Check If Sent",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1360,
+        -656
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": true,\n  \"message\": \"WhatsApp notification sent successfully!\",\n  \"phone\": \"{{ $('Set Variables').item.json.phone }}\",\n  \"timestamp\": \"{{ $('Set Variables').item.json.timestamp }}\"\n}",
+        "options": {}
+      },
+      "id": "e4a47e98-d6a7-41ed-be44-51485903c7aa",
+      "name": "Success Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1552,
+        -752
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": false,\n  \"error\": \"Failed to send WhatsApp message\",\n  \"details\": {{ $json }}\n}",
+        "options": {
+          "responseCode": 500
+        }
+      },
+      "id": "5d9c57a3-56f5-495f-9d41-a7edd36a17ba",
+      "name": "Error Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1552,
+        -544
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set Variables",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Variables": {
+      "main": [
+        [
+          {
+            "node": "Format Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Message": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send WhatsApp Message": {
+      "main": [
+        [
+          {
+            "node": "Check If Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If Sent": {
+      "main": [
+        [
+          {
+            "node": "Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "bfb7db55-905f-464b-a74a-608f7d20d18e",
+  "triggerCount": 0,
+  "shared": [
+    {
+      "createdAt": "2025-10-08T17:08:51.916Z",
+      "updatedAt": "2025-10-08T17:08:51.916Z",
+      "role": "workflow:owner",
+      "workflowId": "d5ivvIczyaUVrpm3",
+      "projectId": "NptNxIUgBjUJaRfd"
+    }
+  ],
+  "tags": []
+}
