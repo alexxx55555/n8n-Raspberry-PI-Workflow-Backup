@@ -1,0 +1,231 @@
+{
+  "createdAt": "2025-10-11T11:14:55.362Z",
+  "updatedAt": "2025-10-11T12:54:35.000Z",
+  "id": "VWpToRskEii3yQbk",
+  "name": "Gmail Auto-Categorize by Content",
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {},
+        "options": {}
+      },
+      "id": "fba60de5-f352-4ae0-8680-ca86318f5aaf",
+      "name": "Gmail Trigger",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "C5742Grqr9Rpnxid",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Analyze email content and determine category\nconst subject = $input.item.json.subject || '';\nconst body = $input.item.json.textPlain || $input.item.json.textHtml || '';\nconst from = $input.item.json.from || '';\n\nconst text = (subject + ' ' + body + ' ' + from).toLowerCase();\n\nlet category = 'General';\n\n// Define your categories based on keywords\nif (text.match(/invoice|payment|receipt|bill|purchase|order/)) {\n  category = 'Finance';\n} else if (text.match(/meeting|calendar|schedule|appointment|zoom|teams/)) {\n  category = 'Meetings';\n} else if (text.match(/newsletter|subscribe|unsubscribe|update/)) {\n  category = 'Newsletters';\n} else if (text.match(/social|facebook|twitter|linkedin|instagram|notification/)) {\n  category = 'Social';\n} else if (text.match(/project|task|deadline|urgent|important/)) {\n  category = 'Work';\n} else if (text.match(/support|ticket|help|issue|problem/)) {\n  category = 'Support';\n} else if (text.match(/promotion|deal|discount|sale|offer|coupon/)) {\n  category = 'Promotions';\n} else if (text.match(/shipping|delivery|tracking|package/)) {\n  category = 'Shipping';\n}\n\nreturn {\n  messageId: $input.item.json.id,\n  threadId: $input.item.json.threadId,\n  category: category,\n  subject: subject\n};"
+      },
+      "id": "9cbd3c28-c911-44a0-a011-36f48e2ba85d",
+      "name": "Categorize Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        208,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "label",
+        "operation": "create",
+        "name": "={{ $json.category }}",
+        "options": {}
+      },
+      "id": "1989745f-416c-4595-8711-f0ee48c0d41e",
+      "name": "Create Label If Not Exists",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        400,
+        0
+      ],
+      "webhookId": "6d7e252a-9cfe-4fbe-ac8f-331fe7fd5b8d",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "C5742Grqr9Rpnxid",
+          "name": "Gmail account"
+        }
+      },
+      "continueOnFail": true,
+      "notes": "Will fail if label already exists, that's OK"
+    },
+    {
+      "parameters": {
+        "operation": "addLabels",
+        "messageId": "={{ $('Categorize Email').item.json.messageId }}",
+        "labelIds": {
+          "labelValues": [
+            {
+              "labelName": "={{ $('Categorize Email').item.json.category }}"
+            }
+          ]
+        }
+      },
+      "id": "32ed7870-7bf1-4c0a-bf9a-beeae2ba4f90",
+      "name": "Add Label to Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        608,
+        0
+      ],
+      "webhookId": "d16848af-3584-4454-b28b-f2d65728d900",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "C5742Grqr9Rpnxid",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "messageId": "={{ $('Categorize Email').item.json.messageId }}"
+      },
+      "id": "ce429aa8-2b79-412b-8537-868015f0a9b0",
+      "name": "Get Message Details",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        800,
+        0
+      ],
+      "webhookId": "fb797fb1-e6aa-49b6-af30-f3d2acd235ed",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "C5742Grqr9Rpnxid",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "removeLabels",
+        "messageId": "={{ $('Categorize Email').item.json.messageId }}",
+        "labelIds": {
+          "labelValues": [
+            {
+              "labelName": "INBOX"
+            }
+          ]
+        }
+      },
+      "id": "3f19a304-b2f7-4e65-b804-e9c19ec40f7d",
+      "name": "Remove from Inbox",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1008,
+        0
+      ],
+      "webhookId": "7a544295-e9ec-4386-ae55-325727fbc5de",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "C5742Grqr9Rpnxid",
+          "name": "Gmail account"
+        }
+      },
+      "notes": "This archives the email (removes from inbox)"
+    }
+  ],
+  "connections": {
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "Categorize Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Categorize Email": {
+      "main": [
+        [
+          {
+            "node": "Create Label If Not Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Label If Not Exists": {
+      "main": [
+        [
+          {
+            "node": "Add Label to Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Label to Email": {
+      "main": [
+        [
+          {
+            "node": "Get Message Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Message Details": {
+      "main": [
+        [
+          {
+            "node": "Remove from Inbox",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "f1f9dd2e-cf80-4012-8530-34ed08992e71",
+  "triggerCount": 0,
+  "shared": [
+    {
+      "createdAt": "2025-10-11T11:14:55.366Z",
+      "updatedAt": "2025-10-11T11:14:55.366Z",
+      "role": "workflow:owner",
+      "workflowId": "VWpToRskEii3yQbk",
+      "projectId": "NptNxIUgBjUJaRfd"
+    }
+  ],
+  "tags": []
+}
