@@ -1,0 +1,398 @@
+{
+  "updatedAt": "2025-09-27T21:11:01.000Z",
+  "createdAt": "2025-09-26T11:21:43.018Z",
+  "id": "KrojGARCPgDgfZk0",
+  "name": "Disable JC User",
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "f54ab6de-2566-4063-b57a-aa7fd93f51fb",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -3344,
+        -144
+      ],
+      "id": "97d49e4d-9a86-4e42-951a-984641eee9d4",
+      "name": "Webhook",
+      "webhookId": "f54ab6de-2566-4063-b57a-aa7fd93f51fb"
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Allow this slash command only in #disable-jc-user\n */\nconst ALLOWED_CHANNEL_IDS = new Set(['C09GN391SQ6']);\nconst payload = $json.body ?? $json;\nconst channelId = payload.channel_id || payload.channel?.id || null;\nconst channelName = payload.channel_name || payload.channel?.name || null;\nlet authorized = false;\nlet errorMessage = '';\nif (channelId && ALLOWED_CHANNEL_IDS.has(channelId)) {\n  authorized = true;\n} else {\n  errorMessage = '🚫 This command can only be used in #disable-jc-user';\n}\nreturn { ...$json, authorized, errorMessage, channelId, channelName };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2832,
+        -144
+      ],
+      "id": "51f6d125-8ac5-4dda-8e89-186b9111f96f",
+      "name": "Authorization Check"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "fbe754c6-374d-46bf-853c-84f7edfb467d",
+              "leftValue": "={{$json.authorized}}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {
+          "looseTypeValidation": true
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -2432,
+        -144
+      ],
+      "id": "fcde27b1-7cf3-4e6b-b38c-2049db65db23",
+      "name": "IF Authorized"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{$json.errorMessage}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        -2144,
+        160
+      ],
+      "id": "8f1ec10f-16e7-4a28-a9a4-0bf11f8d5604",
+      "name": "Access Denied Response"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "🔄 Disabling JumpCloud user... please wait",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        -2144,
+        -160
+      ],
+      "id": "81780e03-3267-44c5-b889-f44fe8202d9d",
+      "name": "Processing Response"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Slack slash command input parser\nconst payload = $json.body ?? $json;\nconst raw = (payload.text ?? payload.username ?? '').trim();\nif (!raw) throw new Error('No username provided.');\nconst username = raw.replace(/^@/, '');\nreturn { body: { username } };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1904,
+        -160
+      ],
+      "id": "5a068a5c-eaaf-4aed-a61d-76f84b96070d",
+      "name": "Normalize input"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "console.log('JC Output:', JSON.stringify($json, null, 2));\n\nif (!$json.stdout || $json.stdout.trim() === '') {\n  const stderr = $json.stderr || 'none';\n  throw new Error('JC PowerShell returned empty stdout. Stderr: ' + stderr);\n}\n\nconst stdout = $json.stdout.trim();\n\ntry {\n  const result = JSON.parse(stdout);\n  return { ...result, System: 'JumpCloud' };\n} catch (e) {\n  throw new Error('Failed to parse JC JSON. Output was: ' + stdout + '. Error: ' + e.message);\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1344,
+        -160
+      ],
+      "id": "551c0dc5-b769-4224-a564-906e7c78f22b",
+      "name": "JC Script Output Parser"
+    },
+    {
+      "parameters": {
+        "sendTo": "vinokura@alex-it.net",
+        "subject": "JumpCloud User Disabled",
+        "message": "={{$json.Status === 'Not Found' || $json.Status === 'Error'\n  ? '<h3 style=\"color:#d32f2f;\">' + ($json.Message || '').replace('?? ', '').replace('? ', '') + '</h3>' +\n    '<p style=\"color:black; font-size:0.95em;\"><b>👤 Username:</b> ' + $json.Username + '</p>' +\n    '<p style=\"color:black; font-size:0.95em;\"><b>🖥️ System:</b> JumpCloud</p>'\n  : '<h2 style=\"color:red;\">🔒 JumpCloud User ' + ($json.Status === 'Already Disabled' ? 'Already Disabled' : 'Disabled') + '</h2>' +\n    '<p style=\"color:black; font-size:0.95em;\"><b>👤 Username:</b> ' + $json.Username + '</p>' +\n    '<p style=\"color:black; font-size:0.95em;\"><b>🆔 Full Name:</b> ' + $json.FullName + '</p>' +\n    '<p style=\"color:black; font-size:0.95em;\"><b>📌 Status:</b> ' + $json.Status + '</p>' +\n    ($json.Email ? '<p style=\"color:black; font-size:0.95em;\"><b>📧 Email:</b> ' + $json.Email + '</p>' : '') +\n    ($json.JCUserId ? '<p style=\"color:black; font-size:0.95em;\"><b>🆔 JC User ID:</b> ' + $json.JCUserId + '</p>' : '') +\n    ($json.GroupsRemoved && $json.GroupsRemoved.length > 0 ? '<p style=\"color:black; font-size:0.95em;\"><b>🗑️ Groups Removed:</b> ' + $json.GroupsRemoved.join(', ') + '</p>' : '')\n}}\n\n<hr>\n<p style=\"font-size:0.85em; color:gray;\">\n  Automated by n8n workflow\n</p>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -176,
+        -320
+      ],
+      "id": "0f94869b-44d1-4af0-be37-c0b35d2905c7",
+      "name": "Send Message",
+      "webhookId": "961eced4-af4c-4015-a632-1c5dcecb5a5f",
+      "executeOnce": false,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "C5742Grqr9Rpnxid",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1nh_eXCRjrbruYZWqF8_8LvW3TQ_d7EsN3bCQF_6Wfpg",
+          "mode": "list",
+          "cachedResultName": "New AD User Created",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1nh_eXCRjrbruYZWqF8_8LvW3TQ_d7EsN3bCQF_6Wfpg/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1nh_eXCRjrbruYZWqF8_8LvW3TQ_d7EsN3bCQF_6Wfpg/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{new Date().toLocaleString('en-GB', { hour12: false, timeZone: 'Asia/Jerusalem' })}}",
+            "System": "JumpCloud",
+            "Username": "={{$json.Username}}",
+            "Full Name": "={{$json.FullName}}",
+            "Email": "={{$json.Email}}",
+            "JC User ID": "={{$json.JCUserId}}",
+            "Status": "={{$json.Status}}",
+            "Groups Removed": "={{($json.GroupsRemoved || []).join(', ')}}",
+            "Message": "={{$json.Message}}"
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.6,
+      "position": [
+        -160,
+        -96
+      ],
+      "id": "cb94afe3-b36b-4c49-8792-2215631ab399",
+      "name": "Append row in sheet",
+      "executeOnce": false,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "MCeFqIGjffYKd95d",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "426570413",
+        "text": "={{$json.Status === 'Not Found' || $json.Status === 'Error'\n  ? '❌ ' + ($json.Message || '').replace('?? ', '').replace('? ', '') +\n    '\\n\\n👤 Username: ' + $json.Username +\n    '\\n🖥️ System: JumpCloud'\n  : '🔒 JumpCloud User ' + ($json.Status === 'Already Disabled' ? 'Already Disabled' : 'Disabled') +\n    '\\n\\n👤 Username: ' + $json.Username +\n    '\\n🆔 Full Name: ' + $json.FullName +\n    '\\n📌 Status: ' + $json.Status +\n    ($json.Email ? '\\n📧 Email: ' + $json.Email : '') +\n    ($json.JCUserId ? '\\n🆔 JC User ID: ' + $json.JCUserId : '') +\n    ($json.GroupsRemoved && $json.GroupsRemoved.length > 0 ? '\\n🗑️ Groups Removed: ' + $json.GroupsRemoved.join(', ') : '')\n}}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -160,
+        112
+      ],
+      "id": "5309340e-fd3c-4acf-b75a-44eca34d478e",
+      "name": "Send a text message",
+      "webhookId": "ae9b49c5-f740-4d7f-b4af-c7ce2935e45f",
+      "executeOnce": false,
+      "credentials": {
+        "telegramApi": {
+          "id": "x7W5pZqq5q5bGRzU",
+          "name": "Disable AD User"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C09GN391SQ6",
+          "mode": "list",
+          "cachedResultName": "disable-ad-user"
+        },
+        "text": "={{$json.Status === 'Not Found' || $json.Status === 'Error'\n  ? '❌ ' + ($json.Message || '').replace('?? ', '').replace('? ', '') +\n    '\\n\\n👤 Username: ' + $json.Username +\n    '\\n🖥️ System: JumpCloud'\n  : '🔒 JumpCloud User ' + ($json.Status === 'Already Disabled' ? 'Already Disabled' : 'Disabled') +\n    '\\n\\n👤 Username: ' + $json.Username +\n    '\\n🆔 Full Name: ' + $json.FullName +\n    '\\n📌 Status: ' + $json.Status +\n    ($json.Email ? '\\n📧 Email: ' + $json.Email : '') +\n    ($json.JCUserId ? '\\n🆔 JC User ID: ' + $json.JCUserId : '') +\n    ($json.GroupsRemoved && $json.GroupsRemoved.length > 0 ? '\\n🗑️ Groups Removed: ' + $json.GroupsRemoved.join(', ') : '')\n}}",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        -160,
+        336
+      ],
+      "id": "f48d326b-9c05-44f6-bd87-b980a5250845",
+      "name": "Send a message",
+      "webhookId": "619d4034-0d7d-43f0-9691-ea960aef7115",
+      "credentials": {
+        "slackApi": {
+          "id": "ogd5puOuqvP7Ix28",
+          "name": "Disable AD User"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "=powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"C:\\Scripts\\Disable-JCUser-From-n8n.ps1\" -Username \"{{$json.body.username}}\"",
+        "cwd": "="
+      },
+      "id": "19e54b24-7e53-4160-ad02-867e97dd6ee1",
+      "name": "Disable JC User",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        -1648,
+        -160
+      ],
+      "credentials": {
+        "sshPassword": {
+          "id": "79KNHZGwd8w288i9",
+          "name": "SSH Password account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Authorization Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Authorization Check": {
+      "main": [
+        [
+          {
+            "node": "IF Authorized",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Authorized": {
+      "main": [
+        [
+          {
+            "node": "Processing Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Access Denied Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Processing Response": {
+      "main": [
+        [
+          {
+            "node": "Normalize input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize input": {
+      "main": [
+        [
+          {
+            "node": "Disable JC User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "JC Script Output Parser": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send Message",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Disable JC User": {
+      "main": [
+        [
+          {
+            "node": "JC Script Output Parser",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "078d448f-14e7-431a-90dd-07b1ea0f4f2b",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2025-10-31T09:14:00.846Z",
+      "createdAt": "2025-10-31T09:14:00.846Z",
+      "role": "workflow:owner",
+      "workflowId": "KrojGARCPgDgfZk0",
+      "projectId": "pWTWmuHnmIHw48U9"
+    }
+  ],
+  "tags": []
+}
