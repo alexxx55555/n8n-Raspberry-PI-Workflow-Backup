@@ -1,0 +1,764 @@
+{
+  "updatedAt": "2025-11-04T17:54:09.000Z",
+  "createdAt": "2025-09-02T14:14:00.696Z",
+  "id": "dPQb7gi6xfrgsXMi",
+  "name": "LG TV C3 Remote",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "id": "4a5161e8-f592-4d74-82d8-d4efa10b8006",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1,
+      "position": [
+        -3408,
+        272
+      ],
+      "webhookId": "4c9eef65-15e0-4b30-bb62-6a0e7f749c8e",
+      "credentials": {
+        "telegramApi": {
+          "id": "sHFM6iZHUCeCwYKY",
+          "name": "TV Remote"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const text = $json.message?.text ?? \"\";\nconst command = text.replace(/^\\//, \"\").trim();\n\nconst volumeMatch = command.match(/^(volume|vol)\\s+(\\d{1,3})$/i);\nconst upDownMatch = command.match(/^(up|down)\\s+(\\d{1,3})$/i);\n\nif (volumeMatch) {\n  const amount = Math.max(1, Math.min(parseInt(volumeMatch[2], 10), 100));\n  return [{ json: { command: 'volume', amount } }];\n} else if (upDownMatch) {\n  const direction = upDownMatch[1].toLowerCase();\n  const amount = Math.max(1, Math.min(parseInt(upDownMatch[2], 10), 100));\n  return [{ json: { command: direction + '_amount', direction, amount } }];\n} else {\n  return [{ json: { command } }];\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2864,
+        272
+      ],
+      "id": "940652e1-5c78-4822-acec-3f42a364966c",
+      "name": "Parse Command"
+    },
+    {
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{$json[\"command\"]}}",
+        "rules": {
+          "rules": [
+            {
+              "value2": "off",
+              "outputKey": "0"
+            },
+            {
+              "value2": "mute",
+              "outputKey": "1"
+            },
+            {
+              "value2": "unmute",
+              "outputKey": "2"
+            },
+            {
+              "value2": "up",
+              "outputKey": "3"
+            },
+            {
+              "value2": "down",
+              "outputKey": "4"
+            },
+            {
+              "value2": "Netflix",
+              "outputKey": "5"
+            },
+            {
+              "value2": "Free TV",
+              "outputKey": "6"
+            },
+            {
+              "value2": "Disney+",
+              "outputKey": "7"
+            },
+            {
+              "value2": "YouTube",
+              "outputKey": "8"
+            },
+            {
+              "value2": "PS 5",
+              "outputKey": "9"
+            },
+            {
+              "value2": "PC",
+              "outputKey": "10"
+            },
+            {
+              "value2": "volume",
+              "outputKey": "11"
+            },
+            {
+              "value2": "up_amount",
+              "outputKey": "12"
+            },
+            {
+              "value2": "down_amount",
+              "outputKey": "13"
+            },
+            {
+              "value2": "ott",
+              "outputKey": "14"
+            },
+            {
+              "value2": "IBO",
+              "outputKey": "15"
+            },
+            {
+              "value2": "Jellyfin",
+              "outputKey": "16"
+            }
+          ]
+        }
+      },
+      "id": "752ce17e-ae25-4915-a841-cd2a50513e16",
+      "name": "Switch Command",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 2,
+      "position": [
+        -2624,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "https://ha.pi.alex-it.net/api/services/homeassistant/turn_off",
+        "jsonParameters": true,
+        "options": {
+          "fullResponse": true
+        },
+        "bodyParametersJson": "{\"entity_id\": \"media_player.lg_c3\"}",
+        "headerParametersJson": "{\n  \"Authorization\": \"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJkNDQyNjUyYWNjY2U0MjBjYjczMzc0OWZjNGMzMjQyZiIsImlhdCI6MTc2MjI3NzUwOSwiZXhwIjoyMDc3NjM3NTA5fQ.SCAwZaY-8grKMdKKu03JNXSmjhQ-y1gSOds4J61EKuw\",\n  \"Content-Type\": \"application/json\"\n}\n"
+      },
+      "id": "34e4cddf-c973-46b5-bc1a-870a57a27138",
+      "name": "Turn Off LG C3",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        -768,
+        -288
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "https://ha.pi.alex-it.net/api/services/media_player/volume_mute",
+        "jsonParameters": true,
+        "options": {
+          "fullResponse": true
+        },
+        "bodyParametersJson": "{\"entity_id\": \"media_player.lg_c3\",\"is_volume_muted\": true}",
+        "headerParametersJson": "{\n  \"Authorization\": \"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJkNDQyNjUyYWNjY2U0MjBjYjczMzc0OWZjNGMzMjQyZiIsImlhdCI6MTc2MjI3NzUwOSwiZXhwIjoyMDc3NjM3NTA5fQ.SCAwZaY-8grKMdKKu03JNXSmjhQ-y1gSOds4J61EKuw\",\n  \"Content-Type\": \"application/json\"\n}\n"
+      },
+      "id": "87602771-47cd-46bf-95e8-9eac01a13dd4",
+      "name": "Mute C3",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        -768,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "https://ha.pi.alex-it.net/api/services/media_player/volume_mute",
+        "jsonParameters": true,
+        "options": {
+          "fullResponse": true
+        },
+        "bodyParametersJson": "{\"entity_id\": \"media_player.lg_c3\",\"is_volume_muted\": false}",
+        "headerParametersJson": "{\n  \"Authorization\": \"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJkNDQyNjUyYWNjY2U0MjBjYjczMzc0OWZjNGMzMjQyZiIsImlhdCI6MTc2MjI3NzUwOSwiZXhwIjoyMDc3NjM3NTA5fQ.SCAwZaY-8grKMdKKu03JNXSmjhQ-y1gSOds4J61EKuw\",\n  \"Content-Type\": \"application/json\"\n}\n"
+      },
+      "id": "6b2183ba-d45f-47fc-a7a5-7ae58749be42",
+      "name": "Unmute",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        -752,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "https://ha.pi.alex-it.net/api/services/media_player/volume_up",
+        "jsonParameters": true,
+        "options": {
+          "fullResponse": true
+        },
+        "bodyParametersJson": "{\"entity_id\": \"media_player.lg_c3\"}",
+        "headerParametersJson": "{\n  \"Authorization\": \"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJkNDQyNjUyYWNjY2U0MjBjYjczMzc0OWZjNGMzMjQyZiIsImlhdCI6MTc2MjI3NzUwOSwiZXhwIjoyMDc3NjM3NTA5fQ.SCAwZaY-8grKMdKKu03JNXSmjhQ-y1gSOds4J61EKuw\",\n  \"Content-Type\": \"application/json\"\n}\n"
+      },
+      "id": "72e04a4a-729c-4e50-baab-6c64bf562a6f",
+      "name": "Up",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        -752,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "https://ha.pi.alex-it.net/api/services/media_player/volume_down",
+        "jsonParameters": true,
+        "options": {
+          "fullResponse": true
+        },
+        "bodyParametersJson": "{\"entity_id\": \"media_player.lg_c3\"}",
+        "headerParametersJson": "{\n  \"Authorization\": \"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJkNDQyNjUyYWNjY2U0MjBjYjczMzc0OWZjNGMzMjQyZiIsImlhdCI6MTc2MjI3NzUwOSwiZXhwIjoyMDc3NjM3NTA5fQ.SCAwZaY-8grKMdKKu03JNXSmjhQ-y1gSOds4J61EKuw\",\n  \"Content-Type\": \"application/json\"\n}\n"
+      },
+      "id": "75b55d2b-5bfc-4dd8-9055-a263269180af",
+      "name": "Down",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        -752,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "https://ha.pi.alex-it.net/api/services/media_player/select_source",
+        "jsonParameters": true,
+        "options": {
+          "fullResponse": true
+        },
+        "bodyParametersJson": "{\"entity_id\": \"media_player.lg_c3\",\"source\": \"Netflix\"}",
+        "headerParametersJson": "{\n  \"Authorization\": \"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJkNDQyNjUyYWNjY2U0MjBjYjczMzc0OWZjNGMzMjQyZiIsImlhdCI6MTc2MjI3NzUwOSwiZXhwIjoyMDc3NjM3NTA5fQ.SCAwZaY-8grKMdKKu03JNXSmjhQ-y1gSOds4J61EKuw\",\n  \"Content-Type\": \"application/json\"\n}\n"
+      },
+      "id": "b397f395-08a6-4e10-9805-dbbd632f9872",
+      "name": "Netflix",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        -752,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "https://ha.pi.alex-it.net/api/services/media_player/select_source",
+        "jsonParameters": true,
+        "options": {
+          "fullResponse": true
+        },
+        "bodyParametersJson": "{\"entity_id\": \"media_player.lg_c3\",\"source\": \"Free TV\"}",
+        "headerParametersJson": "{\n  \"Authorization\": \"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJkNDQyNjUyYWNjY2U0MjBjYjczMzc0OWZjNGMzMjQyZiIsImlhdCI6MTc2MjI3NzUwOSwiZXhwIjoyMDc3NjM3NTA5fQ.SCAwZaY-8grKMdKKu03JNXSmjhQ-y1gSOds4J61EKuw\",\n  \"Content-Type\": \"application/json\"\n}\n"
+      },
+      "id": "2effefb6-13bc-4d8e-abda-78bbe236c5f9",
+      "name": "Free TV",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        -752,
+        928
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "https://ha.pi.alex-it.net/api/services/media_player/select_source",
+        "jsonParameters": true,
+        "options": {
+          "fullResponse": true
+        },
+        "bodyParametersJson": "{\"entity_id\": \"media_player.lg_c3\",\"source\": \"Disney+\"}",
+        "headerParametersJson": "{\n  \"Authorization\": \"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJkNDQyNjUyYWNjY2U0MjBjYjczMzc0OWZjNGMzMjQyZiIsImlhdCI6MTc2MjI3NzUwOSwiZXhwIjoyMDc3NjM3NTA5fQ.SCAwZaY-8grKMdKKu03JNXSmjhQ-y1gSOds4J61EKuw\",\n  \"Content-Type\": \"application/json\"\n}\n"
+      },
+      "id": "08a5a57b-dfd1-402b-a9a6-e7e92ff95ed5",
+      "name": "Disney+",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        -752,
+        1136
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "https://ha.pi.alex-it.net/api/services/media_player/select_source",
+        "jsonParameters": true,
+        "options": {
+          "fullResponse": true
+        },
+        "bodyParametersJson": "{\"entity_id\": \"media_player.lg_c3\",\"source\": \"YouTube\"}",
+        "headerParametersJson": "{\n  \"Authorization\": \"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJkNDQyNjUyYWNjY2U0MjBjYjczMzc0OWZjNGMzMjQyZiIsImlhdCI6MTc2MjI3NzUwOSwiZXhwIjoyMDc3NjM3NTA5fQ.SCAwZaY-8grKMdKKu03JNXSmjhQ-y1gSOds4J61EKuw\",\n  \"Content-Type\": \"application/json\"\n}\n"
+      },
+      "id": "ef45a7b9-2abc-4a93-ac1b-aa26123025d0",
+      "name": "YouTube",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        -736,
+        1328
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "https://ha.pi.alex-it.net/api/services/webostv/button",
+        "jsonParameters": true,
+        "options": {
+          "fullResponse": true
+        },
+        "bodyParametersJson": "{\"entity_id\": \"media_player.lg_c3\",\"button\": \"ENTER\"}",
+        "headerParametersJson": "{\n  \"Authorization\": \"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJkNDQyNjUyYWNjY2U0MjBjYjczMzc0OWZjNGMzMjQyZiIsImlhdCI6MTc2MjI3NzUwOSwiZXhwIjoyMDc3NjM3NTA5fQ.SCAwZaY-8grKMdKKu03JNXSmjhQ-y1gSOds4J61EKuw\",\n  \"Content-Type\": \"application/json\"\n}\n"
+      },
+      "id": "6113625d-8ace-4fc8-ac4f-a0f59397428f",
+      "name": "Enter Button",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        1328
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "https://ha.pi.alex-it.net/api/services/media_player/select_source",
+        "jsonParameters": true,
+        "options": {
+          "fullResponse": true
+        },
+        "bodyParametersJson": "{\"entity_id\": \"media_player.lg_c3\",\"source\": \"PS 5\"}",
+        "headerParametersJson": "{\n  \"Authorization\": \"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJkNDQyNjUyYWNjY2U0MjBjYjczMzc0OWZjNGMzMjQyZiIsImlhdCI6MTc2MjI3NzUwOSwiZXhwIjoyMDc3NjM3NTA5fQ.SCAwZaY-8grKMdKKu03JNXSmjhQ-y1gSOds4J61EKuw\",\n  \"Content-Type\": \"application/json\"\n}\n"
+      },
+      "id": "c44d32b7-889a-4f5a-81a0-f3911d6d6468",
+      "name": "PS 5",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        -736,
+        1536
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "https://ha.pi.alex-it.net/api/services/media_player/select_source",
+        "jsonParameters": true,
+        "options": {
+          "fullResponse": true
+        },
+        "bodyParametersJson": "{\"entity_id\": \"media_player.lg_c3\",\"source\": \"PC\"}",
+        "headerParametersJson": "{\n  \"Authorization\": \"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJkNDQyNjUyYWNjY2U0MjBjYjczMzc0OWZjNGMzMjQyZiIsImlhdCI6MTc2MjI3NzUwOSwiZXhwIjoyMDc3NjM3NTA5fQ.SCAwZaY-8grKMdKKu03JNXSmjhQ-y1gSOds4J61EKuw\",\n  \"Content-Type\": \"application/json\"\n}\n"
+      },
+      "id": "f52ff825-fc47-4079-9bfc-5dc41ea4db37",
+      "name": "PC",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        -736,
+        1760
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "https://ha.pi.alex-it.net/api/services/media_player/volume_set",
+        "jsonParameters": true,
+        "options": {
+          "fullResponse": true
+        },
+        "bodyParametersJson": "={\n  \"entity_id\": \"media_player.lg_c3\",\n  \"volume_level\": {{$json.amount / 100}}\n}",
+        "headerParametersJson": "{\n  \"Authorization\": \"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJkNDQyNjUyYWNjY2U0MjBjYjczMzc0OWZjNGMzMjQyZiIsImlhdCI6MTc2MjI3NzUwOSwiZXhwIjoyMDc3NjM3NTA5fQ.SCAwZaY-8grKMdKKu03JNXSmjhQ-y1gSOds4J61EKuw\",\n  \"Content-Type\": \"application/json\"\n}\n"
+      },
+      "id": "5885a9bc-dc69-4989-a0ab-800ab3253616",
+      "name": "Set Volume",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        -736,
+        1968
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const n = $json.amount ?? 0;\nconst out = [];\nfor (let i = 0; i < n; i++) out.push({ json: { step: i + 1 } });\nreturn out;"
+      },
+      "id": "d96ce28f-8bc2-4aea-8b8f-b45f6e4cfbf3",
+      "name": "Repeat Up",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1056,
+        2160
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "c4bdb74c-f9bd-4393-af8b-565b87ee8b6d",
+      "name": "Wait Up",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [
+        -896,
+        2160
+      ],
+      "webhookId": "wait-up-id"
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "https://ha.pi.alex-it.net/api/services/media_player/volume_up",
+        "jsonParameters": true,
+        "options": {
+          "fullResponse": true
+        },
+        "bodyParametersJson": "{\"entity_id\": \"media_player.lg_c3\"}",
+        "headerParametersJson": "{\n  \"Authorization\": \"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJkNDQyNjUyYWNjY2U0MjBjYjczMzc0OWZjNGMzMjQyZiIsImlhdCI6MTc2MjI3NzUwOSwiZXhwIjoyMDc3NjM3NTA5fQ.SCAwZaY-8grKMdKKu03JNXSmjhQ-y1gSOds4J61EKuw\",\n  \"Content-Type\": \"application/json\"\n}\n"
+      },
+      "id": "fe5ce5ef-9ba3-4494-9d10-c226fd77b6be",
+      "name": "Volume Up Repeat",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        -736,
+        2160
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const n = $json.amount ?? 0;\nconst out = [];\nfor (let i = 0; i < n; i++) out.push({ json: { step: i + 1 } });\nreturn out;"
+      },
+      "id": "18d37187-d531-4564-b4c7-e498c385bcd5",
+      "name": "Repeat Down",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1056,
+        2368
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "c3bb663a-8544-4a4e-a565-dfb350732788",
+      "name": "Wait Down",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [
+        -896,
+        2368
+      ],
+      "webhookId": "wait-down-id"
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "https://ha.pi.alex-it.net/api/services/media_player/volume_down",
+        "jsonParameters": true,
+        "options": {
+          "fullResponse": true
+        },
+        "bodyParametersJson": "{\"entity_id\": \"media_player.lg_c3\"}",
+        "headerParametersJson": "{\n  \"Authorization\": \"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJkNDQyNjUyYWNjY2U0MjBjYjczMzc0OWZjNGMzMjQyZiIsImlhdCI6MTc2MjI3NzUwOSwiZXhwIjoyMDc3NjM3NTA5fQ.SCAwZaY-8grKMdKKu03JNXSmjhQ-y1gSOds4J61EKuw\",\n  \"Content-Type\": \"application/json\"\n}\n"
+      },
+      "id": "03f5a363-3697-4924-9d86-187493856b1e",
+      "name": "Volume Down Repeat",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        -736,
+        2368
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "https://ha.pi.alex-it.net/api/services/media_player/select_source",
+        "jsonParameters": true,
+        "options": {
+          "fullResponse": true
+        },
+        "bodyParametersJson": "{\"entity_id\": \"media_player.lg_c3\",\"source\": \"OttPlayer\"}",
+        "headerParametersJson": "{\n  \"Authorization\": \"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJkNDQyNjUyYWNjY2U0MjBjYjczMzc0OWZjNGMzMjQyZiIsImlhdCI6MTc2MjI3NzUwOSwiZXhwIjoyMDc3NjM3NTA5fQ.SCAwZaY-8grKMdKKu03JNXSmjhQ-y1gSOds4J61EKuw\",\n  \"Content-Type\": \"application/json\"\n}\n"
+      },
+      "id": "ea17fd44-82ad-4e90-baa0-edfac61881e6",
+      "name": "Ott",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        -752,
+        2592
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "https://ha.pi.alex-it.net/api/services/media_player/select_source",
+        "jsonParameters": true,
+        "options": {
+          "fullResponse": true
+        },
+        "bodyParametersJson": "{\"entity_id\": \"media_player.lg_c3\",\"source\": \"ibPlayer Pro\"}",
+        "headerParametersJson": "{\n  \"Authorization\": \"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJkNDQyNjUyYWNjY2U0MjBjYjczMzc0OWZjNGMzMjQyZiIsImlhdCI6MTc2MjI3NzUwOSwiZXhwIjoyMDc3NjM3NTA5fQ.SCAwZaY-8grKMdKKu03JNXSmjhQ-y1gSOds4J61EKuw\",\n  \"Content-Type\": \"application/json\"\n}\n"
+      },
+      "id": "1fc686df-6c13-4fd5-9b9a-86e37c944c54",
+      "name": "IBO",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        -752,
+        2800
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "https://ha.pi.alex-it.net/api/services/media_player/select_source",
+        "jsonParameters": true,
+        "options": {
+          "fullResponse": true
+        },
+        "bodyParametersJson": "{\"entity_id\": \"media_player.lg_c3\",\"source\": \"Jellyfin\"}",
+        "headerParametersJson": "{\n  \"Authorization\": \"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJkNDQyNjUyYWNjY2U0MjBjYjczMzc0OWZjNGMzMjQyZiIsImlhdCI6MTc2MjI3NzUwOSwiZXhwIjoyMDc3NjM3NTA5fQ.SCAwZaY-8grKMdKKu03JNXSmjhQ-y1gSOds4J61EKuw\",\n  \"Content-Type\": \"application/json\"\n}\n"
+      },
+      "id": "38496a62-f62f-4a0a-b9ba-2da6e868eba8",
+      "name": "Jellyfin",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        -768,
+        3024
+      ]
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Parse Command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Command": {
+      "main": [
+        [
+          {
+            "node": "Switch Command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch Command": {
+      "main": [
+        [
+          {
+            "node": "Turn Off LG C3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mute C3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unmute",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Up",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Down",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Netflix",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Free TV",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Disney+",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "YouTube",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "PS 5",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "PC",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set Volume",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Repeat Up",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Repeat Down",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ott",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "IBO",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Jellyfin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "YouTube": {
+      "main": [
+        [
+          {
+            "node": "Enter Button",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Repeat Up": {
+      "main": [
+        [
+          {
+            "node": "Wait Up",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Up": {
+      "main": [
+        [
+          {
+            "node": "Volume Up Repeat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Repeat Down": {
+      "main": [
+        [
+          {
+            "node": "Wait Down",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Down": {
+      "main": [
+        [
+          {
+            "node": "Volume Down Repeat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "7bbc142c-cfde-4e6e-95f3-0d94d3f3d948",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2025-10-31T09:14:00.812Z",
+      "createdAt": "2025-10-31T09:14:00.812Z",
+      "role": "workflow:owner",
+      "workflowId": "dPQb7gi6xfrgsXMi",
+      "projectId": "pWTWmuHnmIHw48U9"
+    }
+  ],
+  "tags": []
+}
