@@ -1,0 +1,691 @@
+{
+  "updatedAt": "2025-10-31T09:20:27.000Z",
+  "createdAt": "2025-09-25T17:15:01.091Z",
+  "id": "HqSNUkMsk5Zj1gYp",
+  "name": "Disable AD/JC User",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "f54ab6de-2566-4063-b57a-aa7fd93f51fb",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -2608,
+        192
+      ],
+      "id": "f3fa1084-1518-44ad-bf54-cc276ee56a50",
+      "name": "Webhook",
+      "webhookId": "f54ab6de-2566-4063-b57a-aa7fd93f51fb"
+    },
+    {
+      "parameters": {
+        "jsCode": "const ALLOWED_CHANNEL_IDS = new Set(['C09GN391SQ6']);\nconst payload = $json.body ?? $json;\nconst channelId = payload.channel_id || payload.channel?.id || null;\nlet authorized = false;\nlet errorMessage = '';\nif (channelId && ALLOWED_CHANNEL_IDS.has(channelId)) {\n  authorized = true;\n} else {\n  errorMessage = '🚫 This command can only be used in #disable-ad-user';\n}\nreturn { ...$json, authorized, errorMessage };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2400,
+        192
+      ],
+      "id": "2a9f6926-836d-40a6-8347-4c8fe6dc440e",
+      "name": "Authorization Check"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{$json.authorized}}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -2208,
+        192
+      ],
+      "id": "fa6a0211-bfbe-41e8-9dd1-4658fc16077f",
+      "name": "IF Authorized"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{$json.errorMessage}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        -2000,
+        400
+      ],
+      "id": "2555079c-9461-4bf2-a162-c7ee6c1ce234",
+      "name": "Access Denied Response"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "🔄 Disabling user... please wait",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        -2000,
+        176
+      ],
+      "id": "73fc258c-e626-4b6d-ac57-4d8f7af9d3dd",
+      "name": "Processing Response"
+    },
+    {
+      "parameters": {
+        "jsCode": "const payload = $json.body ?? $json;\nconst text = (payload.text ?? '').trim();\nconst parts = text.split(/\\s+/);\n\nif (parts.length < 2) {\n  throw new Error('Invalid format. Use: /disable-user AD username OR /disable-user JC username');\n}\n\nconst system = parts[0].toUpperCase();\nconst username = parts[1].replace(/^@/, '');\n\nif (!['AD', 'JC'].includes(system)) {\n  throw new Error('Invalid system. Use AD or JC');\n}\n\nif (!username) {\n  throw new Error('No username provided.');\n}\n\nreturn { \n  body: { \n    username: username,\n    system: system\n  } \n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1808,
+        176
+      ],
+      "id": "724525d6-08af-4a08-858e-1f05eb8e9563",
+      "name": "Normalize Username Input"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.body.system}}",
+                    "rightValue": "AD",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "AD Only"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.body.system}}",
+                    "rightValue": "JC",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "JC Only"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -1600,
+        176
+      ],
+      "id": "a277f086-00b5-4d19-8b7c-25308e4c70f0",
+      "name": "System Switch"
+    },
+    {
+      "parameters": {
+        "command": "=powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"C:\\Scripts\\Disable-ADUser-From-n8n.ps1\" -Username \"{{$json[\"body\"][\"username\"]}}\"",
+        "cwd": "="
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        -1408,
+        96
+      ],
+      "id": "862f3d3c-2e11-4d59-8f60-1c1177d64f70",
+      "name": "Disable AD User",
+      "credentials": {
+        "sshPassword": {
+          "id": "umWU43lA8b3R4GcA",
+          "name": "SSH Password account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "=powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"C:\\\\Scripts\\\\Disable-JCUser-From-n8n.ps1\" -Username \"{{$json[\"body\"][\"username\"]}}\"\n",
+        "cwd": "="
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        -1408,
+        304
+      ],
+      "id": "64675802-928c-4c86-ba1d-fc7a25b11ba2",
+      "name": "Disable JC User",
+      "credentials": {
+        "sshPassword": {
+          "id": "umWU43lA8b3R4GcA",
+          "name": "SSH Password account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Debug: Log what we received\nconsole.log('Raw JSON:', JSON.stringify($json, null, 2));\n\nif (!$json.stdout) {\n  const errorMsg = $json.stderr || 'No stdout received from PowerShell';\n  throw new Error('PowerShell Error: ' + errorMsg);\n}\n\nconst stdout = $json.stdout.trim();\nif (stdout === '') {\n  throw new Error('PowerShell returned empty output. Stderr: ' + ($json.stderr || 'none'));\n}\n\ntry {\n  const result = JSON.parse(stdout);\n  return { ...result, System: 'AD' };\n} catch (e) {\n  throw new Error('Failed to parse JSON. Output was: ' + stdout + '. Error: ' + e.message);\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1200,
+        96
+      ],
+      "id": "a9b0e022-3201-4b74-ab52-6babb658e7d5",
+      "name": "Parse AD Output"
+    },
+    {
+      "parameters": {
+        "jsCode": "console.log('JC Output:', JSON.stringify($json, null, 2));\n\nif (!$json.stdout || $json.stdout.trim() === '') {\n  const stderr = $json.stderr || 'none';\n  throw new Error('JC PowerShell returned empty stdout. Stderr: ' + stderr + '. Check if script outputs JSON with Write-Output.');\n}\n\nconst stdout = $json.stdout.trim();\n\ntry {\n  const result = JSON.parse(stdout);\n  return { ...result, System: 'JC' };\n} catch (e) {\n  throw new Error('Failed to parse JC JSON. Output was: ' + stdout + '. Error: ' + e.message);\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1200,
+        304
+      ],
+      "id": "b78adb2e-aded-40a2-b87d-c4f323d1bf35",
+      "name": "Parse JC Output"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $json;\nconst isAD = data.System === 'AD';\nconst isJC = data.System === 'JC';\n\nif (isAD) {\n  return {\n    Username: data.Username,\n    FullName: data.FullName || '',\n    System: 'Active Directory',\n    Status: data.Status,\n    Message: data.Message,\n    GroupsRemoved: data.GroupsRemoved || [],\n    MovedToOU: data.MovedToOU || '',\n    Email: '',\n    JCUserId: ''\n  };\n} else {\n  return {\n    Username: data.Username,\n    FullName: data.FullName || '',\n    System: 'JumpCloud',\n    Status: data.Status,\n    Message: data.Message,\n    GroupsRemoved: data.GroupsRemoved || [],\n    MovedToOU: '',\n    Email: data.Email || '',\n    JCUserId: data.JCUserId || ''\n  };\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1008,
+        192
+      ],
+      "id": "c1dba5de-d42b-4adc-a9fe-3f16ce72aba1",
+      "name": "Format Results"
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C09GN391SQ6",
+          "mode": "list",
+          "cachedResultName": "disable-ad-user"
+        },
+        "text": "={{$json[\"Status\"] === \"Not Found\" || $json[\"Status\"] === \"Error\" ? $json[\"Message\"] + \"\\n\\n👤 Username: \" + $json[\"Username\"] : \"🔒 AD User \" + ($json[\"Status\"] === \"Already Disabled\" ? \"Already Disabled\" : \"Disabled\") + \"\\n\\n👤 Username: \" + $json[\"Username\"] + \"\\n🆔 Full Name: \" + $json[\"FullName\"] + \"\\n📌 Status: \" + $json[\"Status\"] + ($json[\"GroupsRemoved\"].length > 0 ? \"\\n🗑️ Groups Removed: \" + $json[\"GroupsRemoved\"].join(', ') : \"\") + ($json[\"MovedToOU\"] ? \"\\n📂 Moved To: \" + $json[\"MovedToOU\"] : \"\")}}",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        -784,
+        -48
+      ],
+      "id": "36f76554-61c7-4e44-b033-4b7bc1b83bda",
+      "name": "Slack Notification",
+      "webhookId": "b69b5c30-f83a-4104-989d-6848a3d642bf",
+      "credentials": {
+        "slackApi": {
+          "id": "ogd5puOuqvP7Ix28",
+          "name": "Disable AD User"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "426570413",
+        "text": "={{$json.Status === 'Not Found' || $json.Status === 'Error'\n  ? '❌ ' + ($json.Message || '').replace('?? ', '').replace('? ', '') +\n    '\\n\\n👤 Username: ' + $json.Username +\n    '\\n🖥️ System: ' + $json.System\n  : '🔒 User Disabled in ' + $json.System +\n    '\\n\\n👤 Username: ' + $json.Username +\n    '\\n🆔 Full Name: ' + $json.FullName +\n    '\\n📌 Status: ' + $json.Status +\n    ($json.Message ? '\\n💬 ' + ($json.Message || '').replace('?? ', '').replace('? ', '') : '') +\n    ($json.GroupsRemoved && $json.GroupsRemoved.length > 0\n      ? '\\n🗑️ Groups Removed: ' + $json.GroupsRemoved.join(', ')\n      : ''\n    ) +\n    ($json.MovedToOU ? '\\n📂 Moved To: ' + $json.MovedToOU : '') +\n    ($json.Email ? '\\n📧 Email: ' + $json.Email : '')\n}}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -768,
+        160
+      ],
+      "id": "f230af82-2691-4f20-a726-1ff6994d5b79",
+      "name": "Telegram Notification",
+      "webhookId": "35a23d1a-c4f9-44e8-ac09-d3c18168f91a",
+      "credentials": {
+        "telegramApi": {
+          "id": "x7W5pZqq5q5bGRzU",
+          "name": "Disable AD User"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "vinokura@alex-it.net",
+        "subject": "=User Disabled - {{$json.System}}",
+        "message": "={{\n  $json.Status === 'Not Found' || $json.Status === 'Error'\n    ? (\n        '<h3 style=\"color:#d32f2f;\">' + ($json.Message || '').replace('?? ', '') + '</h3>' +\n        '<p style=\"color:black; font-size:0.95em;\"><b>👤 Username:</b> ' + $json.Username + '</p>' +\n        '<p style=\"color:black; font-size:0.95em;\"><b>🖥️ System:</b> ' + $json.System + '</p>'\n      )\n    : (\n        '<h2 style=\"color:red;\">🔒 User Disabled in ' + $json.System + '</h2>' +\n        '<p style=\"color:black; font-size:0.95em;\"><b>👤 Username:</b> ' + $json.Username + '</p>' +\n        '<p style=\"color:black; font-size:0.95em;\"><b>🆔 Full Name:</b> ' + $json.FullName + '</p>' +\n        '<p style=\"color:black; font-size:0.95em;\"><b>📌 Status:</b> ' + $json.Status + '</p>' +\n        ($json.Message\n          ? '<p style=\"color:black; font-size:0.95em;\"><b>💬 Message:</b> ' + ($json.Message || '').replace('?? ', '') + '</p>'\n          : ''\n        ) +\n        ($json.GroupsRemoved && $json.GroupsRemoved.length > 0\n          ? '<p style=\"color:black; font-size:0.95em;\"><b>🗑️ Groups Removed:</b> ' + $json.GroupsRemoved.join(', ') + '</p>'\n          : ''\n        ) +\n        ($json.MovedToOU\n          ? '<p style=\"color:black; font-size:0.95em;\"><b>📂 Moved To:</b> ' + $json.MovedToOU + '</p>'\n          : ''\n        ) +\n        ($json.Email\n          ? '<p style=\"color:black; font-size:0.95em;\"><b>📧 Email:</b> ' + $json.Email + '</p>'\n          : ''\n        )\n      )\n}}\n<hr><p style=\"font-size:0.85em; color:gray;\">Automated by n8n workflow</p>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -768,
+        352
+      ],
+      "id": "b4fd2872-5cbc-4585-b4db-86ed91e38957",
+      "name": "Gmail Notification",
+      "webhookId": "4ca3e521-09a9-40ab-bf6b-80bbf1573e8a",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "C5742Grqr9Rpnxid",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1nh_eXCRjrbruYZWqF8_8LvW3TQ_d7EsN3bCQF_6Wfpg",
+          "mode": "list",
+          "cachedResultName": "New AD User Created"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{new Date().toLocaleString('en-GB', { hour12: false, timeZone: 'Asia/Jerusalem' })}}",
+            "Username": "={{$json.Username}}",
+            "Email": "={{$json.Email}}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "First Name",
+              "displayName": "First Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Last Name",
+              "displayName": "Last Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Employee Number",
+              "displayName": "Employee Number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Job Title",
+              "displayName": "Job Title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Department",
+              "displayName": "Department",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Manager",
+              "displayName": "Manager",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Office Location",
+              "displayName": "Office Location",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Office Phone",
+              "displayName": "Office Phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Username",
+              "displayName": "Username",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "DL Groups Copied",
+              "displayName": "DL Groups Copied",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Security Groups Copied",
+              "displayName": "Security Groups Copied",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Password",
+              "displayName": "Password",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Conflict Message",
+              "displayName": "Conflict Message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.6,
+      "position": [
+        -768,
+        544
+      ],
+      "id": "8897e8a2-f5b6-4980-b97c-57bca0f2a97c",
+      "name": "Append to Google Sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "MCeFqIGjffYKd95d",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Authorization Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Authorization Check": {
+      "main": [
+        [
+          {
+            "node": "IF Authorized",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Authorized": {
+      "main": [
+        [
+          {
+            "node": "Processing Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Access Denied Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Processing Response": {
+      "main": [
+        [
+          {
+            "node": "Normalize Username Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Username Input": {
+      "main": [
+        [
+          {
+            "node": "System Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "System Switch": {
+      "main": [
+        [
+          {
+            "node": "Disable AD User",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Disable JC User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Disable AD User": {
+      "main": [
+        [
+          {
+            "node": "Parse AD Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Disable JC User": {
+      "main": [
+        [
+          {
+            "node": "Parse JC Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AD Output": {
+      "main": [
+        [
+          {
+            "node": "Format Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse JC Output": {
+      "main": [
+        [
+          {
+            "node": "Format Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Results": {
+      "main": [
+        [
+          {
+            "node": "Slack Notification",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Telegram Notification",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Gmail Notification",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Append to Google Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "f7263349-0fd2-4101-baca-497684183421",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2025-10-31T09:14:00.842Z",
+      "createdAt": "2025-10-31T09:14:00.842Z",
+      "role": "workflow:owner",
+      "workflowId": "HqSNUkMsk5Zj1gYp",
+      "projectId": "pWTWmuHnmIHw48U9"
+    }
+  ],
+  "tags": []
+}
