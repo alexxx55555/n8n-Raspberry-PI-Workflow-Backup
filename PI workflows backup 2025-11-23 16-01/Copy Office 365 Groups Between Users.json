@@ -1,0 +1,948 @@
+{
+  "updatedAt": "2025-11-15T10:22:27.000Z",
+  "createdAt": "2025-10-11T11:14:55.362Z",
+  "id": "VWpToRskEii3yQbk",
+  "name": "Copy Office 365 Groups Between Users",
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "hibob-onboarding",
+        "options": {}
+      },
+      "name": "Webhook - HiBob Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -896,
+        -144
+      ],
+      "webhookId": "auto-generate",
+      "id": "a00e4999-8f5b-45ce-b6ee-9d6faeffd66e",
+      "notes": "Receives webhook from HiBob when new employee is created"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract and format employee data from HiBob payload\nconst employee = $input.item.json;\n\n// Handle both direct webhook and nested data structures\nconst employeeData = employee.employee || employee;\n\n// Generate username from email or first/last name\nconst email = employeeData.email || `${employeeData.firstName}.${employeeData.lastName}@yourdomain.com`.toLowerCase();\nconst username = email.split('@')[0];\n\n// Generate temporary password (should be changed on first login)\nconst generatePassword = () => {\n  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%';\n  let password = '';\n  for (let i = 0; i < 16; i++) {\n    password += chars.charAt(Math.floor(Math.random() * chars.length));\n  }\n  return password + '!Aa1'; // Ensure complexity requirements\n};\n\nconst tempPassword = generatePassword();\n\nreturn {\n  json: {\n    // Basic Info\n    firstName: employeeData.firstName || '',\n    lastName: employeeData.lastName || '',\n    displayName: `${employeeData.firstName} ${employeeData.lastName}`,\n    email: email,\n    username: username,\n    userPrincipalName: email,\n    \n    // Job Info\n    department: employeeData.department || '',\n    jobTitle: employeeData.title || employeeData.jobTitle || '',\n    employeeId: employeeData.id || employeeData.employeeId || '',\n    \n    // Manager\n    managerEmail: employeeData.reportsTo?.email || employeeData.manager?.email || '',\n    \n    // Contact\n    mobilePhone: employeeData.mobile?.phone || employeeData.mobilePhone || '',\n    businessPhone: employeeData.work?.phone || employeeData.workPhone || '',\n    personalEmail: employeeData.personalEmail || '',\n    \n    // Location & Dates\n    officeLocation: employeeData.site || employeeData.location || '',\n    startDate: employeeData.startDate || '',\n    \n    // Credentials\n    temporaryPassword: tempPassword,\n    \n    // Additional\n    employmentType: employeeData.type || 'Full-time',\n    companyName: employeeData.company || 'Your Company'\n  }\n};"
+      },
+      "name": "Extract Employee Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -704,
+        -144
+      ],
+      "id": "64b45bd2-3b88-4f93-925d-7f00a72e7cc1",
+      "notes": "Parse HiBob webhook payload and format data for Microsoft Graph API"
+    },
+    {
+      "parameters": {
+        "amount": 5,
+        "unit": "seconds"
+      },
+      "name": "Wait for User Sync",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [
+        -288,
+        -144
+      ],
+      "webhookId": "auto-generate",
+      "id": "64977f20-143f-42e6-9d9a-161462c68d0c",
+      "notes": "Wait for user to propagate through Microsoft systems"
+    },
+    {
+      "parameters": {
+        "url": "=https://graph.microsoft.com/v1.0/users/{{$node[\"Extract Employee Data\"].json.managerEmail}}",
+        "authentication": "oAuth2",
+        "options": {}
+      },
+      "name": "Get Manager ID",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -96,
+        -240
+      ],
+      "id": "11b3903c-675e-4760-9d24-19f2832bd315",
+      "continueOnFail": true,
+      "notes": "Lookup manager's Azure AD ID from email address"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json.id}}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "name": "Manager Exists?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        112,
+        -240
+      ],
+      "id": "85396b01-ca48-4cfa-bee3-f7a36ccb046e",
+      "notes": "Check if manager was found in Entra ID"
+    },
+    {
+      "parameters": {
+        "url": "=https://graph.microsoft.com/v1.0/users/{{$node[\"Create Entra ID User\"].json.id}}/manager/$ref",
+        "authentication": "oAuth2",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "@odata.id",
+              "value": "=https://graph.microsoft.com/v1.0/users/{{$node[\"Get Manager ID\"].json.id}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Assign Manager",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        336,
+        -256
+      ],
+      "id": "cbe420ed-c324-4ab9-9c45-457ab4d5b45d",
+      "notes": "Set the user's manager in Entra ID"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Determine license assignment based on department/job title\nconst department = $node[\"Extract Employee Data\"].json.department;\nconst jobTitle = $node[\"Extract Employee Data\"].json.jobTitle;\nconst userId = $node[\"Create Entra ID User\"].json.id;\n\n// Define your license SKU IDs - replace with your actual SKU IDs\n// Common ones:\n// Microsoft 365 E3: \"05e9a617-0261-4cee-bb44-138d3ef5d965\"\n// Microsoft 365 E5: \"06ebc4ee-1bb5-47dd-8120-11324bc54e06\"\n// Microsoft 365 Business Premium: \"cbdc14ab-d96c-4c30-b9f4-6ada7cdc1d46\"\n\nconst licenses = [];\n\n// Example logic - customize based on your needs\nif (department === 'IT' || department === 'Engineering') {\n  licenses.push({\n    skuId: '06ebc4ee-1bb5-47dd-8120-11324bc54e06', // E5\n    disabledPlans: []\n  });\n} else if (department === 'Sales' || department === 'Marketing') {\n  licenses.push({\n    skuId: '05e9a617-0261-4cee-bb44-138d3ef5d965', // E3\n    disabledPlans: []\n  });\n} else {\n  // Default to Business Premium\n  licenses.push({\n    skuId: 'cbdc14ab-d96c-4c30-b9f4-6ada7cdc1d46',\n    disabledPlans: []\n  });\n}\n\nreturn {\n  json: {\n    userId: userId,\n    licenses: licenses\n  }\n};"
+      },
+      "name": "Determine Licenses",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -96,
+        -32
+      ],
+      "id": "5bfbf29f-bc75-4243-a8de-92de9d1e727e",
+      "notes": "Logic to assign appropriate Microsoft 365 license based on department/role"
+    },
+    {
+      "parameters": {
+        "url": "=https://graph.microsoft.com/v1.0/users/{{$json.userId}}/assignLicense",
+        "authentication": "oAuth2",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "addLicenses",
+              "value": "={{$json.licenses}}"
+            },
+            {
+              "name": "removeLicenses",
+              "value": "=[]"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Assign M365 License",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        112,
+        -32
+      ],
+      "id": "46b1fbe6-8d97-4f19-9b75-b3d5502909fa",
+      "notes": "Assign Microsoft 365 license to the user"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Determine which Teams to add user to based on department\nconst department = $node[\"Extract Employee Data\"].json.department;\nconst employeeData = $node[\"Extract Employee Data\"].json;\nconst userId = $node[\"Create Entra ID User\"].json.id;\n\n// Map departments to Team IDs - replace with your actual Team IDs\nconst teamMapping = {\n  'IT': ['team-id-it-department'],\n  'Sales': ['team-id-sales-department'],\n  'Marketing': ['team-id-marketing-department'],\n  'Engineering': ['team-id-engineering-department'],\n  'HR': ['team-id-hr-department'],\n  'Finance': ['team-id-finance-department']\n};\n\n// Everyone joins the company-wide team\nconst teams = ['team-id-company-wide'];\n\n// Add department-specific team\nif (teamMapping[department]) {\n  teams.push(...teamMapping[department]);\n}\n\nreturn teams.map(teamId => ({\n  json: {\n    teamId: teamId,\n    userId: userId,\n    userEmail: employeeData.email,\n    userName: employeeData.displayName\n  }\n}));"
+      },
+      "name": "Map User to Teams",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        304,
+        -32
+      ],
+      "id": "33d708d1-f081-4bae-a3d7-2acca8ea59ba",
+      "notes": "Determine which Microsoft Teams the user should be added to"
+    },
+    {
+      "parameters": {
+        "url": "=https://graph.microsoft.com/v1.0/teams/{{$json.teamId}}/members",
+        "authentication": "oAuth2",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "@odata.type",
+              "value": "=#microsoft.graph.aadUserConversationMember"
+            },
+            {
+              "name": "roles",
+              "value": "=[\"member\"]"
+            },
+            {
+              "name": "user@odata.bind",
+              "value": "=https://graph.microsoft.com/v1.0/users('{{$json.userId}}')"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Add to Teams",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        512,
+        -32
+      ],
+      "id": "743324e4-608e-4baa-9445-1c4d5363552a",
+      "continueOnFail": true,
+      "notes": "Add user as member to Microsoft Teams"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Determine security groups based on department and role\nconst department = $node[\"Extract Employee Data\"].json.department;\nconst jobTitle = $node[\"Extract Employee Data\"].json.jobTitle.toLowerCase();\nconst userId = $node[\"Create Entra ID User\"].json.id;\n\n// Map to your actual Entra ID Group IDs\nconst groupMapping = {\n  'IT': ['group-id-it-staff', 'group-id-vpn-users'],\n  'Sales': ['group-id-sales-team', 'group-id-crm-users'],\n  'Marketing': ['group-id-marketing-team'],\n  'Engineering': ['group-id-engineering-team', 'group-id-developers'],\n  'HR': ['group-id-hr-team'],\n  'Finance': ['group-id-finance-team']\n};\n\n// Base groups for all users\nconst groups = ['group-id-all-employees'];\n\n// Add department groups\nif (groupMapping[department]) {\n  groups.push(...groupMapping[department]);\n}\n\n// Add role-based groups\nif (jobTitle.includes('manager') || jobTitle.includes('director')) {\n  groups.push('group-id-managers');\n}\n\nif (jobTitle.includes('admin')) {\n  groups.push('group-id-administrators');\n}\n\nreturn groups.map(groupId => ({\n  json: {\n    groupId: groupId,\n    userId: userId\n  }\n}));"
+      },
+      "name": "Map User to Security Groups",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -96,
+        160
+      ],
+      "id": "b179f1a1-18f7-40ea-b062-6a700907437b",
+      "notes": "Determine which Entra ID security groups user should be added to"
+    },
+    {
+      "parameters": {
+        "url": "=https://graph.microsoft.com/v1.0/groups/{{$json.groupId}}/members/$ref",
+        "authentication": "oAuth2",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "@odata.id",
+              "value": "=https://graph.microsoft.com/v1.0/directoryObjects/{{$json.userId}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Add to Security Groups",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        112,
+        160
+      ],
+      "id": "bef97d9b-6ab7-496b-9dd1-012ccf5acea1",
+      "continueOnFail": true,
+      "notes": "Add user to Entra ID security groups"
+    },
+    {
+      "parameters": {
+        "subject": "=Welcome to {{$node[\"Extract Employee Data\"].json.companyName}}! 🎉",
+        "bodyContent": "=<!DOCTYPE html>\n<html>\n<head>\n  <style>\n    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }\n    .container { max-width: 600px; margin: 0 auto; padding: 20px; }\n    .header { background-color: #0078d4; color: white; padding: 20px; text-align: center; }\n    .content { padding: 20px; background-color: #f9f9f9; }\n    .credentials { background-color: #fff; padding: 15px; margin: 20px 0; border-left: 4px solid #0078d4; }\n    .footer { padding: 20px; text-align: center; font-size: 12px; color: #666; }\n    .important { color: #d83b01; font-weight: bold; }\n  </style>\n</head>\n<body>\n  <div class=\"container\">\n    <div class=\"header\">\n      <h1>Welcome Aboard! 🎉</h1>\n    </div>\n    \n    <div class=\"content\">\n      <p>Hello {{$node[\"Extract Employee Data\"].json.firstName}},</p>\n      \n      <p>We're excited to have you join our team as <strong>{{$node[\"Extract Employee Data\"].json.jobTitle}}</strong> in the {{$node[\"Extract Employee Data\"].json.department}} department!</p>\n      \n      <p>Your Microsoft 365 account has been created and is ready to use. Below are your login credentials:</p>\n      \n      <div class=\"credentials\">\n        <h3>Your Account Details</h3>\n        <p><strong>Email:</strong> {{$node[\"Extract Employee Data\"].json.email}}</p>\n        <p><strong>Temporary Password:</strong> {{$node[\"Extract Employee Data\"].json.temporaryPassword}}</p>\n        <p class=\"important\">⚠️ You will be required to change this password on your first login.</p>\n      </div>\n      \n      <h3>Getting Started</h3>\n      <ol>\n        <li>Go to <a href=\"https://office.com\">office.com</a></li>\n        <li>Click \"Sign In\" and enter your email address</li>\n        <li>Enter the temporary password above</li>\n        <li>Follow the prompts to set your new password</li>\n        <li>Set up multi-factor authentication (MFA) when prompted</li>\n      </ol>\n      \n      <h3>Your Start Date</h3>\n      <p>Your official start date is: <strong>{{$node[\"Extract Employee Data\"].json.startDate}}</strong></p>\n      \n      <h3>Access to Tools</h3>\n      <p>You now have access to:</p>\n      <ul>\n        <li>📧 Outlook Email</li>\n        <li>💬 Microsoft Teams</li>\n        <li>📄 OneDrive & SharePoint</li>\n        <li>📊 Office Apps (Word, Excel, PowerPoint, etc.)</li>\n      </ul>\n      \n      <p>If you have any questions or need assistance, please don't hesitate to reach out to IT support or your manager.</p>\n      \n      <p>Welcome to the team!</p>\n      \n      <p>Best regards,<br>\nIT Team</p>\n    </div>\n    \n    <div class=\"footer\">\n      <p>This is an automated message. Please do not reply to this email.</p>\n    </div>\n  </div>\n</body>\n</html>",
+        "additionalFields": {
+          "bodyContentType": "html"
+        }
+      },
+      "name": "Send Welcome Email",
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "typeVersion": 2,
+      "position": [
+        304,
+        160
+      ],
+      "id": "261f0612-7707-47cd-aeaa-ec92e387dac9",
+      "webhookId": "428682fd-f86c-4508-9e16-50ef5a2fb8ab",
+      "notes": "Send welcome email with credentials to user's personal email"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \n  \"status\": \"success\",\n  \"message\": \"User onboarded successfully\",\n  \"employee\": {\n    \"name\": \"{{$node[\"Extract Employee Data\"].json.displayName}}\",\n    \"email\": \"{{$node[\"Extract Employee Data\"].json.email}}\",\n    \"userId\": \"{{$node[\"Create Entra ID User\"].json.id}}\",\n    \"department\": \"{{$node[\"Extract Employee Data\"].json.department}}\"\n  },\n  \"timestamp\": \"{{$now.format('yyyy-MM-dd HH:mm:ss')}}\"\n}",
+        "options": {}
+      },
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        976,
+        -64
+      ],
+      "id": "49f4fa25-261f-4a30-85e0-aa02c0e2f003",
+      "notes": "Send success response back to HiBob"
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "additionalFields": {},
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-base.microsoftEntra",
+      "typeVersion": 1,
+      "position": [
+        -496,
+        -144
+      ],
+      "id": "26941a74-88b4-4007-9bd1-8412fc3fb40d",
+      "name": "Create user"
+    },
+    {
+      "parameters": {},
+      "id": "75d2dda9-f977-403f-97f2-556b1c1c8aab",
+      "name": "When clicking 'Test workflow'",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1504,
+        736
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "source_email",
+              "name": "source_email",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "destination_email",
+              "name": "destination_email",
+              "value": "",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "43a34b64-1e59-493f-a8ea-c9b183de8a3b",
+      "name": "Set Email Addresses",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [
+        -1216,
+        736
+      ],
+      "notes": "Enter the source and destination email addresses here"
+    },
+    {
+      "parameters": {
+        "url": "=https://graph.microsoft.com/v1.0/users/{{ $('Get Source User').item.json.id }}/memberOf",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "microsoftGraphApi",
+        "options": {}
+      },
+      "id": "728a53f8-f3e3-40cc-b868-e802c03c5e5c",
+      "name": "Get All Groups of Source User",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -848,
+        736
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "group_id",
+              "name": "group_id",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "group_name",
+              "name": "group_name",
+              "value": "={{ $json.displayName }}",
+              "type": "string"
+            },
+            {
+              "id": "group_type",
+              "name": "group_type",
+              "value": "={{ $json['@odata.type'] }}",
+              "type": "string"
+            },
+            {
+              "id": "mail",
+              "name": "mail",
+              "value": "={{ $json.mail || 'N/A' }}",
+              "type": "string"
+            },
+            {
+              "id": "destination_user_id",
+              "name": "destination_user_id",
+              "value": "={{ $('Get Destination User').item.json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "group_types",
+              "name": "group_types",
+              "value": "={{ $json.groupTypes ? $json.groupTypes.join(',') : 'SecurityGroup' }}",
+              "type": "string"
+            },
+            {
+              "id": "security_enabled",
+              "name": "security_enabled",
+              "value": "={{ $json.securityEnabled }}",
+              "type": "boolean"
+            },
+            {
+              "id": "mail_enabled",
+              "name": "mail_enabled",
+              "value": "={{ $json.mailEnabled }}",
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1e1fdf20-556f-4b82-bf69-4fb911307c48",
+      "name": "Process Groups",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [
+        -624,
+        736
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://graph.microsoft.com/v1.0/groups/{{ $json.group_id }}/members/$ref",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "microsoftGraphApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"@odata.id\": \"https://graph.microsoft.com/v1.0/users/{{ $json.destination_user_id }}\"\n}",
+        "options": {}
+      },
+      "id": "7eeb0885-10fb-4478-b103-b85e85892086",
+      "name": "Add Destination User to Group",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -400,
+        736
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "success_condition",
+              "leftValue": "={{ $json.statusCode }}",
+              "rightValue": "204",
+              "operator": {
+                "type": "number",
+                "operation": "equals",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "f7e6179a-153f-4c65-a4e6-ebac96924f08",
+      "name": "Check Success",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -192,
+        736
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "status",
+              "name": "status",
+              "value": "SUCCESS",
+              "type": "string"
+            },
+            {
+              "id": "group_name",
+              "name": "group_name",
+              "value": "={{ $('Process Groups').item.json.group_name }}",
+              "type": "string"
+            },
+            {
+              "id": "group_type",
+              "name": "group_type",
+              "value": "={{ $('Process Groups').item.json.group_types }}",
+              "type": "string"
+            },
+            {
+              "id": "mail",
+              "name": "mail",
+              "value": "={{ $('Process Groups').item.json.mail }}",
+              "type": "string"
+            },
+            {
+              "id": "message",
+              "name": "message",
+              "value": "User successfully added to group",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1671ddcb-6898-4a08-a8de-1c0eb1313550",
+      "name": "Success",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [
+        48,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "status",
+              "name": "status",
+              "value": "FAILED/ALREADY_MEMBER",
+              "type": "string"
+            },
+            {
+              "id": "group_name",
+              "name": "group_name",
+              "value": "={{ $('Process Groups').item.json.group_name }}",
+              "type": "string"
+            },
+            {
+              "id": "group_type",
+              "name": "group_type",
+              "value": "={{ $('Process Groups').item.json.group_types }}",
+              "type": "string"
+            },
+            {
+              "id": "mail",
+              "name": "mail",
+              "value": "={{ $('Process Groups').item.json.mail }}",
+              "type": "string"
+            },
+            {
+              "id": "message",
+              "name": "message",
+              "value": "={{ $json.error ? $json.error.message : 'User may already be a member or operation failed' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "103fa258-be66-4cff-bfcf-af4f1555ca4c",
+      "name": "Failed/Already Member",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [
+        48,
+        832
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineAll",
+        "options": {}
+      },
+      "id": "3ae7d17c-48f8-4bee-a61e-35416df7093d",
+      "name": "Merge Results",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        256,
+        736
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "source_email",
+              "name": "source_email",
+              "value": "={{ $('Set Email Addresses').item.json.source_email }}",
+              "type": "string"
+            },
+            {
+              "id": "destination_email",
+              "name": "destination_email",
+              "value": "={{ $('Set Email Addresses').item.json.destination_email }}",
+              "type": "string"
+            },
+            {
+              "id": "total_groups_processed",
+              "name": "total_groups_processed",
+              "value": "={{ $runIndex + 1 }}",
+              "type": "number"
+            },
+            {
+              "id": "group_details",
+              "name": "group_details",
+              "value": "={{ $json }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "24a082b3-7f75-4d44-8639-c4ab253c64cf",
+      "name": "Final Summary",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [
+        480,
+        736
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "value",
+        "options": {}
+      },
+      "id": "a9b276b4-6fd5-4f7a-9849-f7056e41aefb",
+      "name": "Split Groups",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -624,
+        592
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook - HiBob Trigger": {
+      "main": [
+        [
+          {
+            "node": "Extract Employee Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for User Sync": {
+      "main": [
+        [
+          {
+            "node": "Get Manager ID",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Determine Licenses",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Map User to Security Groups",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Manager ID": {
+      "main": [
+        [
+          {
+            "node": "Manager Exists?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manager Exists?": {
+      "main": [
+        [
+          {
+            "node": "Assign Manager",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Determine Licenses": {
+      "main": [
+        [
+          {
+            "node": "Assign M365 License",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assign M365 License": {
+      "main": [
+        [
+          {
+            "node": "Map User to Teams",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Map User to Teams": {
+      "main": [
+        [
+          {
+            "node": "Add to Teams",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Map User to Security Groups": {
+      "main": [
+        [
+          {
+            "node": "Add to Security Groups",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add to Security Groups": {
+      "main": [
+        [
+          {
+            "node": "Send Welcome Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Welcome Email": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add to Teams": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assign Manager": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond to Webhook": {
+      "main": [
+        []
+      ]
+    },
+    "Extract Employee Data": {
+      "main": [
+        [
+          {
+            "node": "Create user",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create user": {
+      "main": [
+        [
+          {
+            "node": "Wait for User Sync",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking 'Test workflow'": {
+      "main": [
+        [
+          {
+            "node": "Set Email Addresses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get All Groups of Source User": {
+      "main": [
+        [
+          {
+            "node": "Split Groups",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Groups": {
+      "main": [
+        [
+          {
+            "node": "Process Groups",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Groups": {
+      "main": [
+        [
+          {
+            "node": "Add Destination User to Group",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Destination User to Group": {
+      "main": [
+        [
+          {
+            "node": "Check Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Success": {
+      "main": [
+        [
+          {
+            "node": "Success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Failed/Already Member",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Success": {
+      "main": [
+        [
+          {
+            "node": "Merge Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Failed/Already Member": {
+      "main": [
+        [
+          {
+            "node": "Merge Results",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Results": {
+      "main": [
+        [
+          {
+            "node": "Final Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Email Addresses": {
+      "main": [
+        [
+          {
+            "node": "Get All Groups of Source User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "929a650d-4e52-4c88-a4a9-b2ceda8dfda2",
+  "triggerCount": 0,
+  "shared": [
+    {
+      "updatedAt": "2025-10-31T09:14:00.856Z",
+      "createdAt": "2025-10-31T09:14:00.856Z",
+      "role": "workflow:owner",
+      "workflowId": "VWpToRskEii3yQbk",
+      "projectId": "pWTWmuHnmIHw48U9"
+    }
+  ],
+  "tags": []
+}
