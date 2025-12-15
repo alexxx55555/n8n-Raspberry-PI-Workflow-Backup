@@ -1,0 +1,626 @@
+{
+  "updatedAt": "2025-11-29T19:50:58.000Z",
+  "createdAt": "2025-11-15T11:13:05.206Z",
+  "id": "d9VfLDIb89RxTA8s",
+  "name": "Smart Email & Calendar Reminders - Optimized",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours"
+            }
+          ]
+        }
+      },
+      "id": "0f919e00-42d3-426d-8f4b-1731b9c49018",
+      "name": "Check Every Hour",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -2496,
+        -7648
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// EMAIL → Parse & Format with Enhanced Deduplication\nconst CONFIG = {\n  timezone: 'Asia/Jerusalem',\n  reminderWindowDays: 7,\n  maxPreviewLength: 300,\n  urgencyKeywords: {\n    critical: ['urgent', 'asap', 'immediately', 'critical', 'emergency', 'overdue', 'expired'],\n    high: ['deadline', 'due', 'must', 'required', 'payment', 'expires', 'invoice'],\n    medium: ['meeting', 'call', 'reminder', 'review', 'submit', 'approval'],\n    low: ['fyi', 'update', 'info', 'notice', 'newsletter']\n  }\n};\n\nconst out = [];\nconst now = Date.now();\nconst stats = { processed: 0, sent: 0, skipped: 0 };\n\n// Initialize static data\nconst staticData = $getWorkflowStaticData('global');\nif (!staticData.emailReminders) staticData.emailReminders = {};\nconst sentEmails = staticData.emailReminders;\n\n// Clean up old entries\nconst cleanupThreshold = now - (CONFIG.reminderWindowDays * 24 * 60 * 60 * 1000);\nlet cleanedCount = 0;\nfor (const [id, timestamp] of Object.entries(sentEmails)) {\n  if (timestamp < cleanupThreshold) {\n    delete sentEmails[id];\n    cleanedCount++;\n  }\n}\nif (cleanedCount > 0) {\n  console.log(`🧹 Cleaned ${cleanedCount} old email entries`);\n}\n\n// Helper Functions\nfunction extractDatesFromText(text) {\n  const dates = [];\n  const patterns = [\n    /\\b(\\d{1,2})[\\/-](\\d{1,2})[\\/-](\\d{2,4})\\b/g,\n    /\\b(\\d{4})[\\/-](\\d{1,2})[\\/-](\\d{1,2})\\b/g,\n    /\\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\\s+(\\d{1,2}),?\\s+(\\d{4})?/gi,\n    /\\b(\\d{1,2})\\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*,?\\s+(\\d{4})?/gi,\n    // Time patterns\n    /\\b(today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\\b/gi,\n    /\\b(next\\s+week|this\\s+week|next\\s+month)\\b/gi\n  ];\n  \n  patterns.forEach(pattern => {\n    const matches = text.matchAll(pattern);\n    for (const match of matches) {\n      dates.push(match[0]);\n    }\n  });\n  return [...new Set(dates)];\n}\n\nfunction calculateUrgency(text, dates) {\n  const lower = text.toLowerCase();\n  \n  // Check for critical keywords\n  if (CONFIG.urgencyKeywords.critical.some(w => lower.includes(w))) {\n    return { emoji: '🔴', label: 'CRITICAL', priority: 4 };\n  }\n  \n  // Check date proximity\n  if (dates.length > 0) {\n    for (const dateStr of dates) {\n      const parsed = Date.parse(dateStr);\n      if (!isNaN(parsed)) {\n        const daysUntil = (parsed - now) / (24 * 60 * 60 * 1000);\n        if (daysUntil < 1 && daysUntil >= 0) {\n          return { emoji: '🔴', label: 'TODAY', priority: 4 };\n        } else if (daysUntil < 2) {\n          return { emoji: '🟡', label: 'TOMORROW', priority: 3 };\n        }\n      }\n    }\n  }\n  \n// Check other keywords\nif (CONFIG.urgencyKeywords.high.some(w => lower.includes(w))) {\n  return { emoji: '🔴', label: 'HIGH', priority: 3 };\n}\nif (CONFIG.urgencyKeywords.medium.some(w => lower.includes(w))) {\n  return { emoji: '🟡', label: 'MEDIUM', priority: 2 };\n}\nif (CONFIG.urgencyKeywords.low.some(w => lower.includes(w))) {\n  return { emoji: '🟢', label: 'LOW', priority: 1 };\n}\n\nreturn { emoji: '⚪', label: 'INFO', priority: 0 };\n}\n\nfunction extractSenderInfo(item) {\n  let from = item.json.from || item.json.From || '';\n  let name = 'Unknown';\n  let email = 'unknown@email.com';\n  \n  // Try headers if not found\n  if ((!from || !from.includes('@')) && item.json.payload?.headers) {\n    const fromHeader = item.json.payload.headers.find(h => h.name?.toLowerCase() === 'from');\n    if (fromHeader?.value) from = fromHeader.value;\n  }\n  \n  // Extract name and email\n  const nameMatch = from.match(/^([^<]+)\\s*</);\n  if (nameMatch) name = nameMatch[1].trim();\n  \n  const emailMatch = from.match(/<([^>]+)>/);\n  if (emailMatch) {\n    email = emailMatch[1].trim();\n  } else if (from.includes('@')) {\n    email = from.trim();\n  }\n  \n  return { name, email };\n}\n\n// Process emails\nfor (const item of $input.all()) {\n  try {\n    stats.processed++;\n    const emailId = item.json.id || '';\n    \n    // Skip if already sent within window\n    if (sentEmails[emailId]) {\n      const daysSinceSent = (now - sentEmails[emailId]) / (24 * 60 * 60 * 1000);\n      if (daysSinceSent < CONFIG.reminderWindowDays) {\n        stats.skipped++;\n        console.log(`⏭️ Skipping (sent ${daysSinceSent.toFixed(1)} days ago): ${item.json.subject}`);\n        continue;\n      }\n    }\n    \n    // Extract data\n    const subjectRaw = item.json.subject || 'No Subject';\n    const subject = subjectRaw.replace(/\\[/g, '\\\\[').replace(/\\]/g, '\\\\]').replace(/_/g, '\\\\_');\n    const snippet = item.json.snippet || '';\n    const fullText = `${subjectRaw} ${snippet}`;\n    \n    const sender = extractSenderInfo(item);\n    const dates = extractDatesFromText(fullText);\n    const urgency = calculateUrgency(fullText, dates);\n    \n    // Find nearest future date\n    let eventDate = null;\n    let daysUntil = null;\n    for (const dateStr of dates) {\n      const parsed = Date.parse(dateStr);\n      if (!isNaN(parsed) && parsed > now) {\n        eventDate = new Date(parsed).toLocaleDateString('en-GB', { \n          weekday: 'short',\n          year: 'numeric',\n          month: 'short',\n          day: 'numeric'\n        });\n        daysUntil = Math.ceil((parsed - now) / (24 * 60 * 60 * 1000));\n        break;\n      }\n    }\n    \n    // Process if important (priority >= 2 or has dates)\n    if (urgency.priority >= 2 || dates.length > 0) {\n      const preview = snippet.length > CONFIG.maxPreviewLength \n        ? snippet.substring(0, CONFIG.maxPreviewLength - 3) + '...' \n        : snippet;\n      \n      // Format message with better structure\n      let msg = `${urgency.emoji} *${urgency.label} Email Alert*\\n`;\n      msg += `━━━━━━━━━━━━━━━━\\n\\n`;\n      msg += `📧 *Subject:* ${subject}\\n`;\n      msg += `👤 *From:* ${sender.name}\\n`;\n      msg += `📮 *Email:* ${sender.email}\\n`;\n      \n      if (eventDate) {\n        msg += `📅 *Date:* ${eventDate}`;\n        if (daysUntil !== null) {\n          msg += ` (${daysUntil} day${daysUntil !== 1 ? 's' : ''})\\n`;\n        } else {\n          msg += `\\n`;\n        }\n      }\n      \n      if (dates.length > 1) {\n        msg += `📌 *Other dates found:* ${dates.slice(1, 3).join(', ')}\\n`;\n      }\n      \n      msg += `\\n📝 *Preview:*\\n_${preview}_\\n\\n`;\n      msg += `🔗 [Open in Gmail](https://mail.google.com/mail/u/0/#inbox/${emailId})\\n`;\n      msg += `\\n#email #${urgency.label.toLowerCase()}`;\n      \n      stats.sent++;\n      out.push({\n        json: {\n          source: 'email',\n          reminderMessage: msg,\n          shouldSendReminder: true,\n          emailId,\n          subject: subjectRaw,\n          urgency: urgency.emoji,\n          priority: urgency.priority\n        }\n      });\n    } else {\n      stats.skipped++;\n    }\n  } catch (e) {\n    console.error(`❌ Email error: ${e.message}`);\n  }\n}\n\nconsole.log(`📊 Email Stats: Processed ${stats.processed}, Sent ${stats.sent}, Skipped ${stats.skipped}`);\nreturn out;"
+      },
+      "id": "43637195-483b-454a-90ea-547b8b7d14bf",
+      "name": "Format Email Reminders",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1792,
+        -7744
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "value": "sashavi55555@gmail.com",
+          "mode": "list"
+        },
+        "limit": 30,
+        "options": {
+          "orderBy": "startTime"
+        }
+      },
+      "id": "0d0c978f-767e-4b14-9ff6-763fa1d4e693",
+      "name": "Google Calendar - Next 3 Hours",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        -2096,
+        -7344
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "ceazxv6ZgDLso5CX",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// CALENDAR → Smart Reminder Windows\nconst CONFIG = {\n  timezone: 'Asia/Jerusalem',\n  deduplicationHours: 24,\n  reminderWindows: [\n    { minutes: 120, label: '2 hours' },\n    { minutes: 60, label: '1 hour' },\n    { minutes: 30, label: '30 minutes' },\n    { minutes: 15, label: '15 minutes' },\n    { minutes: 5, label: 'Starting soon' }\n  ]\n};\n\nconst out = [];\nconst now = new Date();\nconst nowMs = now.getTime();\nconst stats = { processed: 0, sent: 0, skipped: 0 };\n\n// Initialize static data\nconst staticData = $getWorkflowStaticData('global');\nif (!staticData.calendarEvents) staticData.calendarEvents = {};\nconst sentEvents = staticData.calendarEvents;\n\n// Clean up old entries\nconst cleanupThreshold = nowMs - (CONFIG.deduplicationHours * 60 * 60 * 1000);\nlet cleanedCount = 0;\nfor (const [key, timestamp] of Object.entries(sentEvents)) {\n  if (timestamp < cleanupThreshold) {\n    delete sentEvents[key];\n    cleanedCount++;\n  }\n}\nif (cleanedCount > 0) {\n  console.log(`🧹 Cleaned ${cleanedCount} old calendar entries`);\n}\n\n// Helper function to determine which reminder window we're in\nfunction getReminderWindow(minutesUntil) {\n  for (const window of CONFIG.reminderWindows) {\n    if (minutesUntil <= window.minutes && minutesUntil > (window.minutes - 15)) {\n      return window;\n    }\n  }\n  return null;\n}\n\n// Helper to extract video meeting info\nfunction extractMeetingInfo(event) {\n  const info = { hasVideo: false, platform: null, link: null };\n  \n  if (event.hangoutLink) {\n    info.hasVideo = true;\n    info.platform = 'Google Meet';\n    info.link = event.hangoutLink;\n  } else if (event.location) {\n    const loc = event.location.toLowerCase();\n    if (loc.includes('zoom.us') || loc.includes('zoom')) {\n      info.hasVideo = true;\n      info.platform = 'Zoom';\n      // Extract Zoom URL if present\n      const urlMatch = event.location.match(/https?:\\/\\/[^\\s]+zoom[^\\s]+/i);\n      info.link = urlMatch ? urlMatch[0] : event.location;\n    } else if (loc.includes('teams.microsoft')) {\n      info.hasVideo = true;\n      info.platform = 'Microsoft Teams';\n      const urlMatch = event.location.match(/https?:\\/\\/[^\\s]+teams[^\\s]+/i);\n      info.link = urlMatch ? urlMatch[0] : event.location;\n    }\n  }\n  \n  return info;\n}\n\n// Process events\nfor (const item of $input.all()) {\n  try {\n    stats.processed++;\n    const event = item.json;\n    const eventId = event.id || '';\n    \n    // Skip if no start time\n    const startISO = event.start?.dateTime || event.start?.date;\n    if (!startISO) continue;\n    \n    const startDate = new Date(startISO);\n    const minutesUntil = Math.floor((startDate - nowMs) / 60000);\n    \n    // Skip past events or events too far in future\n    if (minutesUntil < 0 || minutesUntil > 180) {\n      stats.skipped++;\n      continue;\n    }\n    \n    // Determine reminder window\n    const window = getReminderWindow(minutesUntil);\n    if (!window) {\n      stats.skipped++;\n      continue;\n    }\n    \n    // Create unique key for this reminder window\n    const reminderKey = `${eventId}_${window.minutes}`;\n    \n    // Skip if already sent for this window\n    if (sentEvents[reminderKey]) {\n      stats.skipped++;\n      console.log(`⏭️ Skipping (already notified for ${window.label}): ${event.summary}`);\n      continue;\n    }\n    \n    // Extract meeting info\n    const meetingInfo = extractMeetingInfo(event);\n    \n    // Format time\n    const timeStr = startDate.toLocaleTimeString('en-GB', { \n      hour: '2-digit', \n      minute: '2-digit',\n      timeZone: CONFIG.timezone \n    });\n    \n    // Get end time\n    const endISO = event.end?.dateTime || event.end?.date;\n    const endTime = endISO ? new Date(endISO).toLocaleTimeString('en-GB', { \n      hour: '2-digit', \n      minute: '2-digit',\n      timeZone: CONFIG.timezone \n    }) : null;\n    \n    // Get attendees\n    const attendees = (event.attendees || [])\n      .filter(a => !a.self && a.responseStatus !== 'declined')\n      .map(a => {\n        const name = a.displayName || a.email?.split('@')[0] || 'Unknown';\n        const status = a.responseStatus === 'accepted' ? '✓' : \n                       a.responseStatus === 'tentative' ? '?' : '';\n        return status ? `${name}${status}` : name;\n      })\n      .slice(0, 5);\n    \n    // Determine urgency\n    const urgency = minutesUntil <= 15 ? '🔴' : \n                   minutesUntil <= 30 ? '🟡' : \n                   minutesUntil <= 60 ? '🟢' : '⚪';\n    \n    // Format message\n    let msg = `${urgency} *Calendar Alert - ${window.label}*\\n`;\n    msg += `━━━━━━━━━━━━━━━━\\n\\n`;\n    msg += `📅 *${event.summary || 'Untitled Event'}*\\n`;\n    msg += `🕒 *Time:* ${timeStr}${endTime ? ` - ${endTime}` : ''}\\n`;\n    msg += `⏱️ *Starts in ${minutesUntil} minutes*\\n`;\n    \n    if (event.organizer && !event.organizer.self) {\n      const organizer = event.organizer.displayName || event.organizer.email?.split('@')[0];\n      msg += `👔 *Organizer:* ${organizer}\\n`;\n    }\n    \n    if (attendees.length > 0) {\n      msg += `👥 *Attendees:* ${attendees.join(', ')}`;\n      if ((event.attendees || []).length > 5) {\n        msg += ` (+${event.attendees.length - 5} more)`;\n      }\n      msg += `\\n`;\n    }\n    \n    if (!meetingInfo.hasVideo && event.location) {\n      msg += `📍 *Location:* ${event.location}\\n`;\n    }\n    \n    // Add video meeting section\n    if (meetingInfo.hasVideo) {\n      msg += `\\n🎥 *${meetingInfo.platform} Meeting*\\n`;\n      msg += `🔗 [Join Meeting](${meetingInfo.link})\\n`;\n    }\n    \n    if (event.htmlLink) {\n      msg += `📋 [View in Calendar](${event.htmlLink})\\n`;\n    }\n    \n    msg += `\\n#calendar #meeting ${meetingInfo.hasVideo ? '#video' : ''}`;\n    \n    // Mark as sent\n    sentEvents[reminderKey] = nowMs;\n    stats.sent++;\n    \n    out.push({\n      json: {\n        source: 'calendar',\n        reminderMessage: msg,\n        shouldSendReminder: true,\n        eventId,\n        reminderKey,\n        urgency,\n        priority: minutesUntil <= 15 ? 4 : minutesUntil <= 30 ? 3 : 2\n      }\n    });\n  } catch (e) {\n    console.error(`❌ Calendar error: ${e.message}`);\n  }\n}\n\nconsole.log(`📊 Calendar Stats: Processed ${stats.processed}, Sent ${stats.sent}, Skipped ${stats.skipped}`);\nreturn out;"
+      },
+      "id": "ce74707c-f333-4c47-8ee8-d6db4162e5b1",
+      "name": "Format Calendar Reminders",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1792,
+        -7344
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "filters": {
+          "q": "newer_than:24h ((\"deadline\" OR \"due date\" OR \"due by\") OR (\"meeting at\" OR \"meeting on\") OR (\"urgent:\" OR \"action required\") OR (\"reminder:\" OR \"don't forget\") OR (\"payment due\" OR \"invoice due\") OR (\"submit by\" OR \"expires on\"))"
+        }
+      },
+      "id": "a532d8aa-2254-4d59-80f5-3726318fb241",
+      "name": "Gmail - Fetch Task Emails1",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -2096,
+        -7744
+      ],
+      "webhookId": "13ab3a69-3954-424a-8100-b474fcc5b6a6",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "C5742Grqr9Rpnxid",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "27779700-cf7f-4a20-9b37-68b302bb44a0",
+      "name": "Merge All Reminders1",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        -1488,
+        -7552
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "25d0b2a6-83c3-4721-a71a-42432fa0d505",
+              "leftValue": "={{ $json.shouldSendReminder }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d957dc04-a285-4122-aaaf-9037ccd30834",
+      "name": "Filter Valid Reminders1",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.1,
+      "position": [
+        -1184,
+        -7552
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Enhanced deduplication with hash checking\nconst staticData = $getWorkflowStaticData('global');\n\n// Initialize data stores\nif (!staticData.recentReminders) staticData.recentReminders = [];\nif (!staticData.sentHashes) staticData.sentHashes = {};\n\nconst currentReminder = $json.reminderMessage || '';\n\n// Lightweight hash function (since crypto is unavailable)\nfunction hashString(str) {\n  let hash = 0;\n  if (!str.length) return hash.toString(16);\n  for (let i = 0; i < str.length; i++) {\n    const chr = str.charCodeAt(i);\n    hash = (hash << 5) - hash + chr;\n    hash |= 0; // Convert to 32-bit integer\n  }\n  return Math.abs(hash).toString(16).substring(0, 8);\n}\n\nconst reminderHash = hashString(currentReminder);\n\n// Cleanup old hashes (older than 24h)\nconst now = Date.now();\nconst oneDayAgo = now - 24 * 60 * 60 * 1000;\nlet cleanedCount = 0;\n\nfor (const [hash, timestamp] of Object.entries(staticData.sentHashes)) {\n  if (timestamp < oneDayAgo) {\n    delete staticData.sentHashes[hash];\n    cleanedCount++;\n  }\n}\nif (cleanedCount > 0) {\n  console.log(`🧹 Cleaned ${cleanedCount} old hashes`);\n}\n\n// Check if this exact reminder was already sent\nif (staticData.sentHashes[reminderHash]) {\n  const minutesAgo = Math.floor((now - staticData.sentHashes[reminderHash]) / 60000);\n  console.log(`⏭️ Blocking duplicate (sent ${minutesAgo} min ago): ${currentReminder.substring(0, 60)}...`);\n  return [];\n}\n\n// Store hash timestamp\nstaticData.sentHashes[reminderHash] = now;\n\n// Prepare context for AI\nconst recentSummary = staticData.recentReminders\n  .slice(-5)\n  .map((r, i) => `[${i + 1}] ${r.substring(0, 60)}...`)\n  .join('\\n') || 'No previous reminders';\n\n// Sort by priority if available\nconst priority = $json.priority || 0;\n\nreturn [{\n  json: {\n    ...$json,\n    newReminder: currentReminder,\n    previousReminders: recentSummary,\n    reminderHash,\n    priority\n  }\n}];\n"
+      },
+      "id": "84ee149c-64b6-4020-96af-c9331e11dd5a",
+      "name": "Prepare AI Context1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -832,
+        -7552
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "426570413",
+        "text": "={{ $json.reminderMessage }}",
+        "additionalFields": {
+          "disable_web_page_preview": true,
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "b739255c-008c-419e-a1cc-ca836b244936",
+      "name": "Send Telegram Notification1",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -528,
+        -7552
+      ],
+      "webhookId": "754cc178-2afb-4bef-92cf-c2d0bfb2c9ef",
+      "credentials": {
+        "telegramApi": {
+          "id": "WlROsIRML0DIjcRe",
+          "name": "email_task_bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Check Every Hour": {
+      "main": [
+        [
+          {
+            "node": "Gmail - Fetch Task Emails1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Google Calendar - Next 3 Hours",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Email Reminders": {
+      "main": [
+        [
+          {
+            "node": "Merge All Reminders1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Calendar - Next 3 Hours": {
+      "main": [
+        [
+          {
+            "node": "Format Calendar Reminders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Calendar Reminders": {
+      "main": [
+        [
+          {
+            "node": "Merge All Reminders1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Gmail - Fetch Task Emails1": {
+      "main": [
+        [
+          {
+            "node": "Format Email Reminders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge All Reminders1": {
+      "main": [
+        [
+          {
+            "node": "Filter Valid Reminders1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Valid Reminders1": {
+      "main": [
+        [
+          {
+            "node": "Prepare AI Context1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare AI Context1": {
+      "main": [
+        [
+          {
+            "node": "Send Telegram Notification1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Jerusalem",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": true
+  },
+  "staticData": {
+    "node:Check Every Hour": {
+      "recurrenceRules": []
+    },
+    "node:Check Every Hour1": {
+      "recurrenceRules": []
+    },
+    "node:Check Every 30 Minutes1": {
+      "recurrenceRules": []
+    },
+    "node:Check Every 1 Hour": {
+      "recurrenceRules": []
+    },
+    "node:Check Every 1 Hour1": {
+      "recurrenceRules": []
+    },
+    "global": {
+      "emailReminders": {},
+      "calendarEvents": {
+        "64s66pb16sqmcb9j6tj32b9k6thm2bb16gp66b9k6or68c9n6gs3cchgc4_20251119T110000Z_120": 1763542813266,
+        "64s66pb16sqmcb9j6tj32b9k6thm2bb16gp66b9k6or68c9n6gs3cchgc4_20251119T110000Z_60": 1763546413662,
+        "cks3ee1i6pijcb9jc5j3cb9k68o64bb171gjeb9m61hm2oj170o3cp9oco_120": 1763560813809,
+        "cks3ee1i6pijcb9jc5j3cb9k68o64bb171gjeb9m61hm2oj170o3cp9oco_60": 1763564413200,
+        "6csj4cpm6sq6cb9k75i64b9k64qjeb9p6kr64bb5c5i36opp6kpj2p1j60_30": 1763571614025
+      },
+      "sentItems": {},
+      "recentReminders": [],
+      "sentHashes": {
+        "2545931e": 1763542813281,
+        "7ed2baf8": 1763546413675,
+        "452258da": 1763560813850,
+        "7bddc954": 1763564413221,
+        "385237c6": 1763568013998
+      }
+    }
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "ff5a027f-2ec1-4f9b-84de-edd0a526c68c",
+  "activeVersionId": "ff5a027f-2ec1-4f9b-84de-edd0a526c68c",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2025-11-15T11:13:05.213Z",
+      "createdAt": "2025-11-15T11:13:05.213Z",
+      "role": "workflow:owner",
+      "workflowId": "d9VfLDIb89RxTA8s",
+      "projectId": "pWTWmuHnmIHw48U9"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2025-11-29T19:50:58.096Z",
+    "createdAt": "2025-11-29T19:50:58.096Z",
+    "versionId": "ff5a027f-2ec1-4f9b-84de-edd0a526c68c",
+    "workflowId": "d9VfLDIb89RxTA8s",
+    "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "hours"
+              }
+            ]
+          }
+        },
+        "id": "0f919e00-42d3-426d-8f4b-1731b9c49018",
+        "name": "Check Every Hour",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          -2496,
+          -7648
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "// EMAIL → Parse & Format with Enhanced Deduplication\nconst CONFIG = {\n  timezone: 'Asia/Jerusalem',\n  reminderWindowDays: 7,\n  maxPreviewLength: 300,\n  urgencyKeywords: {\n    critical: ['urgent', 'asap', 'immediately', 'critical', 'emergency', 'overdue', 'expired'],\n    high: ['deadline', 'due', 'must', 'required', 'payment', 'expires', 'invoice'],\n    medium: ['meeting', 'call', 'reminder', 'review', 'submit', 'approval'],\n    low: ['fyi', 'update', 'info', 'notice', 'newsletter']\n  }\n};\n\nconst out = [];\nconst now = Date.now();\nconst stats = { processed: 0, sent: 0, skipped: 0 };\n\n// Initialize static data\nconst staticData = $getWorkflowStaticData('global');\nif (!staticData.emailReminders) staticData.emailReminders = {};\nconst sentEmails = staticData.emailReminders;\n\n// Clean up old entries\nconst cleanupThreshold = now - (CONFIG.reminderWindowDays * 24 * 60 * 60 * 1000);\nlet cleanedCount = 0;\nfor (const [id, timestamp] of Object.entries(sentEmails)) {\n  if (timestamp < cleanupThreshold) {\n    delete sentEmails[id];\n    cleanedCount++;\n  }\n}\nif (cleanedCount > 0) {\n  console.log(`🧹 Cleaned ${cleanedCount} old email entries`);\n}\n\n// Helper Functions\nfunction extractDatesFromText(text) {\n  const dates = [];\n  const patterns = [\n    /\\b(\\d{1,2})[\\/-](\\d{1,2})[\\/-](\\d{2,4})\\b/g,\n    /\\b(\\d{4})[\\/-](\\d{1,2})[\\/-](\\d{1,2})\\b/g,\n    /\\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\\s+(\\d{1,2}),?\\s+(\\d{4})?/gi,\n    /\\b(\\d{1,2})\\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*,?\\s+(\\d{4})?/gi,\n    // Time patterns\n    /\\b(today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\\b/gi,\n    /\\b(next\\s+week|this\\s+week|next\\s+month)\\b/gi\n  ];\n  \n  patterns.forEach(pattern => {\n    const matches = text.matchAll(pattern);\n    for (const match of matches) {\n      dates.push(match[0]);\n    }\n  });\n  return [...new Set(dates)];\n}\n\nfunction calculateUrgency(text, dates) {\n  const lower = text.toLowerCase();\n  \n  // Check for critical keywords\n  if (CONFIG.urgencyKeywords.critical.some(w => lower.includes(w))) {\n    return { emoji: '🔴', label: 'CRITICAL', priority: 4 };\n  }\n  \n  // Check date proximity\n  if (dates.length > 0) {\n    for (const dateStr of dates) {\n      const parsed = Date.parse(dateStr);\n      if (!isNaN(parsed)) {\n        const daysUntil = (parsed - now) / (24 * 60 * 60 * 1000);\n        if (daysUntil < 1 && daysUntil >= 0) {\n          return { emoji: '🔴', label: 'TODAY', priority: 4 };\n        } else if (daysUntil < 2) {\n          return { emoji: '🟡', label: 'TOMORROW', priority: 3 };\n        }\n      }\n    }\n  }\n  \n// Check other keywords\nif (CONFIG.urgencyKeywords.high.some(w => lower.includes(w))) {\n  return { emoji: '🔴', label: 'HIGH', priority: 3 };\n}\nif (CONFIG.urgencyKeywords.medium.some(w => lower.includes(w))) {\n  return { emoji: '🟡', label: 'MEDIUM', priority: 2 };\n}\nif (CONFIG.urgencyKeywords.low.some(w => lower.includes(w))) {\n  return { emoji: '🟢', label: 'LOW', priority: 1 };\n}\n\nreturn { emoji: '⚪', label: 'INFO', priority: 0 };\n}\n\nfunction extractSenderInfo(item) {\n  let from = item.json.from || item.json.From || '';\n  let name = 'Unknown';\n  let email = 'unknown@email.com';\n  \n  // Try headers if not found\n  if ((!from || !from.includes('@')) && item.json.payload?.headers) {\n    const fromHeader = item.json.payload.headers.find(h => h.name?.toLowerCase() === 'from');\n    if (fromHeader?.value) from = fromHeader.value;\n  }\n  \n  // Extract name and email\n  const nameMatch = from.match(/^([^<]+)\\s*</);\n  if (nameMatch) name = nameMatch[1].trim();\n  \n  const emailMatch = from.match(/<([^>]+)>/);\n  if (emailMatch) {\n    email = emailMatch[1].trim();\n  } else if (from.includes('@')) {\n    email = from.trim();\n  }\n  \n  return { name, email };\n}\n\n// Process emails\nfor (const item of $input.all()) {\n  try {\n    stats.processed++;\n    const emailId = item.json.id || '';\n    \n    // Skip if already sent within window\n    if (sentEmails[emailId]) {\n      const daysSinceSent = (now - sentEmails[emailId]) / (24 * 60 * 60 * 1000);\n      if (daysSinceSent < CONFIG.reminderWindowDays) {\n        stats.skipped++;\n        console.log(`⏭️ Skipping (sent ${daysSinceSent.toFixed(1)} days ago): ${item.json.subject}`);\n        continue;\n      }\n    }\n    \n    // Extract data\n    const subjectRaw = item.json.subject || 'No Subject';\n    const subject = subjectRaw.replace(/\\[/g, '\\\\[').replace(/\\]/g, '\\\\]').replace(/_/g, '\\\\_');\n    const snippet = item.json.snippet || '';\n    const fullText = `${subjectRaw} ${snippet}`;\n    \n    const sender = extractSenderInfo(item);\n    const dates = extractDatesFromText(fullText);\n    const urgency = calculateUrgency(fullText, dates);\n    \n    // Find nearest future date\n    let eventDate = null;\n    let daysUntil = null;\n    for (const dateStr of dates) {\n      const parsed = Date.parse(dateStr);\n      if (!isNaN(parsed) && parsed > now) {\n        eventDate = new Date(parsed).toLocaleDateString('en-GB', { \n          weekday: 'short',\n          year: 'numeric',\n          month: 'short',\n          day: 'numeric'\n        });\n        daysUntil = Math.ceil((parsed - now) / (24 * 60 * 60 * 1000));\n        break;\n      }\n    }\n    \n    // Process if important (priority >= 2 or has dates)\n    if (urgency.priority >= 2 || dates.length > 0) {\n      const preview = snippet.length > CONFIG.maxPreviewLength \n        ? snippet.substring(0, CONFIG.maxPreviewLength - 3) + '...' \n        : snippet;\n      \n      // Format message with better structure\n      let msg = `${urgency.emoji} *${urgency.label} Email Alert*\\n`;\n      msg += `━━━━━━━━━━━━━━━━\\n\\n`;\n      msg += `📧 *Subject:* ${subject}\\n`;\n      msg += `👤 *From:* ${sender.name}\\n`;\n      msg += `📮 *Email:* ${sender.email}\\n`;\n      \n      if (eventDate) {\n        msg += `📅 *Date:* ${eventDate}`;\n        if (daysUntil !== null) {\n          msg += ` (${daysUntil} day${daysUntil !== 1 ? 's' : ''})\\n`;\n        } else {\n          msg += `\\n`;\n        }\n      }\n      \n      if (dates.length > 1) {\n        msg += `📌 *Other dates found:* ${dates.slice(1, 3).join(', ')}\\n`;\n      }\n      \n      msg += `\\n📝 *Preview:*\\n_${preview}_\\n\\n`;\n      msg += `🔗 [Open in Gmail](https://mail.google.com/mail/u/0/#inbox/${emailId})\\n`;\n      msg += `\\n#email #${urgency.label.toLowerCase()}`;\n      \n      stats.sent++;\n      out.push({\n        json: {\n          source: 'email',\n          reminderMessage: msg,\n          shouldSendReminder: true,\n          emailId,\n          subject: subjectRaw,\n          urgency: urgency.emoji,\n          priority: urgency.priority\n        }\n      });\n    } else {\n      stats.skipped++;\n    }\n  } catch (e) {\n    console.error(`❌ Email error: ${e.message}`);\n  }\n}\n\nconsole.log(`📊 Email Stats: Processed ${stats.processed}, Sent ${stats.sent}, Skipped ${stats.skipped}`);\nreturn out;"
+        },
+        "id": "43637195-483b-454a-90ea-547b8b7d14bf",
+        "name": "Format Email Reminders",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -1792,
+          -7744
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "getAll",
+          "calendar": {
+            "__rl": true,
+            "value": "sashavi55555@gmail.com",
+            "mode": "list"
+          },
+          "limit": 30,
+          "options": {
+            "orderBy": "startTime"
+          }
+        },
+        "id": "0d0c978f-767e-4b14-9ff6-763fa1d4e693",
+        "name": "Google Calendar - Next 3 Hours",
+        "type": "n8n-nodes-base.googleCalendar",
+        "typeVersion": 1.3,
+        "position": [
+          -2096,
+          -7344
+        ],
+        "credentials": {
+          "googleCalendarOAuth2Api": {
+            "id": "ceazxv6ZgDLso5CX",
+            "name": "Google Calendar account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "// CALENDAR → Smart Reminder Windows\nconst CONFIG = {\n  timezone: 'Asia/Jerusalem',\n  deduplicationHours: 24,\n  reminderWindows: [\n    { minutes: 120, label: '2 hours' },\n    { minutes: 60, label: '1 hour' },\n    { minutes: 30, label: '30 minutes' },\n    { minutes: 15, label: '15 minutes' },\n    { minutes: 5, label: 'Starting soon' }\n  ]\n};\n\nconst out = [];\nconst now = new Date();\nconst nowMs = now.getTime();\nconst stats = { processed: 0, sent: 0, skipped: 0 };\n\n// Initialize static data\nconst staticData = $getWorkflowStaticData('global');\nif (!staticData.calendarEvents) staticData.calendarEvents = {};\nconst sentEvents = staticData.calendarEvents;\n\n// Clean up old entries\nconst cleanupThreshold = nowMs - (CONFIG.deduplicationHours * 60 * 60 * 1000);\nlet cleanedCount = 0;\nfor (const [key, timestamp] of Object.entries(sentEvents)) {\n  if (timestamp < cleanupThreshold) {\n    delete sentEvents[key];\n    cleanedCount++;\n  }\n}\nif (cleanedCount > 0) {\n  console.log(`🧹 Cleaned ${cleanedCount} old calendar entries`);\n}\n\n// Helper function to determine which reminder window we're in\nfunction getReminderWindow(minutesUntil) {\n  for (const window of CONFIG.reminderWindows) {\n    if (minutesUntil <= window.minutes && minutesUntil > (window.minutes - 15)) {\n      return window;\n    }\n  }\n  return null;\n}\n\n// Helper to extract video meeting info\nfunction extractMeetingInfo(event) {\n  const info = { hasVideo: false, platform: null, link: null };\n  \n  if (event.hangoutLink) {\n    info.hasVideo = true;\n    info.platform = 'Google Meet';\n    info.link = event.hangoutLink;\n  } else if (event.location) {\n    const loc = event.location.toLowerCase();\n    if (loc.includes('zoom.us') || loc.includes('zoom')) {\n      info.hasVideo = true;\n      info.platform = 'Zoom';\n      // Extract Zoom URL if present\n      const urlMatch = event.location.match(/https?:\\/\\/[^\\s]+zoom[^\\s]+/i);\n      info.link = urlMatch ? urlMatch[0] : event.location;\n    } else if (loc.includes('teams.microsoft')) {\n      info.hasVideo = true;\n      info.platform = 'Microsoft Teams';\n      const urlMatch = event.location.match(/https?:\\/\\/[^\\s]+teams[^\\s]+/i);\n      info.link = urlMatch ? urlMatch[0] : event.location;\n    }\n  }\n  \n  return info;\n}\n\n// Process events\nfor (const item of $input.all()) {\n  try {\n    stats.processed++;\n    const event = item.json;\n    const eventId = event.id || '';\n    \n    // Skip if no start time\n    const startISO = event.start?.dateTime || event.start?.date;\n    if (!startISO) continue;\n    \n    const startDate = new Date(startISO);\n    const minutesUntil = Math.floor((startDate - nowMs) / 60000);\n    \n    // Skip past events or events too far in future\n    if (minutesUntil < 0 || minutesUntil > 180) {\n      stats.skipped++;\n      continue;\n    }\n    \n    // Determine reminder window\n    const window = getReminderWindow(minutesUntil);\n    if (!window) {\n      stats.skipped++;\n      continue;\n    }\n    \n    // Create unique key for this reminder window\n    const reminderKey = `${eventId}_${window.minutes}`;\n    \n    // Skip if already sent for this window\n    if (sentEvents[reminderKey]) {\n      stats.skipped++;\n      console.log(`⏭️ Skipping (already notified for ${window.label}): ${event.summary}`);\n      continue;\n    }\n    \n    // Extract meeting info\n    const meetingInfo = extractMeetingInfo(event);\n    \n    // Format time\n    const timeStr = startDate.toLocaleTimeString('en-GB', { \n      hour: '2-digit', \n      minute: '2-digit',\n      timeZone: CONFIG.timezone \n    });\n    \n    // Get end time\n    const endISO = event.end?.dateTime || event.end?.date;\n    const endTime = endISO ? new Date(endISO).toLocaleTimeString('en-GB', { \n      hour: '2-digit', \n      minute: '2-digit',\n      timeZone: CONFIG.timezone \n    }) : null;\n    \n    // Get attendees\n    const attendees = (event.attendees || [])\n      .filter(a => !a.self && a.responseStatus !== 'declined')\n      .map(a => {\n        const name = a.displayName || a.email?.split('@')[0] || 'Unknown';\n        const status = a.responseStatus === 'accepted' ? '✓' : \n                       a.responseStatus === 'tentative' ? '?' : '';\n        return status ? `${name}${status}` : name;\n      })\n      .slice(0, 5);\n    \n    // Determine urgency\n    const urgency = minutesUntil <= 15 ? '🔴' : \n                   minutesUntil <= 30 ? '🟡' : \n                   minutesUntil <= 60 ? '🟢' : '⚪';\n    \n    // Format message\n    let msg = `${urgency} *Calendar Alert - ${window.label}*\\n`;\n    msg += `━━━━━━━━━━━━━━━━\\n\\n`;\n    msg += `📅 *${event.summary || 'Untitled Event'}*\\n`;\n    msg += `🕒 *Time:* ${timeStr}${endTime ? ` - ${endTime}` : ''}\\n`;\n    msg += `⏱️ *Starts in ${minutesUntil} minutes*\\n`;\n    \n    if (event.organizer && !event.organizer.self) {\n      const organizer = event.organizer.displayName || event.organizer.email?.split('@')[0];\n      msg += `👔 *Organizer:* ${organizer}\\n`;\n    }\n    \n    if (attendees.length > 0) {\n      msg += `👥 *Attendees:* ${attendees.join(', ')}`;\n      if ((event.attendees || []).length > 5) {\n        msg += ` (+${event.attendees.length - 5} more)`;\n      }\n      msg += `\\n`;\n    }\n    \n    if (!meetingInfo.hasVideo && event.location) {\n      msg += `📍 *Location:* ${event.location}\\n`;\n    }\n    \n    // Add video meeting section\n    if (meetingInfo.hasVideo) {\n      msg += `\\n🎥 *${meetingInfo.platform} Meeting*\\n`;\n      msg += `🔗 [Join Meeting](${meetingInfo.link})\\n`;\n    }\n    \n    if (event.htmlLink) {\n      msg += `📋 [View in Calendar](${event.htmlLink})\\n`;\n    }\n    \n    msg += `\\n#calendar #meeting ${meetingInfo.hasVideo ? '#video' : ''}`;\n    \n    // Mark as sent\n    sentEvents[reminderKey] = nowMs;\n    stats.sent++;\n    \n    out.push({\n      json: {\n        source: 'calendar',\n        reminderMessage: msg,\n        shouldSendReminder: true,\n        eventId,\n        reminderKey,\n        urgency,\n        priority: minutesUntil <= 15 ? 4 : minutesUntil <= 30 ? 3 : 2\n      }\n    });\n  } catch (e) {\n    console.error(`❌ Calendar error: ${e.message}`);\n  }\n}\n\nconsole.log(`📊 Calendar Stats: Processed ${stats.processed}, Sent ${stats.sent}, Skipped ${stats.skipped}`);\nreturn out;"
+        },
+        "id": "ce74707c-f333-4c47-8ee8-d6db4162e5b1",
+        "name": "Format Calendar Reminders",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -1792,
+          -7344
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "getAll",
+          "filters": {
+            "q": "newer_than:24h ((\"deadline\" OR \"due date\" OR \"due by\") OR (\"meeting at\" OR \"meeting on\") OR (\"urgent:\" OR \"action required\") OR (\"reminder:\" OR \"don't forget\") OR (\"payment due\" OR \"invoice due\") OR (\"submit by\" OR \"expires on\"))"
+          }
+        },
+        "id": "a532d8aa-2254-4d59-80f5-3726318fb241",
+        "name": "Gmail - Fetch Task Emails1",
+        "type": "n8n-nodes-base.gmail",
+        "typeVersion": 2.1,
+        "position": [
+          -2096,
+          -7744
+        ],
+        "webhookId": "13ab3a69-3954-424a-8100-b474fcc5b6a6",
+        "credentials": {
+          "gmailOAuth2": {
+            "id": "C5742Grqr9Rpnxid",
+            "name": "Gmail account"
+          }
+        }
+      },
+      {
+        "parameters": {},
+        "id": "27779700-cf7f-4a20-9b37-68b302bb44a0",
+        "name": "Merge All Reminders1",
+        "type": "n8n-nodes-base.merge",
+        "typeVersion": 2,
+        "position": [
+          -1488,
+          -7552
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 1
+            },
+            "conditions": [
+              {
+                "id": "25d0b2a6-83c3-4721-a71a-42432fa0d505",
+                "leftValue": "={{ $json.shouldSendReminder }}",
+                "rightValue": true,
+                "operator": {
+                  "type": "boolean",
+                  "operation": "equals"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "d957dc04-a285-4122-aaaf-9037ccd30834",
+        "name": "Filter Valid Reminders1",
+        "type": "n8n-nodes-base.filter",
+        "typeVersion": 2.1,
+        "position": [
+          -1184,
+          -7552
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "// Enhanced deduplication with hash checking\nconst staticData = $getWorkflowStaticData('global');\n\n// Initialize data stores\nif (!staticData.recentReminders) staticData.recentReminders = [];\nif (!staticData.sentHashes) staticData.sentHashes = {};\n\nconst currentReminder = $json.reminderMessage || '';\n\n// Lightweight hash function (since crypto is unavailable)\nfunction hashString(str) {\n  let hash = 0;\n  if (!str.length) return hash.toString(16);\n  for (let i = 0; i < str.length; i++) {\n    const chr = str.charCodeAt(i);\n    hash = (hash << 5) - hash + chr;\n    hash |= 0; // Convert to 32-bit integer\n  }\n  return Math.abs(hash).toString(16).substring(0, 8);\n}\n\nconst reminderHash = hashString(currentReminder);\n\n// Cleanup old hashes (older than 24h)\nconst now = Date.now();\nconst oneDayAgo = now - 24 * 60 * 60 * 1000;\nlet cleanedCount = 0;\n\nfor (const [hash, timestamp] of Object.entries(staticData.sentHashes)) {\n  if (timestamp < oneDayAgo) {\n    delete staticData.sentHashes[hash];\n    cleanedCount++;\n  }\n}\nif (cleanedCount > 0) {\n  console.log(`🧹 Cleaned ${cleanedCount} old hashes`);\n}\n\n// Check if this exact reminder was already sent\nif (staticData.sentHashes[reminderHash]) {\n  const minutesAgo = Math.floor((now - staticData.sentHashes[reminderHash]) / 60000);\n  console.log(`⏭️ Blocking duplicate (sent ${minutesAgo} min ago): ${currentReminder.substring(0, 60)}...`);\n  return [];\n}\n\n// Store hash timestamp\nstaticData.sentHashes[reminderHash] = now;\n\n// Prepare context for AI\nconst recentSummary = staticData.recentReminders\n  .slice(-5)\n  .map((r, i) => `[${i + 1}] ${r.substring(0, 60)}...`)\n  .join('\\n') || 'No previous reminders';\n\n// Sort by priority if available\nconst priority = $json.priority || 0;\n\nreturn [{\n  json: {\n    ...$json,\n    newReminder: currentReminder,\n    previousReminders: recentSummary,\n    reminderHash,\n    priority\n  }\n}];\n"
+        },
+        "id": "84ee149c-64b6-4020-96af-c9331e11dd5a",
+        "name": "Prepare AI Context1",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -832,
+          -7552
+        ]
+      },
+      {
+        "parameters": {
+          "chatId": "426570413",
+          "text": "={{ $json.reminderMessage }}",
+          "additionalFields": {
+            "disable_web_page_preview": true,
+            "parse_mode": "Markdown"
+          }
+        },
+        "id": "b739255c-008c-419e-a1cc-ca836b244936",
+        "name": "Send Telegram Notification1",
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1.2,
+        "position": [
+          -528,
+          -7552
+        ],
+        "webhookId": "754cc178-2afb-4bef-92cf-c2d0bfb2c9ef",
+        "credentials": {
+          "telegramApi": {
+            "id": "WlROsIRML0DIjcRe",
+            "name": "email_task_bot"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Check Every Hour": {
+        "main": [
+          [
+            {
+              "node": "Gmail - Fetch Task Emails1",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Google Calendar - Next 3 Hours",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Format Email Reminders": {
+        "main": [
+          [
+            {
+              "node": "Merge All Reminders1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Google Calendar - Next 3 Hours": {
+        "main": [
+          [
+            {
+              "node": "Format Calendar Reminders",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Format Calendar Reminders": {
+        "main": [
+          [
+            {
+              "node": "Merge All Reminders1",
+              "type": "main",
+              "index": 1
+            }
+          ]
+        ]
+      },
+      "Gmail - Fetch Task Emails1": {
+        "main": [
+          [
+            {
+              "node": "Format Email Reminders",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Merge All Reminders1": {
+        "main": [
+          [
+            {
+              "node": "Filter Valid Reminders1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Filter Valid Reminders1": {
+        "main": [
+          [
+            {
+              "node": "Prepare AI Context1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Prepare AI Context1": {
+        "main": [
+          [
+            {
+              "node": "Send Telegram Notification1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Alex Vinokur",
+    "name": null,
+    "description": null
+  },
+  "tags": []
+}
