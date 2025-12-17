@@ -1,0 +1,226 @@
+{
+  "updatedAt": "2025-10-31T09:20:36.000Z",
+  "createdAt": "2025-10-04T20:22:00.944Z",
+  "id": "ostkCLdWtNyOHedy",
+  "name": "Renew No-IP DDNS",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "daysInterval": 25
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -432,
+        -80
+      ],
+      "id": "30654694-2df9-43a2-9a46-a89b4f292dfa",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "url": "https://dynupdate.no-ip.com/nic/update?hostname=alex-router.ddns.net",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -224,
+        -80
+      ],
+      "id": "742d9aa6-508e-44e7-ad72-0c5c79d0f6ef",
+      "name": "Renew No-IP DDNS",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "8pihdBsX3Vor23Mu",
+          "name": "No-IP"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "vinokura@alex-it.net",
+        "subject": "The renewal request completed with response:",
+        "message": "=<!DOCTYPE html>\n<html>\n  <body style=\"font-family: Arial, sans-serif; color: #222; background-color: #f9f9f9; padding: 20px;\">\n    <div style=\"max-width: 600px; margin: auto; background: white; border-radius: 8px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);\">\n      <h2 style=\"color: #0073aa;\">No-IP Renewal Report</h2>\n      <p>\n        <strong>Status:</strong>\n        <span style=\"color: #007700;\">{{ $json[\"data\"] }}</span>\n      </p>\n      <p>\n        <strong>Hostname:</strong> alex-router.ddns.net<br>\n        <strong>Run Time:</strong> {{ $now.toFormat(\"dd-LL-yyyy HH:mm:ss\") }}\n      </p>\n      <hr style=\"margin: 20px 0;\">\n      <p style=\"font-size: 13px; color: #777;\">\n        This message was sent automatically by your n8n workflow.<br>\n        If you keep seeing <code>badauth</code>, check your No-IP credentials.\n      </p>\n    </div>\n  </body>\n</html>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -16,
+        -80
+      ],
+      "id": "134a230e-ec58-41a5-9d94-c273035bd7b7",
+      "name": "Send a message",
+      "webhookId": "ff46358a-daa7-4d4b-958c-0e801993a1da",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "C5742Grqr9Rpnxid",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Renew No-IP DDNS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Renew No-IP DDNS": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Jerusalem",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": {
+    "node:Schedule Trigger": {
+      "recurrenceRules": [
+        278
+      ]
+    }
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "db50040a-80b5-483c-a0ae-fa46296bc930",
+  "activeVersionId": "db50040a-80b5-483c-a0ae-fa46296bc930",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2025-10-31T09:14:00.854Z",
+      "createdAt": "2025-10-31T09:14:00.854Z",
+      "role": "workflow:owner",
+      "workflowId": "ostkCLdWtNyOHedy",
+      "projectId": "pWTWmuHnmIHw48U9"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2025-11-25T10:51:06.122Z",
+    "createdAt": "2025-11-25T10:51:06.122Z",
+    "versionId": "db50040a-80b5-483c-a0ae-fa46296bc930",
+    "workflowId": "ostkCLdWtNyOHedy",
+    "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "daysInterval": 25
+              }
+            ]
+          }
+        },
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          -432,
+          -80
+        ],
+        "id": "30654694-2df9-43a2-9a46-a89b4f292dfa",
+        "name": "Schedule Trigger"
+      },
+      {
+        "parameters": {
+          "url": "https://dynupdate.no-ip.com/nic/update?hostname=alex-router.ddns.net",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpBasicAuth",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          -224,
+          -80
+        ],
+        "id": "742d9aa6-508e-44e7-ad72-0c5c79d0f6ef",
+        "name": "Renew No-IP DDNS",
+        "credentials": {
+          "httpBasicAuth": {
+            "id": "8pihdBsX3Vor23Mu",
+            "name": "No-IP"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "sendTo": "vinokura@alex-it.net",
+          "subject": "The renewal request completed with response:",
+          "message": "=<!DOCTYPE html>\n<html>\n  <body style=\"font-family: Arial, sans-serif; color: #222; background-color: #f9f9f9; padding: 20px;\">\n    <div style=\"max-width: 600px; margin: auto; background: white; border-radius: 8px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);\">\n      <h2 style=\"color: #0073aa;\">No-IP Renewal Report</h2>\n      <p>\n        <strong>Status:</strong>\n        <span style=\"color: #007700;\">{{ $json[\"data\"] }}</span>\n      </p>\n      <p>\n        <strong>Hostname:</strong> alex-router.ddns.net<br>\n        <strong>Run Time:</strong> {{ $now.toFormat(\"dd-LL-yyyy HH:mm:ss\") }}\n      </p>\n      <hr style=\"margin: 20px 0;\">\n      <p style=\"font-size: 13px; color: #777;\">\n        This message was sent automatically by your n8n workflow.<br>\n        If you keep seeing <code>badauth</code>, check your No-IP credentials.\n      </p>\n    </div>\n  </body>\n</html>",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.gmail",
+        "typeVersion": 2.1,
+        "position": [
+          -16,
+          -80
+        ],
+        "id": "134a230e-ec58-41a5-9d94-c273035bd7b7",
+        "name": "Send a message",
+        "webhookId": "ff46358a-daa7-4d4b-958c-0e801993a1da",
+        "credentials": {
+          "gmailOAuth2": {
+            "id": "C5742Grqr9Rpnxid",
+            "name": "Gmail account"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Schedule Trigger": {
+        "main": [
+          [
+            {
+              "node": "Renew No-IP DDNS",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Renew No-IP DDNS": {
+        "main": [
+          [
+            {
+              "node": "Send a message",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "system migration",
+    "name": null,
+    "description": null
+  },
+  "tags": []
+}
