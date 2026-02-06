@@ -1,24 +1,23 @@
 # n8n-Raspberry-PI-Workflow-Backup
 
-## Latest Backup: 2026-01-30 16:02
+## Latest Backup: 2026-02-06 23:07
 
 ### Backup URL
-https://github.com/alexxx55555/n8n-Raspberry-PI-Workflow-Backup/tree/main/PI%20workflows%20backup%202026-01-30%2016-02
+https://github.com/alexxx55555/n8n-Raspberry-PI-Workflow-Backup/tree/main/PI%20workflows%20backup%202026-02-06%2023-07
 
-### Workflows Backed Up (16 total)
+### Workflows Backed Up (15 total)
+- Hebrew Translate
 - Create New JC User
 - Slack Article Summarizer
 - Disable AD/JC User
 - Disable JC User
 - DNS Update
 - Manual Slack Article Summarizer
-- Copy Office 365 Groups Between Users
 - Auto Update Device Models in Monday.com
 - Smart Email & Calendar Reminders - Optimized
 - LG TV C3 Remote
-- Slack AI Translation Bot
+- AI Translator
 - PI workflows backup to Google Drive & GitHub
-- Renew No-IP DDNS
 - Create new AD account
 - Create AD/JC User
 - Disable AD User
