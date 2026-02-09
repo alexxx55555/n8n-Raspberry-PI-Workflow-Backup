@@ -1,0 +1,174 @@
+{
+  "updatedAt": "2026-02-06T21:03:45.483Z",
+  "createdAt": "2026-02-06T19:08:06.039Z",
+  "id": "4dE1oydUR9YdxgZew-of2",
+  "name": "Hebrew Translate",
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p",
+              "name": "text",
+              "value": "как дела?",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8509f52c-09b3-46c0-9700-bd41bcb545c7",
+      "name": "📝 Enter Your Text Here",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [
+        -16,
+        -112
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are a translation tool.\nTranslate the following text to Hebrew.\n\nTranslate the entire text accurately while preserving:\n- Original meaning and tone\n- Technical terms (translate or keep as-is if standard)\n- Names of people and places\n- Formatting and structure\n\n⚠️ Important:\n- Output must be ONLY valid JSON (no extra text, no markdown)\n- Provide complete, accurate translation to Hebrew\n- Maintain professional quality\n- If text is empty, return JSON with empty translation\n\nFormat:\n{\n  \"original_language\": \"detected language code\",\n  \"target_language\": \"he\",\n  \"translation\": \"תרגום מלא לעברית כאן\"\n}\n\nText to translate:\n{{ $json[\"text\"] }}",
+        "options": {
+          "systemMessage": "You are an expert translation AI. Always output valid JSON only, no markdown, no code blocks."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        384,
+        -112
+      ],
+      "id": "54f3f44c-d35c-4d11-a513-5c98fc24d391",
+      "name": "Translate to Hebrew"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse the JSON response from AI Agent\nconst response = $input.first().json.output;\n\n// Try to extract JSON from the response\nlet jsonMatch = response.match(/\\{[\\s\\S]*\\}/);\nlet result;\n\nif (jsonMatch) {\n  result = JSON.parse(jsonMatch[0]);\n} else {\n  result = {\n    original_language: \"unknown\",\n    target_language: \"he\",\n    translation: response\n  };\n}\n\nreturn result;"
+      },
+      "id": "69ff9891-d666-4142-bcb5-841c0f929922",
+      "name": "✅ Hebrew Translation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        912,
+        -112
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "google/gemma-3-27b",
+          "mode": "list",
+          "cachedResultName": "google/gemma-3-27b"
+        },
+        "options": {
+          "frequencyPenalty": 0.3,
+          "maxTokens": 2500,
+          "presencePenalty": 0.1,
+          "temperature": 0.2,
+          "timeout": 120000,
+          "topP": 0.9
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        384,
+        160
+      ],
+      "id": "584708b3-f800-4516-9e36-3d805deba6c7",
+      "name": "AI1",
+      "credentials": {
+        "openAiApi": {
+          "id": "WJsCuec8UzGRGVIc",
+          "name": "Macbook ProM1 Pro"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -480,
+        -112
+      ],
+      "id": "ea1d7017-a1be-4acd-86e7-49f23ed78626",
+      "name": "When clicking ‘Execute workflow’"
+    }
+  ],
+  "connections": {
+    "📝 Enter Your Text Here": {
+      "main": [
+        [
+          {
+            "node": "Translate to Hebrew",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Translate to Hebrew": {
+      "main": [
+        [
+          {
+            "node": "✅ Hebrew Translation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Translate to Hebrew",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "📝 Enter Your Text Here",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "8fcf31c1-1b48-4362-b4e1-3a50f07deb0a",
+  "activeVersionId": null,
+  "triggerCount": 0,
+  "shared": [
+    {
+      "updatedAt": "2026-02-06T19:08:06.042Z",
+      "createdAt": "2026-02-06T19:08:06.042Z",
+      "role": "workflow:owner",
+      "workflowId": "4dE1oydUR9YdxgZew-of2",
+      "projectId": "pWTWmuHnmIHw48U9"
+    }
+  ],
+  "activeVersion": null,
+  "tags": []
+}
