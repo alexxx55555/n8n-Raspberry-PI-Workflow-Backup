@@ -1,0 +1,378 @@
+{
+  "updatedAt": "2026-02-11T17:55:47.971Z",
+  "createdAt": "2026-02-11T16:17:47.301Z",
+  "id": "OEFYCMB5Tm7IXO4P",
+  "name": "AD Lockout Alert - Polling via SSH (Fixed)",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "b6d8e3da-c9fb-43c5-bc20-176c42f5966e",
+      "name": "Every 1 min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        -2144,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "command": "=powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"C:/Scripts/AD-Lockout-Monitor.ps1\" -LookbackMinutes 1",
+        "cwd": "="
+      },
+      "id": "dbbbc19e-8e6d-4e6b-90e8-a0363b060e5b",
+      "name": "Run AD Lockout Script",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        -1840,
+        240
+      ],
+      "credentials": {
+        "sshPassword": {
+          "id": "umWU43lA8b3R4GcA",
+          "name": "SSH Password account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "let raw = $input.first().json;\nlet events = [];\n\nif (typeof raw === 'string' && raw.trim() !== '') {\n  try {\n    let parsed = JSON.parse(raw);\n    events = Array.isArray(parsed) ? parsed : [parsed];\n  } catch {}\n}\n\nevents = events.filter(e => e && e.Username);\n\nreturn events.map(e => ({ json: { username: e.Username, computer: e.CallerComputer || 'UNKNOWN', timestamp: e.Timestamp } }));"
+      },
+      "id": "a0c07820-0c72-448c-b23b-9da667dfaf28",
+      "name": "Parse Events",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1552,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $input.all().length }}",
+              "operation": "larger"
+            }
+          ]
+        }
+      },
+      "id": "ce7c2450-2c9f-40fa-be82-745834b6fe5d",
+      "name": "Any lockouts?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -1248,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "sashavi55555@gmail.com",
+        "subject": "🔒 AD Lockout Alert ({{ $input.all().length }} events)",
+        "message": "<h2>AD Lockouts</h2><table border=\"1\" cellpadding=\"5\"><tr><th>User</th><th>Computer</th><th>Time</th></tr>{{ $input.all().map(e => `<tr><td>${e.json.username}</td><td>${e.json.computer}</td><td>${e.json.timestamp}</td></tr>`).join('') }}</table>",
+        "options": {}
+      },
+      "id": "0cbcc2ce-9ede-4fc2-8c09-82cfd913d0dd",
+      "name": "Send Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [
+        -944,
+        128
+      ],
+      "webhookId": "4daed7dc-3119-4155-8779-07b60b01ea00",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "C5742Grqr9Rpnxid",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "7785afa8-5555-47ab-b387-cdc22d79dca4",
+      "name": "No Events",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -944,
+        336
+      ]
+    }
+  ],
+  "connections": {
+    "Every 1 min": {
+      "main": [
+        [
+          {
+            "node": "Run AD Lockout Script",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run AD Lockout Script": {
+      "main": [
+        [
+          {
+            "node": "Parse Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Events": {
+      "main": [
+        [
+          {
+            "node": "Any lockouts?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Any lockouts?": {
+      "main": [
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "timezone": "Asia/Jerusalem",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": {
+    "node:Every 7 min": {
+      "recurrenceRules": []
+    },
+    "node:Every 5 min": {
+      "recurrenceRules": []
+    },
+    "node:Every 1 min": {
+      "recurrenceRules": []
+    }
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "6ee697e3-5ede-4fc6-8ca0-7169f16fbc7f",
+  "activeVersionId": "6ee697e3-5ede-4fc6-8ca0-7169f16fbc7f",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-02-11T16:17:47.307Z",
+      "createdAt": "2026-02-11T16:17:47.307Z",
+      "role": "workflow:owner",
+      "workflowId": "OEFYCMB5Tm7IXO4P",
+      "projectId": "pWTWmuHnmIHw48U9"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-02-11T17:55:52.000Z",
+    "createdAt": "2026-02-11T17:55:47.972Z",
+    "versionId": "6ee697e3-5ede-4fc6-8ca0-7169f16fbc7f",
+    "workflowId": "OEFYCMB5Tm7IXO4P",
+    "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "minutes",
+                "minutesInterval": 1
+              }
+            ]
+          }
+        },
+        "id": "b6d8e3da-c9fb-43c5-bc20-176c42f5966e",
+        "name": "Every 1 min",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1,
+        "position": [
+          -2144,
+          240
+        ]
+      },
+      {
+        "parameters": {
+          "command": "=powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"C:/Scripts/AD-Lockout-Monitor.ps1\" -LookbackMinutes 1",
+          "cwd": "="
+        },
+        "id": "dbbbc19e-8e6d-4e6b-90e8-a0363b060e5b",
+        "name": "Run AD Lockout Script",
+        "type": "n8n-nodes-base.ssh",
+        "typeVersion": 1,
+        "position": [
+          -1840,
+          240
+        ],
+        "credentials": {
+          "sshPassword": {
+            "id": "umWU43lA8b3R4GcA",
+            "name": "SSH Password account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "let raw = $input.first().json;\nlet events = [];\n\nif (typeof raw === 'string' && raw.trim() !== '') {\n  try {\n    let parsed = JSON.parse(raw);\n    events = Array.isArray(parsed) ? parsed : [parsed];\n  } catch {}\n}\n\nevents = events.filter(e => e && e.Username);\n\nreturn events.map(e => ({ json: { username: e.Username, computer: e.CallerComputer || 'UNKNOWN', timestamp: e.Timestamp } }));"
+        },
+        "id": "a0c07820-0c72-448c-b23b-9da667dfaf28",
+        "name": "Parse Events",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -1552,
+          240
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "number": [
+              {
+                "value1": "={{ $input.all().length }}",
+                "operation": "larger"
+              }
+            ]
+          }
+        },
+        "id": "ce7c2450-2c9f-40fa-be82-745834b6fe5d",
+        "name": "Any lockouts?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 1,
+        "position": [
+          -1248,
+          240
+        ]
+      },
+      {
+        "parameters": {
+          "sendTo": "sashavi55555@gmail.com",
+          "subject": "🔒 AD Lockout Alert ({{ $input.all().length }} events)",
+          "message": "<h2>AD Lockouts</h2><table border=\"1\" cellpadding=\"5\"><tr><th>User</th><th>Computer</th><th>Time</th></tr>{{ $input.all().map(e => `<tr><td>${e.json.username}</td><td>${e.json.computer}</td><td>${e.json.timestamp}</td></tr>`).join('') }}</table>",
+          "options": {}
+        },
+        "id": "0cbcc2ce-9ede-4fc2-8c09-82cfd913d0dd",
+        "name": "Send Email",
+        "type": "n8n-nodes-base.gmail",
+        "typeVersion": 2,
+        "position": [
+          -944,
+          128
+        ],
+        "webhookId": "4daed7dc-3119-4155-8779-07b60b01ea00",
+        "credentials": {
+          "gmailOAuth2": {
+            "id": "C5742Grqr9Rpnxid",
+            "name": "Gmail account"
+          }
+        }
+      },
+      {
+        "parameters": {},
+        "id": "7785afa8-5555-47ab-b387-cdc22d79dca4",
+        "name": "No Events",
+        "type": "n8n-nodes-base.noOp",
+        "typeVersion": 1,
+        "position": [
+          -944,
+          336
+        ]
+      }
+    ],
+    "connections": {
+      "Every 1 min": {
+        "main": [
+          [
+            {
+              "node": "Run AD Lockout Script",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Run AD Lockout Script": {
+        "main": [
+          [
+            {
+              "node": "Parse Events",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Parse Events": {
+        "main": [
+          [
+            {
+              "node": "Any lockouts?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Any lockouts?": {
+        "main": [
+          [
+            {
+              "node": "Send Email",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "No Events",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Alex Vinokur",
+    "name": "Version 6ee697e3",
+    "description": "",
+    "autosaved": true
+  },
+  "tags": []
+}
