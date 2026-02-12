@@ -1,0 +1,628 @@
+{
+  "updatedAt": "2026-02-12T07:25:22.094Z",
+  "createdAt": "2026-02-11T16:17:47.301Z",
+  "id": "OEFYCMB5Tm7IXO4P",
+  "name": "AD Lockout Alert",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "da5a1b59-1fa7-40cb-83db-c05206c631f0",
+      "name": "Every 1 min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        -2304,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "command": "=powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"C:/Scripts/AD-Lockout-Monitor.ps1\"",
+        "cwd": "="
+      },
+      "id": "73f5c8da-6949-4525-986d-37dad5b6051c",
+      "name": "Run AD Lockout Script",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        -1984,
+        448
+      ],
+      "credentials": {
+        "sshPassword": {
+          "id": "umWU43lA8b3R4GcA",
+          "name": "SSH Password account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Get the raw output from the previous SSH/PowerShell node\nlet raw = $input.first().json.stdout;\nlet events = [];\n\n// 2. Parse the JSON string from PowerShell into a JS object\nif (raw && typeof raw === 'string' && raw.trim() !== '') {\n  try {\n    let parsed = JSON.parse(raw);\n    // Ensure events is always an array even if only one lockout is found\n    events = Array.isArray(parsed) ? parsed : [parsed];\n  } catch (e) {\n    // If parsing fails, return an empty array to stop the workflow safely\n    return [];\n  }\n}\n\n// 3. Map the data and fix the timestamp to use the REAL event time\nreturn events.map(e => {\n  const eventDate = new Date(e.Timestamp);\n  \n  const friendlyTime = eventDate.toLocaleString('en-US', {\n    month: 'short',\n    day: 'numeric',\n    year: 'numeric',\n    hour: 'numeric',\n    minute: '2-digit',\n    hour12: true\n  });\n\n  return {\n    json: {\n      username: e.Username,\n      fullname: e.FullName,\n      computer: e.CallerComputer || 'UNKNOWN',\n      timestamp: friendlyTime \n    }\n  };\n});"
+      },
+      "id": "bc7c5493-05d8-40f7-a973-57de503319f4",
+      "name": "Parse Events",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1760,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.data.length }}",
+              "operation": "larger"
+            }
+          ]
+        }
+      },
+      "id": "c3c0e6c0-7e92-4d2f-8bf2-06c1aa782e4f",
+      "name": "Any lockouts?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -992,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "vinokura@alex-it.net",
+        "subject": "={{ \"🚨 URGENT: \" + $json.lockoutCount + \" Account(s) Locked Out\" }}",
+        "message": "={{ $json.emailHtml }}",
+        "options": {}
+      },
+      "id": "63d3f8a4-76d0-4e15-ae6d-03c556759289",
+      "name": "Send Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [
+        -672,
+        128
+      ],
+      "webhookId": "4daed7dc-3119-4155-8779-07b60b01ea00",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "C5742Grqr9Rpnxid",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "67389342-32d3-4e6a-bc09-d00d5f69fa91",
+      "name": "No Events",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -688,
+        544
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Setup\nconst currentLockouts = $input.all();\nconst staticData = $getWorkflowStaticData('global');\nstaticData.alreadyAlerted = staticData.alreadyAlerted || {};\n\nconst now = Date.now();\nconst TWO_HOURS = 2 * 60 * 60 * 1000;\nconst currentUsernameList = currentLockouts.map(item => item.json.username);\n\n// 2. Cleanup Memory\n// If a user was previously alerted but is NOT in the current lockout list, \n// they are likely unlocked. Remove them so a future lockout triggers immediately.\nfor (const user in staticData.alreadyAlerted) {\n  if (!currentUsernameList.includes(user)) {\n    delete staticData.alreadyAlerted[user];\n  }\n}\n\n// 3. Filter for New or \"Stale\" Lockouts\nconst newLockouts = currentLockouts.filter(item => {\n  const user = item.json.username;\n  const lastAlertTime = staticData.alreadyAlerted[user];\n\n  // Logic: Alert if we've never seen them, OR if they've been locked for > 2 hours\n  if (!lastAlertTime || (now - lastAlertTime) > TWO_HOURS) {\n    staticData.alreadyAlerted[user] = now; // Update/Set alert timestamp\n    return true;\n  }\n  \n  return false;\n});\n\nreturn newLockouts;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1536,
+        448
+      ],
+      "id": "89321fd8-7dac-4467-beb9-71fb7fab7a83",
+      "name": "Check Memory"
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0AEJQD4FA6",
+          "mode": "list",
+          "cachedResultName": "alerts-ad-lockout"
+        },
+        "text": "=🚨 *AD LOCKOUT DETECTED* (Total: {{ $json.data.length }})\n_________________________________________\n\n{{ $json.data.map(user => \n`👤 *Full Name:* ${user.fullname || 'N/A'}\n🆔 *Username:* \\`${user.username}\\`\n💻 *Workstation:* \\`${user.computer}\\`\n📅 *Timestamp:* ${user.timestamp}`).join('\\n\\n') }}\n\n_________________________________________\n🔓 *Action:* _Please investigate and unlock these accounts if required._\n",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        -672,
+        320
+      ],
+      "id": "080a8df2-87e0-474c-a526-0538bf7409c0",
+      "name": "Send a message",
+      "webhookId": "ffc3f21e-c64d-4948-b8c2-f33c999ea7d7",
+      "credentials": {
+        "slackApi": {
+          "id": "H1ZUde7LNFHzMcK9",
+          "name": "#alerts-ad-lockouts"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        -1264,
+        448
+      ],
+      "id": "c237ae1b-b93f-4245-8f43-2bf3fbf41ae8",
+      "name": "Keep all incoming items"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Get the list of lockouts from the Aggregate node\nconst lockouts = $json.data;\n\n// 2. Build the table rows as a clean string\nconst tableRows = lockouts.map((item, idx) => {\n  const bgColor = idx % 2 === 0 ? '#ffffff' : '#f8f9fa';\n  return `\n    <tr style=\"border-bottom: 1px solid #e0e0e0; background-color: ${bgColor};\">\n      <td style=\"padding: 14px 16px; font-family: sans-serif; font-size: 13px;\">${item.username}</td>\n      <td style=\"padding: 14px 16px; font-weight: 500;\">${item.fullname || '—'}</td>\n      <td style=\"padding: 14px 16px;\"><span style=\"background-color: #fadbd8; color: #c0392b; padding: 4px 12px; border-radius: 4px; font-weight: 600; font-size: 12px;\">⚠ Locked</span></td>\n      <td style=\"padding: 14px 16px;\">${item.computer || '—'}</td>\n      <td style=\"padding: 14px 16px; color: #7f8c8d;\">${item.timestamp}</td>\n    </tr>`;\n}).join('');\n\n// 3. Wrap rows in the full template\nconst fullHtml = `\n<div style=\"font-family: sans-serif; color: #333; max-width: 900px;\">\n     <div style=\"background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 24px; border-radius: 8px 8px 0 0;\">\n         <h2 style=\"margin: 0;\">🔐 AD Account Lockouts</h2>\n         <p style=\"margin: 8px 0 0 0; opacity: 0.9;\">Live Status Monitor</p>\n     </div>\n     <div style=\"background: white; border: 1px solid #e0e0e0; border-radius: 0 0 8px 8px; overflow: hidden;\">\n         <table style=\"border-collapse: collapse; width: 100%;\">\n             <thead>\n                 <tr style=\"background-color: #f8f9fa; border-bottom: 2px solid #e0e0e0;\">\n                     <th style=\"padding: 16px; text-align: left;\">Username</th>\n                     <th style=\"padding: 16px; text-align: left;\">Full Name</th>\n                     <th style=\"padding: 16px; text-align: left;\">Status</th>\n                     <th style=\"padding: 16px; text-align: left;\">Source</th>\n                     <th style=\"padding: 16px; text-align: left;\">Last Check</th>\n                 </tr>\n             </thead>\n             <tbody>${tableRows}</tbody>\n         </table>\n     </div>\n     <div style=\"background: #f8f9fa; padding: 16px; text-align: right; font-size: 12px; color: #95a5a6;\">\n         <em>Generated via n8n</em>\n     </div>\n</div>`;\n\nreturn { \n  emailHtml: fullHtml,\n  lockoutCount: lockouts.length\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -880,
+        -112
+      ],
+      "id": "2fc079ac-1b79-4b29-afcc-a08f5b9eac90",
+      "name": "Build Email HTML"
+    }
+  ],
+  "connections": {
+    "Every 1 min": {
+      "main": [
+        [
+          {
+            "node": "Run AD Lockout Script",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run AD Lockout Script": {
+      "main": [
+        [
+          {
+            "node": "Parse Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Events": {
+      "main": [
+        [
+          {
+            "node": "Check Memory",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Any lockouts?": {
+      "main": [
+        [
+          {
+            "node": "Build Email HTML",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Memory": {
+      "main": [
+        [
+          {
+            "node": "Keep all incoming items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        []
+      ]
+    },
+    "Keep all incoming items": {
+      "main": [
+        [
+          {
+            "node": "Any lockouts?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Email HTML": {
+      "main": [
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "timezone": "Asia/Jerusalem",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": {
+    "node:Every 7 min": {
+      "recurrenceRules": []
+    },
+    "node:Every 5 min": {
+      "recurrenceRules": []
+    },
+    "node:Every 1 min": {
+      "recurrenceRules": []
+    },
+    "global": {
+      "alreadyAlerted": {
+        "Steve": 1770875541570
+      },
+      "lockoutHistory": {
+        "Steve": {
+          "firstLockout": 1770876119699,
+          "alertCount": 2,
+          "lastAlertTime": 1770877979781,
+          "lockoutCount": 42,
+          "lastSeen": 1770878580304
+        },
+        "Tim": {
+          "firstLockout": 1770876119699,
+          "alertCount": 2,
+          "lastAlertTime": 1770877979781,
+          "lockoutCount": 42,
+          "lastSeen": 1770878580304
+        },
+        "Ash": {
+          "firstLockout": 1770878400360,
+          "alertCount": 1,
+          "lastAlertTime": 1770878400360,
+          "lockoutCount": 4,
+          "lastSeen": 1770878580304
+        }
+      }
+    }
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "b9e8b855-105f-4867-8c5c-493b1c83dbe5",
+  "activeVersionId": "b9e8b855-105f-4867-8c5c-493b1c83dbe5",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-02-11T16:17:47.307Z",
+      "createdAt": "2026-02-11T16:17:47.307Z",
+      "role": "workflow:owner",
+      "workflowId": "OEFYCMB5Tm7IXO4P",
+      "projectId": "pWTWmuHnmIHw48U9"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-02-12T07:25:32.000Z",
+    "createdAt": "2026-02-12T07:25:22.095Z",
+    "versionId": "b9e8b855-105f-4867-8c5c-493b1c83dbe5",
+    "workflowId": "OEFYCMB5Tm7IXO4P",
+    "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "minutes",
+                "minutesInterval": 1
+              }
+            ]
+          }
+        },
+        "id": "da5a1b59-1fa7-40cb-83db-c05206c631f0",
+        "name": "Every 1 min",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1,
+        "position": [
+          -2304,
+          448
+        ]
+      },
+      {
+        "parameters": {
+          "command": "=powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"C:/Scripts/AD-Lockout-Monitor.ps1\"",
+          "cwd": "="
+        },
+        "id": "73f5c8da-6949-4525-986d-37dad5b6051c",
+        "name": "Run AD Lockout Script",
+        "type": "n8n-nodes-base.ssh",
+        "typeVersion": 1,
+        "position": [
+          -1984,
+          448
+        ],
+        "credentials": {
+          "sshPassword": {
+            "id": "umWU43lA8b3R4GcA",
+            "name": "SSH Password account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "// 1. Get the raw output from the previous SSH/PowerShell node\nlet raw = $input.first().json.stdout;\nlet events = [];\n\n// 2. Parse the JSON string from PowerShell into a JS object\nif (raw && typeof raw === 'string' && raw.trim() !== '') {\n  try {\n    let parsed = JSON.parse(raw);\n    // Ensure events is always an array even if only one lockout is found\n    events = Array.isArray(parsed) ? parsed : [parsed];\n  } catch (e) {\n    // If parsing fails, return an empty array to stop the workflow safely\n    return [];\n  }\n}\n\n// 3. Map the data and fix the timestamp to use the REAL event time\nreturn events.map(e => {\n  const eventDate = new Date(e.Timestamp);\n  \n  const friendlyTime = eventDate.toLocaleString('en-US', {\n    month: 'short',\n    day: 'numeric',\n    year: 'numeric',\n    hour: 'numeric',\n    minute: '2-digit',\n    hour12: true\n  });\n\n  return {\n    json: {\n      username: e.Username,\n      fullname: e.FullName,\n      computer: e.CallerComputer || 'UNKNOWN',\n      timestamp: friendlyTime \n    }\n  };\n});"
+        },
+        "id": "bc7c5493-05d8-40f7-a973-57de503319f4",
+        "name": "Parse Events",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -1760,
+          448
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "number": [
+              {
+                "value1": "={{ $json.data.length }}",
+                "operation": "larger"
+              }
+            ]
+          }
+        },
+        "id": "c3c0e6c0-7e92-4d2f-8bf2-06c1aa782e4f",
+        "name": "Any lockouts?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 1,
+        "position": [
+          -992,
+          448
+        ]
+      },
+      {
+        "parameters": {
+          "sendTo": "vinokura@alex-it.net",
+          "subject": "={{ \"🚨 URGENT: \" + $json.lockoutCount + \" Account(s) Locked Out\" }}",
+          "message": "={{ $json.emailHtml }}",
+          "options": {}
+        },
+        "id": "63d3f8a4-76d0-4e15-ae6d-03c556759289",
+        "name": "Send Email",
+        "type": "n8n-nodes-base.gmail",
+        "typeVersion": 2,
+        "position": [
+          -672,
+          128
+        ],
+        "webhookId": "4daed7dc-3119-4155-8779-07b60b01ea00",
+        "credentials": {
+          "gmailOAuth2": {
+            "id": "C5742Grqr9Rpnxid",
+            "name": "Gmail account"
+          }
+        }
+      },
+      {
+        "parameters": {},
+        "id": "67389342-32d3-4e6a-bc09-d00d5f69fa91",
+        "name": "No Events",
+        "type": "n8n-nodes-base.noOp",
+        "typeVersion": 1,
+        "position": [
+          -688,
+          544
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "// 1. Setup\nconst currentLockouts = $input.all();\nconst staticData = $getWorkflowStaticData('global');\nstaticData.alreadyAlerted = staticData.alreadyAlerted || {};\n\nconst now = Date.now();\nconst TWO_HOURS = 2 * 60 * 60 * 1000;\nconst currentUsernameList = currentLockouts.map(item => item.json.username);\n\n// 2. Cleanup Memory\n// If a user was previously alerted but is NOT in the current lockout list, \n// they are likely unlocked. Remove them so a future lockout triggers immediately.\nfor (const user in staticData.alreadyAlerted) {\n  if (!currentUsernameList.includes(user)) {\n    delete staticData.alreadyAlerted[user];\n  }\n}\n\n// 3. Filter for New or \"Stale\" Lockouts\nconst newLockouts = currentLockouts.filter(item => {\n  const user = item.json.username;\n  const lastAlertTime = staticData.alreadyAlerted[user];\n\n  // Logic: Alert if we've never seen them, OR if they've been locked for > 2 hours\n  if (!lastAlertTime || (now - lastAlertTime) > TWO_HOURS) {\n    staticData.alreadyAlerted[user] = now; // Update/Set alert timestamp\n    return true;\n  }\n  \n  return false;\n});\n\nreturn newLockouts;"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -1536,
+          448
+        ],
+        "id": "89321fd8-7dac-4467-beb9-71fb7fab7a83",
+        "name": "Check Memory"
+      },
+      {
+        "parameters": {
+          "select": "channel",
+          "channelId": {
+            "__rl": true,
+            "value": "C0AEJQD4FA6",
+            "mode": "list",
+            "cachedResultName": "alerts-ad-lockout"
+          },
+          "text": "=🚨 *AD LOCKOUT DETECTED* (Total: {{ $json.data.length }})\n_________________________________________\n\n{{ $json.data.map(user => \n`👤 *Full Name:* ${user.fullname || 'N/A'}\n🆔 *Username:* \\`${user.username}\\`\n💻 *Workstation:* \\`${user.computer}\\`\n📅 *Timestamp:* ${user.timestamp}`).join('\\n\\n') }}\n\n_________________________________________\n🔓 *Action:* _Please investigate and unlock these accounts if required._\n",
+          "otherOptions": {}
+        },
+        "type": "n8n-nodes-base.slack",
+        "typeVersion": 2.4,
+        "position": [
+          -672,
+          320
+        ],
+        "id": "080a8df2-87e0-474c-a526-0538bf7409c0",
+        "name": "Send a message",
+        "webhookId": "ffc3f21e-c64d-4948-b8c2-f33c999ea7d7",
+        "credentials": {
+          "slackApi": {
+            "id": "H1ZUde7LNFHzMcK9",
+            "name": "#alerts-ad-lockouts"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "aggregate": "aggregateAllItemData",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.aggregate",
+        "typeVersion": 1,
+        "position": [
+          -1264,
+          448
+        ],
+        "id": "c237ae1b-b93f-4245-8f43-2bf3fbf41ae8",
+        "name": "Keep all incoming items"
+      },
+      {
+        "parameters": {
+          "jsCode": "// 1. Get the list of lockouts from the Aggregate node\nconst lockouts = $json.data;\n\n// 2. Build the table rows as a clean string\nconst tableRows = lockouts.map((item, idx) => {\n  const bgColor = idx % 2 === 0 ? '#ffffff' : '#f8f9fa';\n  return `\n    <tr style=\"border-bottom: 1px solid #e0e0e0; background-color: ${bgColor};\">\n      <td style=\"padding: 14px 16px; font-family: sans-serif; font-size: 13px;\">${item.username}</td>\n      <td style=\"padding: 14px 16px; font-weight: 500;\">${item.fullname || '—'}</td>\n      <td style=\"padding: 14px 16px;\"><span style=\"background-color: #fadbd8; color: #c0392b; padding: 4px 12px; border-radius: 4px; font-weight: 600; font-size: 12px;\">⚠ Locked</span></td>\n      <td style=\"padding: 14px 16px;\">${item.computer || '—'}</td>\n      <td style=\"padding: 14px 16px; color: #7f8c8d;\">${item.timestamp}</td>\n    </tr>`;\n}).join('');\n\n// 3. Wrap rows in the full template\nconst fullHtml = `\n<div style=\"font-family: sans-serif; color: #333; max-width: 900px;\">\n     <div style=\"background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 24px; border-radius: 8px 8px 0 0;\">\n         <h2 style=\"margin: 0;\">🔐 AD Account Lockouts</h2>\n         <p style=\"margin: 8px 0 0 0; opacity: 0.9;\">Live Status Monitor</p>\n     </div>\n     <div style=\"background: white; border: 1px solid #e0e0e0; border-radius: 0 0 8px 8px; overflow: hidden;\">\n         <table style=\"border-collapse: collapse; width: 100%;\">\n             <thead>\n                 <tr style=\"background-color: #f8f9fa; border-bottom: 2px solid #e0e0e0;\">\n                     <th style=\"padding: 16px; text-align: left;\">Username</th>\n                     <th style=\"padding: 16px; text-align: left;\">Full Name</th>\n                     <th style=\"padding: 16px; text-align: left;\">Status</th>\n                     <th style=\"padding: 16px; text-align: left;\">Source</th>\n                     <th style=\"padding: 16px; text-align: left;\">Last Check</th>\n                 </tr>\n             </thead>\n             <tbody>${tableRows}</tbody>\n         </table>\n     </div>\n     <div style=\"background: #f8f9fa; padding: 16px; text-align: right; font-size: 12px; color: #95a5a6;\">\n         <em>Generated via n8n</em>\n     </div>\n</div>`;\n\nreturn { \n  emailHtml: fullHtml,\n  lockoutCount: lockouts.length\n};"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -880,
+          -112
+        ],
+        "id": "2fc079ac-1b79-4b29-afcc-a08f5b9eac90",
+        "name": "Build Email HTML"
+      }
+    ],
+    "connections": {
+      "Every 1 min": {
+        "main": [
+          [
+            {
+              "node": "Run AD Lockout Script",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Run AD Lockout Script": {
+        "main": [
+          [
+            {
+              "node": "Parse Events",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Parse Events": {
+        "main": [
+          [
+            {
+              "node": "Check Memory",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Any lockouts?": {
+        "main": [
+          [
+            {
+              "node": "Build Email HTML",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Send a message",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "No Events",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Check Memory": {
+        "main": [
+          [
+            {
+              "node": "Keep all incoming items",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Send a message": {
+        "main": [
+          []
+        ]
+      },
+      "Keep all incoming items": {
+        "main": [
+          [
+            {
+              "node": "Any lockouts?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build Email HTML": {
+        "main": [
+          [
+            {
+              "node": "Send Email",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Alex Vinokur",
+    "name": "Version b9e8b855",
+    "description": "",
+    "autosaved": true
+  },
+  "tags": []
+}
