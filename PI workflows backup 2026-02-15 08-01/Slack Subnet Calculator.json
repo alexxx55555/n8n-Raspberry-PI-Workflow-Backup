@@ -1,0 +1,647 @@
+{
+  "updatedAt": "2026-02-14T11:16:07.385Z",
+  "createdAt": "2026-02-14T09:26:59.550Z",
+  "id": "XvXxMrg14TzP6QtU",
+  "name": "Slack Subnet Calculator",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "trigger": [
+          "app_mention"
+        ],
+        "channelId": {
+          "__rl": true,
+          "value": "C0AF191GN2W",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "name": "Slack Trigger",
+      "type": "n8n-nodes-base.slackTrigger",
+      "typeVersion": 1,
+      "position": [
+        -928,
+        304
+      ],
+      "webhookId": "subnet-calc-trigger",
+      "id": "90cf9d80-57da-4268-a372-3f31a6fd646e",
+      "credentials": {
+        "slackApi": {
+          "id": "F4TbMFcYC0qqJERR",
+          "name": "Subnet Calculator"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.item.json;\nif (input.error) return [{ json: input }];\n\nconst ip = input.ip;\nconst cidr = input.cidr;\n\n// --- Helper Functions ---\nfunction ipToBinary(ip) { return ip.split('.').map(o => parseInt(o).toString(2).padStart(8, '0')).join(''); }\nfunction binaryToIp(b) { return b.match(/.{8}/g).map(bin => parseInt(bin, 2)).join('.'); }\nfunction intToIp(int) { return [(int >>> 24) & 255, (int >>> 16) & 255, (int >>> 8) & 255, int & 255].join('.'); }\nfunction formatBin(b) { return b.match(/.{8}/g).join('.'); }\n\n// --- Calculations ---\nconst maskBinary = '1'.repeat(cidr) + '0'.repeat(32 - cidr);\nconst wildcardBinary = '0'.repeat(cidr) + '1'.repeat(32 - cidr);\nconst ipBinary = ipToBinary(ip);\n\n// Network & Broadcast Binary\nlet netBin = ''; for (let i = 0; i < 32; i++) netBin += (ipBinary[i] === '1' && maskBinary[i] === '1') ? '1' : '0';\nlet broadBin = ''; for (let i = 0; i < 32; i++) broadBin += (ipBinary[i] === '1' || wildcardBinary[i] === '1') ? '1' : '0';\n\nconst networkAddress = binaryToIp(netBin);\nconst broadcastAddress = binaryToIp(broadBin);\nconst subnetMask = binaryToIp(maskBinary);\nconst wildcardMask = binaryToIp(wildcardBinary);\n\n// --- Modern CIDR vs Legacy Class Logic ---\nconst octets = ip.split('.').map(Number);\nlet legacyClass = 'Unknown';\nif (octets[0] <= 126) legacyClass = 'A';\nelse if (octets[0] >= 128 && octets[0] <= 191) legacyClass = 'B';\nelse if (octets[0] >= 192 && octets[0] <= 223) legacyClass = 'C';\n\nlet cidrEquivalent = '';\nif (cidr === 24) cidrEquivalent = ' (Class C Size)';\nelse if (cidr === 16) cidrEquivalent = ' (Class B Size)';\nelse if (cidr === 8) cidrEquivalent = ' (Class A Size)';\n\nconst isPrivate = (octets[0] === 10) || \n                  (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31) || \n                  (octets[0] === 192 && octets[1] === 168);\n\n// --- Neighbors & Usable ---\nconst netInt = parseInt(netBin, 2);\nconst subnetSize = Math.pow(2, 32 - cidr);\nconst firstUsable = cidr >= 31 ? networkAddress : intToIp(netInt + 1);\nconst lastUsable = cidr >= 31 ? broadcastAddress : intToIp(parseInt(broadBin, 2) - 1);\n\nreturn [{\n  json: {\n    ...input,\n    networkAddress, \n    broadcastAddress, \n    subnetMask,\n    wildcardMask,\n    firstUsable, \n    lastUsable, \n    totalHosts: Math.pow(2, 32 - cidr),\n    usableHosts: cidr === 32 ? 1 : (cidr === 31 ? 2 : Math.pow(2, 32 - cidr) - 2),\n    ipClass: `Class ${legacyClass}${cidrEquivalent}`, // Legacy + Size\n    networkType: isPrivate ? '🔒 Private Network' : '🌍 Public Network', // Separate Line\n    ipBinary: formatBin(ipBinary),\n    maskBinary: formatBin(maskBinary),\n    networkBinary: formatBin(netBin),\n    previousSubnet: netInt - subnetSize >= 0 ? intToIp(netInt - subnetSize) + '/' + cidr : 'N/A',\n    nextSubnet: netInt + subnetSize <= 4294967295 ? intToIp(netInt + subnetSize) + '/' + cidr : 'N/A',\n    reverseDNS: cidr >= 24 ? `${octets[2]}.${octets[1]}.${octets[0]}.in-addr.arpa` : `${octets[1]}.${octets[0]}.in-addr.arpa`\n  }\n}];"
+      },
+      "name": "Calculate Subnet",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -384,
+        304
+      ],
+      "id": "303bd36c-5707-4130-a174-e194d53dc87b"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.error }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "Check for Error",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -128,
+        304
+      ],
+      "id": "f26c652d-469a-4a76-bed5-a588c80c3a35"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.isPrivate }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "Is Private IP?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        128,
+        416
+      ],
+      "id": "579b84ca-d762-4216-b052-50aa8d43ffe7"
+    },
+    {
+      "parameters": {
+        "url": "=http://ip-api.com/json/{{ $json.ip }}?fields=status,message,country,countryCode,region,regionName,city,zip,lat,lon,isp,org,as,mobile,proxy,hosting,query",
+        "options": {}
+      },
+      "name": "Lookup IP Info",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        432,
+        576
+      ],
+      "id": "d59691bf-3217-4668-bfcc-19e83d70e14f"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Get Subnet Data\nconst subnet = $('Calculate Subnet').first().json;\n\n// 2. Get Security Data (Direct Input)\nconst abuse = $input.item.json;\n\n// 3. Get Geolocation Data\nlet geo = {};\ntry { geo = $('Lookup IP Info').first().json; } catch(e) {}\n\n// Start the message string\nlet ipInfo = '*📡 Intelligence & Security:*\\n';\n\n// --- Build the Message ---\n\n// Add Geolocation\nif (geo && (geo.status === 'success' || geo.org)) {\n  ipInfo += `• 🏢 Org: ${geo.org || geo.isp || 'Unknown'}\\n`;\n  ipInfo += `• 🌍 Location: ${geo.city}, ${geo.country}\\n`;\n  ipInfo += `• 🔢 ASN: ${geo.as || 'Unknown'}\\n`;\n}\n\n// Add Abuse Score\nif (abuse && abuse.data) {\n  const score = abuse.data.abuseConfidenceScore;\n  const reports = abuse.data.totalReports;\n  \n  let emoji = '✅';\n  if (score > 25) emoji = '⚠️';\n  if (score > 75) emoji = '🚨';\n  \n  ipInfo += `• ${emoji} *Abuse Score:* ${score}% (${reports} reports)\\n`;\n}\n\nreturn {\n  json: {\n    ...subnet,\n    ipInfo: ipInfo\n  }\n};"
+      },
+      "name": "Format Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        848,
+        400
+      ],
+      "id": "f150a665-e9ec-40fd-8152-bdad8f05741c"
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "={{ $json.channel }}",
+          "mode": "id"
+        },
+        "text": "=*🌐 Subnet Calculator Results:*\n\n*📍 IP Address:* `{{ $json.ip }}/{{ $json.cidr }}`\n*📊 IP Class:* {{ $json.ipClass }}\n*🏷️ Network Type:* {{ $json.networkType }}\n\n*🔧 Network Information:*\n• Network: `{{ $json.networkAddress }}`\n• Broadcast: `{{ $json.broadcastAddress }}`\n• Netmask: `{{ $json.subnetMask }}`\n• Wildcard: `{{ $json.wildcardMask }}`\n\n*🎯 Usable IP Range:*\n• First: `{{ $json.firstUsable }}`\n• Last: `{{ $json.lastUsable }}`\n\n*👥 Host Information:*\n• Total Hosts: {{ $json.totalHosts }}\n• Usable Hosts: {{ $json.usableHosts }}\n\n*💻 Binary Representation:*\n• IP Address: `{{ $json.ipBinary }}`\n• Subnet Mask: `{{ $json.maskBinary }}`\n• Network Address: `{{ $json.networkBinary }}`\n\n*🔀 Neighboring Networks:*\n• Previous: `{{ $json.previousSubnet }}`\n• Next: `{{ $json.nextSubnet }}`\n\n*🔄 Reverse DNS Zone:*\n`{{ $json.reverseDNS }}`\n\n{{ $json.ipInfo }}",
+        "otherOptions": {}
+      },
+      "name": "Send Results",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.1,
+      "position": [
+        1072,
+        400
+      ],
+      "id": "6edc8d25-8972-46bd-acaa-cb67edf0440c",
+      "webhookId": "742538c9-c764-49a4-9d3c-1eafae017d96",
+      "credentials": {
+        "slackApi": {
+          "id": "F4TbMFcYC0qqJERR",
+          "name": "Subnet Calculator"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "={{ $json.channel }}",
+          "mode": "id"
+        },
+        "text": "={{ $json.message }}",
+        "otherOptions": {}
+      },
+      "name": "Send Error",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.1,
+      "position": [
+        128,
+        144
+      ],
+      "id": "b44c5be0-aff8-41f4-aef0-a11bb69d9be2",
+      "webhookId": "383d40b1-48ce-4b3f-9c21-353aeab2cca4",
+      "credentials": {
+        "slackApi": {
+          "id": "F4TbMFcYC0qqJERR",
+          "name": "Subnet Calculator"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract IP/CIDR from Slack message\nconst item = $input.item.json;\nlet text = '';\n\n// Handle different Slack event structures\nif (item.event && item.event.text) {\n  text = item.event.text;\n} else if (item.text) {\n  text = item.text;\n} else if (item.body && item.body.event && item.body.event.text) {\n  text = item.body.event.text;\n}\n\n// Remove bot mention (e.g., <@U12345>) to find the IP cleanly\nconst cleanText = text.replace(/<@.*?>/g, '').trim();\n\n// Regex to find IP and optional CIDR\nconst cidrMatch = cleanText.match(/\\b(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3})(\\/(\\d{1,2}))?\\b/);\n\nif (!cidrMatch) {\n  return {\n    error: true,\n    message: 'Invalid format. Please provide an IP (e.g., `192.168.1.50/24`).',\n    channel: item.event?.channel || item.channel\n  };\n}\n\nconst ip = cidrMatch[1];\nconst cidr = cidrMatch[3] ? parseInt(cidrMatch[3]) : 24; // Default to /24\n\n// Validate IP Octets\nconst octets = ip.split('.').map(Number);\nif (octets.some(o => o < 0 || o > 255)) {\n  return { error: true, message: 'Invalid IP address.', channel: item.event?.channel };\n}\nif (cidr < 0 || cidr > 32) {\n  return { error: true, message: 'Invalid CIDR (0-32).', channel: item.event?.channel };\n}\n\nreturn {\n  error: false,\n  ip: ip,\n  cidr: cidr,\n  channel: item.event?.channel || item.channel\n};\n"
+      },
+      "name": "Parse Input1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -688,
+        304
+      ],
+      "id": "6ffc3fd5-65b5-404b-b498-5e9caf601fd4"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.abuseipdb.com/api/v2/check?ipAddress={{ $json.query }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "name": "Check AbuseIPDB",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        688,
+        576
+      ],
+      "id": "e122a42d-b1b2-484a-9c73-92f78b6e42f0",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "4z2IIeR6L21b9xLD",
+          "name": "Abuseipdb"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Slack Trigger": {
+      "main": [
+        [
+          {
+            "node": "Parse Input1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Subnet": {
+      "main": [
+        [
+          {
+            "node": "Check for Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check for Error": {
+      "main": [
+        [
+          {
+            "node": "Send Error",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Is Private IP?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Private IP?": {
+      "main": [
+        [
+          {
+            "node": "Format Results",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Lookup IP Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup IP Info": {
+      "main": [
+        [
+          {
+            "node": "Check AbuseIPDB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Results": {
+      "main": [
+        [
+          {
+            "node": "Send Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Input1": {
+      "main": [
+        [
+          {
+            "node": "Calculate Subnet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check AbuseIPDB": {
+      "main": [
+        [
+          {
+            "node": "Format Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "2a034cf2-30fa-43e7-a753-693d30a28eac",
+  "activeVersionId": "2a034cf2-30fa-43e7-a753-693d30a28eac",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-02-14T09:26:59.595Z",
+      "createdAt": "2026-02-14T09:26:59.595Z",
+      "role": "workflow:owner",
+      "workflowId": "XvXxMrg14TzP6QtU",
+      "projectId": "pWTWmuHnmIHw48U9"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-02-14T12:48:34.000Z",
+    "createdAt": "2026-02-14T11:13:35.791Z",
+    "versionId": "2a034cf2-30fa-43e7-a753-693d30a28eac",
+    "workflowId": "XvXxMrg14TzP6QtU",
+    "nodes": [
+      {
+        "parameters": {
+          "trigger": [
+            "app_mention"
+          ],
+          "channelId": {
+            "__rl": true,
+            "value": "C0AF191GN2W",
+            "mode": "id"
+          },
+          "options": {}
+        },
+        "name": "Slack Trigger",
+        "type": "n8n-nodes-base.slackTrigger",
+        "typeVersion": 1,
+        "position": [
+          -928,
+          304
+        ],
+        "webhookId": "subnet-calc-trigger",
+        "id": "90cf9d80-57da-4268-a372-3f31a6fd646e",
+        "credentials": {
+          "slackApi": {
+            "id": "F4TbMFcYC0qqJERR",
+            "name": "Subnet Calculator"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "const input = $input.item.json;\nif (input.error) return [{ json: input }];\n\nconst ip = input.ip;\nconst cidr = input.cidr;\n\n// --- Helper Functions ---\nfunction ipToBinary(ip) { return ip.split('.').map(o => parseInt(o).toString(2).padStart(8, '0')).join(''); }\nfunction binaryToIp(b) { return b.match(/.{8}/g).map(bin => parseInt(bin, 2)).join('.'); }\nfunction intToIp(int) { return [(int >>> 24) & 255, (int >>> 16) & 255, (int >>> 8) & 255, int & 255].join('.'); }\nfunction formatBin(b) { return b.match(/.{8}/g).join('.'); }\n\n// --- Calculations ---\nconst maskBinary = '1'.repeat(cidr) + '0'.repeat(32 - cidr);\nconst wildcardBinary = '0'.repeat(cidr) + '1'.repeat(32 - cidr);\nconst ipBinary = ipToBinary(ip);\n\n// Network & Broadcast Binary\nlet netBin = ''; for (let i = 0; i < 32; i++) netBin += (ipBinary[i] === '1' && maskBinary[i] === '1') ? '1' : '0';\nlet broadBin = ''; for (let i = 0; i < 32; i++) broadBin += (ipBinary[i] === '1' || wildcardBinary[i] === '1') ? '1' : '0';\n\nconst networkAddress = binaryToIp(netBin);\nconst broadcastAddress = binaryToIp(broadBin);\nconst subnetMask = binaryToIp(maskBinary);\nconst wildcardMask = binaryToIp(wildcardBinary);\n\n// --- Modern CIDR vs Legacy Class Logic ---\nconst octets = ip.split('.').map(Number);\nlet legacyClass = 'Unknown';\nif (octets[0] <= 126) legacyClass = 'A';\nelse if (octets[0] >= 128 && octets[0] <= 191) legacyClass = 'B';\nelse if (octets[0] >= 192 && octets[0] <= 223) legacyClass = 'C';\n\nlet cidrEquivalent = '';\nif (cidr === 24) cidrEquivalent = ' (Class C Size)';\nelse if (cidr === 16) cidrEquivalent = ' (Class B Size)';\nelse if (cidr === 8) cidrEquivalent = ' (Class A Size)';\n\nconst isPrivate = (octets[0] === 10) || \n                  (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31) || \n                  (octets[0] === 192 && octets[1] === 168);\n\n// --- Neighbors & Usable ---\nconst netInt = parseInt(netBin, 2);\nconst subnetSize = Math.pow(2, 32 - cidr);\nconst firstUsable = cidr >= 31 ? networkAddress : intToIp(netInt + 1);\nconst lastUsable = cidr >= 31 ? broadcastAddress : intToIp(parseInt(broadBin, 2) - 1);\n\nreturn [{\n  json: {\n    ...input,\n    networkAddress, \n    broadcastAddress, \n    subnetMask,\n    wildcardMask,\n    firstUsable, \n    lastUsable, \n    totalHosts: Math.pow(2, 32 - cidr),\n    usableHosts: cidr === 32 ? 1 : (cidr === 31 ? 2 : Math.pow(2, 32 - cidr) - 2),\n    ipClass: `Class ${legacyClass}${cidrEquivalent}`, // Legacy + Size\n    networkType: isPrivate ? '🔒 Private Network' : '🌍 Public Network', // Separate Line\n    ipBinary: formatBin(ipBinary),\n    maskBinary: formatBin(maskBinary),\n    networkBinary: formatBin(netBin),\n    previousSubnet: netInt - subnetSize >= 0 ? intToIp(netInt - subnetSize) + '/' + cidr : 'N/A',\n    nextSubnet: netInt + subnetSize <= 4294967295 ? intToIp(netInt + subnetSize) + '/' + cidr : 'N/A',\n    reverseDNS: cidr >= 24 ? `${octets[2]}.${octets[1]}.${octets[0]}.in-addr.arpa` : `${octets[1]}.${octets[0]}.in-addr.arpa`\n  }\n}];"
+        },
+        "name": "Calculate Subnet",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -384,
+          304
+        ],
+        "id": "303bd36c-5707-4130-a174-e194d53dc87b"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "boolean": [
+              {
+                "value1": "={{ $json.error }}",
+                "value2": true
+              }
+            ]
+          }
+        },
+        "name": "Check for Error",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 1,
+        "position": [
+          -128,
+          304
+        ],
+        "id": "f26c652d-469a-4a76-bed5-a588c80c3a35"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "boolean": [
+              {
+                "value1": "={{ $json.isPrivate }}",
+                "value2": true
+              }
+            ]
+          }
+        },
+        "name": "Is Private IP?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 1,
+        "position": [
+          128,
+          416
+        ],
+        "id": "579b84ca-d762-4216-b052-50aa8d43ffe7"
+      },
+      {
+        "parameters": {
+          "url": "=http://ip-api.com/json/{{ $json.ip }}?fields=status,message,country,countryCode,region,regionName,city,zip,lat,lon,isp,org,as,mobile,proxy,hosting,query",
+          "options": {}
+        },
+        "name": "Lookup IP Info",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.1,
+        "position": [
+          432,
+          576
+        ],
+        "id": "d59691bf-3217-4668-bfcc-19e83d70e14f"
+      },
+      {
+        "parameters": {
+          "jsCode": "// 1. Get Subnet Data\nconst subnet = $('Calculate Subnet').first().json;\n\n// 2. Get Security Data (Direct Input)\nconst abuse = $input.item.json;\n\n// 3. Get Geolocation Data\nlet geo = {};\ntry { geo = $('Lookup IP Info').first().json; } catch(e) {}\n\n// Start the message string\nlet ipInfo = '*📡 Intelligence & Security:*\\n';\n\n// --- Build the Message ---\n\n// Add Geolocation\nif (geo && (geo.status === 'success' || geo.org)) {\n  ipInfo += `• 🏢 Org: ${geo.org || geo.isp || 'Unknown'}\\n`;\n  ipInfo += `• 🌍 Location: ${geo.city}, ${geo.country}\\n`;\n  ipInfo += `• 🔢 ASN: ${geo.as || 'Unknown'}\\n`;\n}\n\n// Add Abuse Score\nif (abuse && abuse.data) {\n  const score = abuse.data.abuseConfidenceScore;\n  const reports = abuse.data.totalReports;\n  \n  let emoji = '✅';\n  if (score > 25) emoji = '⚠️';\n  if (score > 75) emoji = '🚨';\n  \n  ipInfo += `• ${emoji} *Abuse Score:* ${score}% (${reports} reports)\\n`;\n}\n\nreturn {\n  json: {\n    ...subnet,\n    ipInfo: ipInfo\n  }\n};"
+        },
+        "name": "Format Results",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          848,
+          400
+        ],
+        "id": "f150a665-e9ec-40fd-8152-bdad8f05741c"
+      },
+      {
+        "parameters": {
+          "select": "channel",
+          "channelId": {
+            "__rl": true,
+            "value": "={{ $json.channel }}",
+            "mode": "id"
+          },
+          "text": "=*🌐 Subnet Calculator Results:*\n\n*📍 IP Address:* `{{ $json.ip }}/{{ $json.cidr }}`\n*📊 IP Class:* {{ $json.ipClass }}\n*🏷️ Network Type:* {{ $json.networkType }}\n\n*🔧 Network Information:*\n• Network: `{{ $json.networkAddress }}`\n• Broadcast: `{{ $json.broadcastAddress }}`\n• Netmask: `{{ $json.subnetMask }}`\n• Wildcard: `{{ $json.wildcardMask }}`\n\n*🎯 Usable IP Range:*\n• First: `{{ $json.firstUsable }}`\n• Last: `{{ $json.lastUsable }}`\n\n*👥 Host Information:*\n• Total Hosts: {{ $json.totalHosts }}\n• Usable Hosts: {{ $json.usableHosts }}\n\n*💻 Binary Representation:*\n• IP Address: `{{ $json.ipBinary }}`\n• Subnet Mask: `{{ $json.maskBinary }}`\n• Network Address: `{{ $json.networkBinary }}`\n\n*🔀 Neighboring Networks:*\n• Previous: `{{ $json.previousSubnet }}`\n• Next: `{{ $json.nextSubnet }}`\n\n*🔄 Reverse DNS Zone:*\n`{{ $json.reverseDNS }}`\n\n{{ $json.ipInfo }}",
+          "otherOptions": {}
+        },
+        "name": "Send Results",
+        "type": "n8n-nodes-base.slack",
+        "typeVersion": 2.1,
+        "position": [
+          1072,
+          400
+        ],
+        "id": "6edc8d25-8972-46bd-acaa-cb67edf0440c",
+        "webhookId": "742538c9-c764-49a4-9d3c-1eafae017d96",
+        "credentials": {
+          "slackApi": {
+            "id": "F4TbMFcYC0qqJERR",
+            "name": "Subnet Calculator"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "select": "channel",
+          "channelId": {
+            "__rl": true,
+            "value": "={{ $json.channel }}",
+            "mode": "id"
+          },
+          "text": "={{ $json.message }}",
+          "otherOptions": {}
+        },
+        "name": "Send Error",
+        "type": "n8n-nodes-base.slack",
+        "typeVersion": 2.1,
+        "position": [
+          128,
+          144
+        ],
+        "id": "b44c5be0-aff8-41f4-aef0-a11bb69d9be2",
+        "webhookId": "383d40b1-48ce-4b3f-9c21-353aeab2cca4",
+        "credentials": {
+          "slackApi": {
+            "id": "F4TbMFcYC0qqJERR",
+            "name": "Subnet Calculator"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "// Extract IP/CIDR from Slack message\nconst item = $input.item.json;\nlet text = '';\n\n// Handle different Slack event structures\nif (item.event && item.event.text) {\n  text = item.event.text;\n} else if (item.text) {\n  text = item.text;\n} else if (item.body && item.body.event && item.body.event.text) {\n  text = item.body.event.text;\n}\n\n// Remove bot mention (e.g., <@U12345>) to find the IP cleanly\nconst cleanText = text.replace(/<@.*?>/g, '').trim();\n\n// Regex to find IP and optional CIDR\nconst cidrMatch = cleanText.match(/\\b(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3})(\\/(\\d{1,2}))?\\b/);\n\nif (!cidrMatch) {\n  return {\n    error: true,\n    message: 'Invalid format. Please provide an IP (e.g., `192.168.1.50/24`).',\n    channel: item.event?.channel || item.channel\n  };\n}\n\nconst ip = cidrMatch[1];\nconst cidr = cidrMatch[3] ? parseInt(cidrMatch[3]) : 24; // Default to /24\n\n// Validate IP Octets\nconst octets = ip.split('.').map(Number);\nif (octets.some(o => o < 0 || o > 255)) {\n  return { error: true, message: 'Invalid IP address.', channel: item.event?.channel };\n}\nif (cidr < 0 || cidr > 32) {\n  return { error: true, message: 'Invalid CIDR (0-32).', channel: item.event?.channel };\n}\n\nreturn {\n  error: false,\n  ip: ip,\n  cidr: cidr,\n  channel: item.event?.channel || item.channel\n};\n"
+        },
+        "name": "Parse Input1",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -688,
+          304
+        ],
+        "id": "6ffc3fd5-65b5-404b-b498-5e9caf601fd4"
+      },
+      {
+        "parameters": {
+          "url": "=https://api.abuseipdb.com/api/v2/check?ipAddress={{ $json.query }}",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpHeaderAuth",
+          "options": {}
+        },
+        "name": "Check AbuseIPDB",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.1,
+        "position": [
+          688,
+          576
+        ],
+        "id": "e122a42d-b1b2-484a-9c73-92f78b6e42f0",
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "4z2IIeR6L21b9xLD",
+            "name": "Abuseipdb"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Slack Trigger": {
+        "main": [
+          [
+            {
+              "node": "Parse Input1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Calculate Subnet": {
+        "main": [
+          [
+            {
+              "node": "Check for Error",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Check for Error": {
+        "main": [
+          [
+            {
+              "node": "Send Error",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Is Private IP?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Is Private IP?": {
+        "main": [
+          [
+            {
+              "node": "Format Results",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Lookup IP Info",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Lookup IP Info": {
+        "main": [
+          [
+            {
+              "node": "Check AbuseIPDB",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Format Results": {
+        "main": [
+          [
+            {
+              "node": "Send Results",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Parse Input1": {
+        "main": [
+          [
+            {
+              "node": "Calculate Subnet",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Check AbuseIPDB": {
+        "main": [
+          [
+            {
+              "node": "Format Results",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Alex Vinokur",
+    "name": "Version 2a034cf2",
+    "description": "",
+    "autosaved": false
+  },
+  "tags": []
+}
