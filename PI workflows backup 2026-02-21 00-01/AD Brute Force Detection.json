@@ -1,0 +1,459 @@
+{
+  "updatedAt": "2026-02-20T20:56:07.492Z",
+  "createdAt": "2026-02-20T12:43:29.116Z",
+  "id": "RcK0xz8MHqK9Y3e7",
+  "name": "AD Brute Force Detection",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "brute-force-alert",
+        "options": {}
+      },
+      "id": "b1c31403-5cff-4efb-a947-5ac54efaf8cf",
+      "name": "Webhook - Brute Force",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        368,
+        192
+      ],
+      "webhookId": "brute-force-alert"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "verify-secret",
+              "leftValue": "={{ $json.body.secret }}",
+              "rightValue": "n8w-GmC9x$kQ2vLpR7fT4bYe!Aj6Xs8Z",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "7fa4cbe9-6915-4dbf-a4aa-60ab45699eb1",
+      "name": "Verify Secret",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [
+        608,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "target-user",
+              "name": "targetUser",
+              "value": "={{ $json.body.targetUser }}",
+              "type": "string"
+            },
+            {
+              "id": "display-name",
+              "name": "displayName",
+              "value": "={{ $json.body.displayName }}",
+              "type": "string"
+            },
+            {
+              "id": "source-ip",
+              "name": "sourceIP",
+              "value": "={{ $json.body.sourceIP }}",
+              "type": "string"
+            },
+            {
+              "id": "source-computer",
+              "name": "sourceComputer",
+              "value": "={{ $json.body.sourceComputer }}",
+              "type": "string"
+            },
+            {
+              "id": "source-host",
+              "name": "sourceHost",
+              "value": "={{ $json.body.sourceHost }}",
+              "type": "string"
+            },
+            {
+              "id": "failure-count",
+              "name": "failureCount",
+              "value": "={{ $json.body.failureCount }}",
+              "type": "number"
+            },
+            {
+              "id": "failure-reason",
+              "name": "failureReason",
+              "value": "={{ $json.body.failureReason }}",
+              "type": "string"
+            },
+            {
+              "id": "logon-type",
+              "name": "logonType",
+              "value": "={{ $json.body.logonType }}",
+              "type": "string"
+            },
+            {
+              "id": "time-window",
+              "name": "timeWindow",
+              "value": "={{ $json.body.timeWindow }}",
+              "type": "number"
+            },
+            {
+              "id": "first-attempt",
+              "name": "firstAttempt",
+              "value": "={{ $json.body.firstAttempt }}",
+              "type": "string"
+            },
+            {
+              "id": "last-attempt",
+              "name": "lastAttempt",
+              "value": "={{ $json.body.lastAttempt }}",
+              "type": "string"
+            },
+            {
+              "id": "affected-machines",
+              "name": "affectedMachines",
+              "value": "={{ $json.body.affectedMachines }}",
+              "type": "string"
+            },
+            {
+              "id": "dc-name",
+              "name": "dcName",
+              "value": "={{ $json.body.dcName }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "4494b548-ee3b-49f3-bafc-fdf417e2071a",
+      "name": "Extract Alert Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        848,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "#brute-force-alerts",
+          "mode": "name"
+        },
+        "text": "=🚨 *Brute Force Attack Detected*\n\n━━━━━━━━━━━━━━━━━━━━\n• *Target User:* {{ $json.targetUser }}{{ $json.displayName ? ' (' + $json.displayName + ')' : '' }}\n• *Failed Attempts:* {{ $json.failureCount }} in {{ $json.timeWindow }} minutes\n• *Failure Reason:* {{ $json.failureReason }}\n• *Logon Type:* {{ $json.logonType }}\n━━━━━━━━━━━━━━━━━━━━\n• *Source:* {{ $json.sourceComputer }} ({{ $json.sourceIP }})\n• *Target Machine:* {{ $json.affectedMachines }}\n━━━━━━━━━━━━━━━━━━━━\n• *First Attempt:* {{ new Date($json.firstAttempt).toLocaleDateString('en-GB', {day:'numeric',month:'numeric',year:'numeric'}) + ' ' + new Date($json.firstAttempt).toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit',hour12:true}) }}\n• *Last Attempt:* {{ new Date($json.lastAttempt).toLocaleDateString('en-GB', {day:'numeric',month:'numeric',year:'numeric'}) + ' ' + new Date($json.lastAttempt).toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit',hour12:true}) }}\n• *Monitored By:* {{ $json.dcName }}\n━━━━━━━━━━━━━━━━━━━━\n⚠️ _Investigate immediately — possible credential attack_",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "id": "aa016ab4-0830-4779-a4b0-0bbfe38496d3",
+      "name": "Slack - Brute Force Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        1088,
+        192
+      ],
+      "webhookId": "927e0dc4-d670-440f-9023-cbcfcfcd2106",
+      "credentials": {
+        "slackApi": {
+          "id": "obEYVo8oQOJ22JqX",
+          "name": "AD Admin Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook - Brute Force": {
+      "main": [
+        [
+          {
+            "node": "Verify Secret",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Secret": {
+      "main": [
+        [
+          {
+            "node": "Extract Alert Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Alert Data": {
+      "main": [
+        [
+          {
+            "node": "Slack - Brute Force Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "15a337b2-ce3f-49fb-baa8-8f6626bdeef6",
+  "activeVersionId": "15a337b2-ce3f-49fb-baa8-8f6626bdeef6",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-02-20T12:43:29.118Z",
+      "createdAt": "2026-02-20T12:43:29.118Z",
+      "role": "workflow:owner",
+      "workflowId": "RcK0xz8MHqK9Y3e7",
+      "projectId": "pWTWmuHnmIHw48U9"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-02-20T20:57:18.000Z",
+    "createdAt": "2026-02-20T20:56:07.493Z",
+    "versionId": "15a337b2-ce3f-49fb-baa8-8f6626bdeef6",
+    "workflowId": "RcK0xz8MHqK9Y3e7",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "brute-force-alert",
+          "options": {}
+        },
+        "id": "b1c31403-5cff-4efb-a947-5ac54efaf8cf",
+        "name": "Webhook - Brute Force",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          368,
+          192
+        ],
+        "webhookId": "brute-force-alert"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict"
+            },
+            "conditions": [
+              {
+                "id": "verify-secret",
+                "leftValue": "={{ $json.body.secret }}",
+                "rightValue": "n8w-GmC9x$kQ2vLpR7fT4bYe!Aj6Xs8Z",
+                "operator": {
+                  "type": "string",
+                  "operation": "equals"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "7fa4cbe9-6915-4dbf-a4aa-60ab45699eb1",
+        "name": "Verify Secret",
+        "type": "n8n-nodes-base.filter",
+        "typeVersion": 2,
+        "position": [
+          608,
+          192
+        ]
+      },
+      {
+        "parameters": {
+          "assignments": {
+            "assignments": [
+              {
+                "id": "target-user",
+                "name": "targetUser",
+                "value": "={{ $json.body.targetUser }}",
+                "type": "string"
+              },
+              {
+                "id": "display-name",
+                "name": "displayName",
+                "value": "={{ $json.body.displayName }}",
+                "type": "string"
+              },
+              {
+                "id": "source-ip",
+                "name": "sourceIP",
+                "value": "={{ $json.body.sourceIP }}",
+                "type": "string"
+              },
+              {
+                "id": "source-computer",
+                "name": "sourceComputer",
+                "value": "={{ $json.body.sourceComputer }}",
+                "type": "string"
+              },
+              {
+                "id": "source-host",
+                "name": "sourceHost",
+                "value": "={{ $json.body.sourceHost }}",
+                "type": "string"
+              },
+              {
+                "id": "failure-count",
+                "name": "failureCount",
+                "value": "={{ $json.body.failureCount }}",
+                "type": "number"
+              },
+              {
+                "id": "failure-reason",
+                "name": "failureReason",
+                "value": "={{ $json.body.failureReason }}",
+                "type": "string"
+              },
+              {
+                "id": "logon-type",
+                "name": "logonType",
+                "value": "={{ $json.body.logonType }}",
+                "type": "string"
+              },
+              {
+                "id": "time-window",
+                "name": "timeWindow",
+                "value": "={{ $json.body.timeWindow }}",
+                "type": "number"
+              },
+              {
+                "id": "first-attempt",
+                "name": "firstAttempt",
+                "value": "={{ $json.body.firstAttempt }}",
+                "type": "string"
+              },
+              {
+                "id": "last-attempt",
+                "name": "lastAttempt",
+                "value": "={{ $json.body.lastAttempt }}",
+                "type": "string"
+              },
+              {
+                "id": "affected-machines",
+                "name": "affectedMachines",
+                "value": "={{ $json.body.affectedMachines }}",
+                "type": "string"
+              },
+              {
+                "id": "dc-name",
+                "name": "dcName",
+                "value": "={{ $json.body.dcName }}",
+                "type": "string"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "4494b548-ee3b-49f3-bafc-fdf417e2071a",
+        "name": "Extract Alert Data",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [
+          848,
+          192
+        ]
+      },
+      {
+        "parameters": {
+          "select": "channel",
+          "channelId": {
+            "__rl": true,
+            "value": "#brute-force-alerts",
+            "mode": "name"
+          },
+          "text": "=🚨 *Brute Force Attack Detected*\n\n━━━━━━━━━━━━━━━━━━━━\n• *Target User:* {{ $json.targetUser }}{{ $json.displayName ? ' (' + $json.displayName + ')' : '' }}\n• *Failed Attempts:* {{ $json.failureCount }} in {{ $json.timeWindow }} minutes\n• *Failure Reason:* {{ $json.failureReason }}\n• *Logon Type:* {{ $json.logonType }}\n━━━━━━━━━━━━━━━━━━━━\n• *Source:* {{ $json.sourceComputer }} ({{ $json.sourceIP }})\n• *Target Machine:* {{ $json.affectedMachines }}\n━━━━━━━━━━━━━━━━━━━━\n• *First Attempt:* {{ new Date($json.firstAttempt).toLocaleDateString('en-GB', {day:'numeric',month:'numeric',year:'numeric'}) + ' ' + new Date($json.firstAttempt).toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit',hour12:true}) }}\n• *Last Attempt:* {{ new Date($json.lastAttempt).toLocaleDateString('en-GB', {day:'numeric',month:'numeric',year:'numeric'}) + ' ' + new Date($json.lastAttempt).toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit',hour12:true}) }}\n• *Monitored By:* {{ $json.dcName }}\n━━━━━━━━━━━━━━━━━━━━\n⚠️ _Investigate immediately — possible credential attack_",
+          "otherOptions": {
+            "includeLinkToWorkflow": false
+          }
+        },
+        "id": "aa016ab4-0830-4779-a4b0-0bbfe38496d3",
+        "name": "Slack - Brute Force Alert",
+        "type": "n8n-nodes-base.slack",
+        "typeVersion": 2.2,
+        "position": [
+          1088,
+          192
+        ],
+        "webhookId": "927e0dc4-d670-440f-9023-cbcfcfcd2106",
+        "credentials": {
+          "slackApi": {
+            "id": "obEYVo8oQOJ22JqX",
+            "name": "AD Admin Bot"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Webhook - Brute Force": {
+        "main": [
+          [
+            {
+              "node": "Verify Secret",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Verify Secret": {
+        "main": [
+          [
+            {
+              "node": "Extract Alert Data",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Extract Alert Data": {
+        "main": [
+          [
+            {
+              "node": "Slack - Brute Force Alert",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Alex Vinokur",
+    "name": "Version 15a337b2",
+    "description": "",
+    "autosaved": true
+  },
+  "tags": []
+}
