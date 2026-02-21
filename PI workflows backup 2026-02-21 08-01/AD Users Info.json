@@ -1,0 +1,761 @@
+{
+  "updatedAt": "2026-02-17T18:52:15.087Z",
+  "createdAt": "2026-02-12T15:39:50.049Z",
+  "id": "LZ8OZU5KXo6Ps6dS",
+  "name": "AD Users Info",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json[\"error\"]}}",
+              "value2": "true"
+            }
+          ]
+        }
+      },
+      "id": "ce14c0b0-a0bb-4c87-9239-857416bf083e",
+      "name": "Is Input Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -320,
+        1856
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "={{ $('Parse Username').item.json.response_channel }}",
+          "mode": "id"
+        },
+        "text": "=⚠️ *Input Validation Error*\n━━━━━━━━━━━━━━━━━━━━━━\n{{ $('Parse Username').item.json.message }}\n\nPlease provide a valid AD username.",
+        "otherOptions": {}
+      },
+      "id": "79ccb80f-d774-4019-9b4a-318288129cb1",
+      "name": "Respond - Invalid Input",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2,
+      "position": [
+        -32,
+        1632
+      ],
+      "webhookId": "c1dab9d4-e320-405c-9b34-33e3dc075c6b",
+      "credentials": {
+        "slackApi": {
+          "id": "obEYVo8oQOJ22JqX",
+          "name": "AD Admin Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json[\"stderr\"]}}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "id": "ffb7feca-b727-4312-adb1-a665a6a2e649",
+      "name": "SSH Error?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        240,
+        2080
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "={{ $('Parse Username').item.json.response_channel }}",
+          "mode": "id"
+        },
+        "text": "=⚠️ *AD Connection Error*\n━━━━━━━━━━━━━━━━━━━━━━\nFailed to connect to Active Directory server.\n\n*Error:* ```{{ $json.stderr }}```\n\n*Requested by:* @{{ $('Parse Username').item.json.requested_by }}\n\nPlease contact IT if this issue persists.",
+        "otherOptions": {}
+      },
+      "id": "4ad4be73-e09f-40f5-a645-329e1da857a3",
+      "name": "Respond - SSH Error",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2,
+      "position": [
+        512,
+        1856
+      ],
+      "webhookId": "fb714cf4-68db-48e4-af1f-a77dc4142543",
+      "credentials": {
+        "slackApi": {
+          "id": "obEYVo8oQOJ22JqX",
+          "name": "AD Admin Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "slack/get-ad-user",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "fb8122fd-5278-4288-9547-ea64007eec87",
+      "name": "Slack Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -1168,
+        1856
+      ],
+      "webhookId": "ad-user-lookup-webhook"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "🔍 Processing request... please wait.",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        -880,
+        1856
+      ],
+      "id": "e9cec69c-64b4-4573-a622-887b46af35ea",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = items[0].json.body;\nconst text = body.text || '';\nconst channel = body.channel_id || '';\nconst requestedBy = body.user_name || 'unknown';\n\nconst username = text.trim().replace(/[^a-zA-Z0-9._-]/g, '');\n\nif (!username || username.length === 0) {\n  return [{ json: { error: true, message: 'Invalid username provided. Only alphanumeric characters, dots, hyphens, and underscores are allowed.' } }];\n}\n\nif (username.length > 64) {\n  return [{ json: { error: true, message: 'Username too long. Maximum 64 characters allowed.' } }];\n}\n\nreturn [{ json: { user_to_search: username, response_channel: channel, requested_by: requestedBy } }];"
+      },
+      "id": "78e5155a-faa8-48a6-b584-b8b16d741b24",
+      "name": "Parse Username",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -592,
+        1856
+      ]
+    },
+    {
+      "parameters": {
+        "command": "=powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"C:\\Scripts\\Get-ADUserInfo.ps1\" -Username \"{{$json.user_to_search}}\"",
+        "cwd": "="
+      },
+      "id": "0a7a0687-2c20-4200-aafa-0071ad53e41c",
+      "name": "SSH to AD",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        -32,
+        2080
+      ],
+      "credentials": {
+        "sshPassword": {
+          "id": "umWU43lA8b3R4GcA",
+          "name": "SSH Password account"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "={{ $('Parse Username').item.json.response_channel }}",
+          "mode": "id"
+        },
+        "text": "=👤 *AD User Information*\n━━━━━━━━━━━━━━━━━━━━━━\n🆔 *Username:* `{{ $json.data.username }}`\n🔢 *Employee ID:* {{ $json.data.employeeNumber || 'N/A' }}\n📛 *Full Name:* {{ $json.data.fullName }}\n📧 *Email:* {{ $json.data.email }}\n📝 *Description:* {{ $json.data.description || 'N/A' }}\n💼 *Title:* {{ $json.data.title }}\n📞 *Phone:* {{ $json.data.telephoneNumber || 'N/A' }}\n👔 *Manager:* {{ $json.data.manager }}\n⚙️ *Account Enabled:* {{ $json.data.enabled ? '✅ Yes' : '❌ No' }}\n🔐 *Account Locked:* {{ $json.data.locked ? '🔒 Yes (Locked)' : '🔓 No' }}\n🕒 *Last Logon:* {{ $json.data.lastLogon }}\n🔑 *Password Last Set:* {{ $json.data.passwordLastSet }}\n📅 *Account Created:* {{ $json.data.accountCreatedDate }}\n━━━━━━━━━━━━━━━━━━━━━━\n📁 *Group Memberships*\n\n✉️ *Distribution Groups:*\n{{ $json.data.groups.distribution.length > 0 ? $json.data.groups.distribution.map(g => `• ${g}`).join('\\n') : '• None' }}\n\n🛡️ *Security Groups:*\n{{ $json.data.groups.security.length > 0 ? $json.data.groups.security.map(g => `• ${g}`).join('\\n') : '• None' }}\n━━━━━━━━━━━━━━━━━━━━━━\n🔎 *Requested by:* @{{ $('Parse Username').item.json.requested_by }}",
+        "otherOptions": {}
+      },
+      "id": "edc74285-7882-4896-83a9-0d3fb5969d0c",
+      "name": "Respond - User Found",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2,
+      "position": [
+        1056,
+        2080
+      ],
+      "webhookId": "5915e11f-2d9e-4e93-a1cc-7cf986ca81dc",
+      "credentials": {
+        "slackApi": {
+          "id": "obEYVo8oQOJ22JqX",
+          "name": "AD Admin Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "={{ $('Parse Username').item.json.response_channel }}",
+          "mode": "id"
+        },
+        "text": "=❌ *User Not Found*\n━━━━━━━━━━━━━━━━━━━━━━\n{{ $json.message }}\n\nPlease check the username and try again.\n\n🔎 *Requested by:* @{{ $('Parse Username').item.json.requested_by }}",
+        "otherOptions": {}
+      },
+      "id": "7c385e06-3114-4858-9515-49bec274fc36",
+      "name": "Respond - Not Found",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2,
+      "position": [
+        1056,
+        2528
+      ],
+      "webhookId": "13d20690-ae10-4fff-a546-8c98662e97bc",
+      "credentials": {
+        "slackApi": {
+          "id": "obEYVo8oQOJ22JqX",
+          "name": "AD Admin Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json[\"status\"]}}",
+              "value2": "success"
+            }
+          ]
+        }
+      },
+      "id": "50c4bf04-d0b8-4d18-9484-91a04a69d8f3",
+      "name": "Is User Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        784,
+        2304
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = items[0].json;\n\nif (item.error || !item.stdout || item.stdout.trim() === '') {\n  return [{ json: { status: 'error', message: item.stderr || 'No output from AD script. The script may have timed out or encountered an error.' } }];\n}\n\nlet parsedData = null;\n\ntry {\n  parsedData = JSON.parse(item.stdout);\n} catch (parseError) {\n  const jsonMatch = item.stdout.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    try {\n      parsedData = JSON.parse(jsonMatch[0]);\n    } catch (e) {\n      return [{ json: { status: 'error', message: 'Failed to parse PowerShell output. Raw output: ' + item.stdout.substring(0, 200) } }];\n    }\n  } else {\n    return [{ json: { status: 'error', message: 'Unexpected response format from AD server.' } }];\n  }\n}\n\nif (!parsedData || !parsedData.status) {\n  return [{ json: { status: 'error', message: 'AD response missing required status field.' } }];\n}\n\nreturn [{ json: parsedData }];"
+      },
+      "id": "0cbc0e78-c0eb-43cd-a6bf-af03d160ba85",
+      "name": "Parse AD Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        512,
+        2304
+      ]
+    }
+  ],
+  "connections": {
+    "Is Input Valid?": {
+      "main": [
+        [
+          {
+            "node": "Respond - Invalid Input",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "SSH to AD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH Error?": {
+      "main": [
+        [
+          {
+            "node": "Respond - SSH Error",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Parse AD Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack Webhook": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond to Webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse Username",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Username": {
+      "main": [
+        [
+          {
+            "node": "Is Input Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH to AD": {
+      "main": [
+        [
+          {
+            "node": "SSH Error?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is User Found?": {
+      "main": [
+        [
+          {
+            "node": "Respond - User Found",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond - Not Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AD Response": {
+      "main": [
+        [
+          {
+            "node": "Is User Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "ddeed4ac-b41a-4904-92cb-9a3db72548cf",
+  "activeVersionId": "ddeed4ac-b41a-4904-92cb-9a3db72548cf",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-02-12T15:39:50.058Z",
+      "createdAt": "2026-02-12T15:39:50.058Z",
+      "role": "workflow:owner",
+      "workflowId": "LZ8OZU5KXo6Ps6dS",
+      "projectId": "pWTWmuHnmIHw48U9"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-02-17T18:52:17.000Z",
+    "createdAt": "2026-02-17T18:52:15.089Z",
+    "versionId": "ddeed4ac-b41a-4904-92cb-9a3db72548cf",
+    "workflowId": "LZ8OZU5KXo6Ps6dS",
+    "nodes": [
+      {
+        "parameters": {
+          "conditions": {
+            "string": [
+              {
+                "value1": "={{$json[\"error\"]}}",
+                "value2": "true"
+              }
+            ]
+          }
+        },
+        "id": "ce14c0b0-a0bb-4c87-9239-857416bf083e",
+        "name": "Is Input Valid?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 1,
+        "position": [
+          -320,
+          1856
+        ]
+      },
+      {
+        "parameters": {
+          "select": "channel",
+          "channelId": {
+            "__rl": true,
+            "value": "={{ $('Parse Username').item.json.response_channel }}",
+            "mode": "id"
+          },
+          "text": "=⚠️ *Input Validation Error*\n━━━━━━━━━━━━━━━━━━━━━━\n{{ $('Parse Username').item.json.message }}\n\nPlease provide a valid AD username.",
+          "otherOptions": {}
+        },
+        "id": "79ccb80f-d774-4019-9b4a-318288129cb1",
+        "name": "Respond - Invalid Input",
+        "type": "n8n-nodes-base.slack",
+        "typeVersion": 2,
+        "position": [
+          -32,
+          1632
+        ],
+        "webhookId": "c1dab9d4-e320-405c-9b34-33e3dc075c6b",
+        "credentials": {
+          "slackApi": {
+            "id": "obEYVo8oQOJ22JqX",
+            "name": "AD Admin Bot"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "string": [
+              {
+                "value1": "={{$json[\"stderr\"]}}",
+                "operation": "isNotEmpty"
+              }
+            ]
+          }
+        },
+        "id": "ffb7feca-b727-4312-adb1-a665a6a2e649",
+        "name": "SSH Error?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 1,
+        "position": [
+          240,
+          2080
+        ]
+      },
+      {
+        "parameters": {
+          "select": "channel",
+          "channelId": {
+            "__rl": true,
+            "value": "={{ $('Parse Username').item.json.response_channel }}",
+            "mode": "id"
+          },
+          "text": "=⚠️ *AD Connection Error*\n━━━━━━━━━━━━━━━━━━━━━━\nFailed to connect to Active Directory server.\n\n*Error:* ```{{ $json.stderr }}```\n\n*Requested by:* @{{ $('Parse Username').item.json.requested_by }}\n\nPlease contact IT if this issue persists.",
+          "otherOptions": {}
+        },
+        "id": "4ad4be73-e09f-40f5-a645-329e1da857a3",
+        "name": "Respond - SSH Error",
+        "type": "n8n-nodes-base.slack",
+        "typeVersion": 2,
+        "position": [
+          512,
+          1856
+        ],
+        "webhookId": "fb714cf4-68db-48e4-af1f-a77dc4142543",
+        "credentials": {
+          "slackApi": {
+            "id": "obEYVo8oQOJ22JqX",
+            "name": "AD Admin Bot"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "slack/get-ad-user",
+          "responseMode": "responseNode",
+          "options": {}
+        },
+        "id": "fb8122fd-5278-4288-9547-ea64007eec87",
+        "name": "Slack Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 1,
+        "position": [
+          -1168,
+          1856
+        ],
+        "webhookId": "ad-user-lookup-webhook"
+      },
+      {
+        "parameters": {
+          "respondWith": "text",
+          "responseBody": "🔍 Processing request... please wait.",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.5,
+        "position": [
+          -880,
+          1856
+        ],
+        "id": "e9cec69c-64b4-4573-a622-887b46af35ea",
+        "name": "Respond to Webhook"
+      },
+      {
+        "parameters": {
+          "jsCode": "const body = items[0].json.body;\nconst text = body.text || '';\nconst channel = body.channel_id || '';\nconst requestedBy = body.user_name || 'unknown';\n\nconst username = text.trim().replace(/[^a-zA-Z0-9._-]/g, '');\n\nif (!username || username.length === 0) {\n  return [{ json: { error: true, message: 'Invalid username provided. Only alphanumeric characters, dots, hyphens, and underscores are allowed.' } }];\n}\n\nif (username.length > 64) {\n  return [{ json: { error: true, message: 'Username too long. Maximum 64 characters allowed.' } }];\n}\n\nreturn [{ json: { user_to_search: username, response_channel: channel, requested_by: requestedBy } }];"
+        },
+        "id": "78e5155a-faa8-48a6-b584-b8b16d741b24",
+        "name": "Parse Username",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -592,
+          1856
+        ]
+      },
+      {
+        "parameters": {
+          "command": "=powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"C:\\Scripts\\Get-ADUserInfo.ps1\" -Username \"{{$json.user_to_search}}\"",
+          "cwd": "="
+        },
+        "id": "0a7a0687-2c20-4200-aafa-0071ad53e41c",
+        "name": "SSH to AD",
+        "type": "n8n-nodes-base.ssh",
+        "typeVersion": 1,
+        "position": [
+          -32,
+          2080
+        ],
+        "credentials": {
+          "sshPassword": {
+            "id": "umWU43lA8b3R4GcA",
+            "name": "SSH Password account"
+          }
+        },
+        "continueOnFail": true
+      },
+      {
+        "parameters": {
+          "select": "channel",
+          "channelId": {
+            "__rl": true,
+            "value": "={{ $('Parse Username').item.json.response_channel }}",
+            "mode": "id"
+          },
+          "text": "=👤 *AD User Information*\n━━━━━━━━━━━━━━━━━━━━━━\n🆔 *Username:* `{{ $json.data.username }}`\n🔢 *Employee ID:* {{ $json.data.employeeNumber || 'N/A' }}\n📛 *Full Name:* {{ $json.data.fullName }}\n📧 *Email:* {{ $json.data.email }}\n📝 *Description:* {{ $json.data.description || 'N/A' }}\n💼 *Title:* {{ $json.data.title }}\n📞 *Phone:* {{ $json.data.telephoneNumber || 'N/A' }}\n👔 *Manager:* {{ $json.data.manager }}\n⚙️ *Account Enabled:* {{ $json.data.enabled ? '✅ Yes' : '❌ No' }}\n🔐 *Account Locked:* {{ $json.data.locked ? '🔒 Yes (Locked)' : '🔓 No' }}\n🕒 *Last Logon:* {{ $json.data.lastLogon }}\n🔑 *Password Last Set:* {{ $json.data.passwordLastSet }}\n📅 *Account Created:* {{ $json.data.accountCreatedDate }}\n━━━━━━━━━━━━━━━━━━━━━━\n📁 *Group Memberships*\n\n✉️ *Distribution Groups:*\n{{ $json.data.groups.distribution.length > 0 ? $json.data.groups.distribution.map(g => `• ${g}`).join('\\n') : '• None' }}\n\n🛡️ *Security Groups:*\n{{ $json.data.groups.security.length > 0 ? $json.data.groups.security.map(g => `• ${g}`).join('\\n') : '• None' }}\n━━━━━━━━━━━━━━━━━━━━━━\n🔎 *Requested by:* @{{ $('Parse Username').item.json.requested_by }}",
+          "otherOptions": {}
+        },
+        "id": "edc74285-7882-4896-83a9-0d3fb5969d0c",
+        "name": "Respond - User Found",
+        "type": "n8n-nodes-base.slack",
+        "typeVersion": 2,
+        "position": [
+          1056,
+          2080
+        ],
+        "webhookId": "5915e11f-2d9e-4e93-a1cc-7cf986ca81dc",
+        "credentials": {
+          "slackApi": {
+            "id": "obEYVo8oQOJ22JqX",
+            "name": "AD Admin Bot"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "select": "channel",
+          "channelId": {
+            "__rl": true,
+            "value": "={{ $('Parse Username').item.json.response_channel }}",
+            "mode": "id"
+          },
+          "text": "=❌ *User Not Found*\n━━━━━━━━━━━━━━━━━━━━━━\n{{ $json.message }}\n\nPlease check the username and try again.\n\n🔎 *Requested by:* @{{ $('Parse Username').item.json.requested_by }}",
+          "otherOptions": {}
+        },
+        "id": "7c385e06-3114-4858-9515-49bec274fc36",
+        "name": "Respond - Not Found",
+        "type": "n8n-nodes-base.slack",
+        "typeVersion": 2,
+        "position": [
+          1056,
+          2528
+        ],
+        "webhookId": "13d20690-ae10-4fff-a546-8c98662e97bc",
+        "credentials": {
+          "slackApi": {
+            "id": "obEYVo8oQOJ22JqX",
+            "name": "AD Admin Bot"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "string": [
+              {
+                "value1": "={{$json[\"status\"]}}",
+                "value2": "success"
+              }
+            ]
+          }
+        },
+        "id": "50c4bf04-d0b8-4d18-9484-91a04a69d8f3",
+        "name": "Is User Found?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 1,
+        "position": [
+          784,
+          2304
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const item = items[0].json;\n\nif (item.error || !item.stdout || item.stdout.trim() === '') {\n  return [{ json: { status: 'error', message: item.stderr || 'No output from AD script. The script may have timed out or encountered an error.' } }];\n}\n\nlet parsedData = null;\n\ntry {\n  parsedData = JSON.parse(item.stdout);\n} catch (parseError) {\n  const jsonMatch = item.stdout.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    try {\n      parsedData = JSON.parse(jsonMatch[0]);\n    } catch (e) {\n      return [{ json: { status: 'error', message: 'Failed to parse PowerShell output. Raw output: ' + item.stdout.substring(0, 200) } }];\n    }\n  } else {\n    return [{ json: { status: 'error', message: 'Unexpected response format from AD server.' } }];\n  }\n}\n\nif (!parsedData || !parsedData.status) {\n  return [{ json: { status: 'error', message: 'AD response missing required status field.' } }];\n}\n\nreturn [{ json: parsedData }];"
+        },
+        "id": "0cbc0e78-c0eb-43cd-a6bf-af03d160ba85",
+        "name": "Parse AD Response",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          512,
+          2304
+        ]
+      }
+    ],
+    "connections": {
+      "Is Input Valid?": {
+        "main": [
+          [
+            {
+              "node": "Respond - Invalid Input",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "SSH to AD",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "SSH Error?": {
+        "main": [
+          [
+            {
+              "node": "Respond - SSH Error",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Parse AD Response",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Slack Webhook": {
+        "main": [
+          [
+            {
+              "node": "Respond to Webhook",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Respond to Webhook": {
+        "main": [
+          [
+            {
+              "node": "Parse Username",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Parse Username": {
+        "main": [
+          [
+            {
+              "node": "Is Input Valid?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "SSH to AD": {
+        "main": [
+          [
+            {
+              "node": "SSH Error?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Is User Found?": {
+        "main": [
+          [
+            {
+              "node": "Respond - User Found",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Respond - Not Found",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Parse AD Response": {
+        "main": [
+          [
+            {
+              "node": "Is User Found?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Alex Vinokur",
+    "name": "Version ddeed4ac",
+    "description": "",
+    "autosaved": true
+  },
+  "tags": []
+}
