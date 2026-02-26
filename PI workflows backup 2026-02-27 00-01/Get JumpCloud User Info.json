@@ -1,0 +1,788 @@
+{
+  "updatedAt": "2026-02-23T19:49:16.414Z",
+  "createdAt": "2026-02-23T19:42:10.938Z",
+  "id": "MqTJlk1YyldDChBZ",
+  "name": "Get JumpCloud User Info",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "slack/get-jc-user",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "480ab9a0-a961-4436-940a-b19346ddb903",
+      "name": "Slack Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -544,
+        160
+      ],
+      "webhookId": "get-jc-user-webhook"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "🔍 Looking up JumpCloud user... please wait.",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        -256,
+        160
+      ],
+      "id": "47338b1b-878e-4a98-b265-a34d53b060a6",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = items[0].json.body;\nconst text = body.text || '';\nconst channel = body.channel_id || '';\nconst requestedBy = body.user_name || 'unknown';\n\nconst username = text.trim().replace(/[^a-zA-Z0-9._-]/g, '');\n\nif (!username || username.length === 0) {\n  return [{ json: { error: true, message: 'Invalid username provided. Only alphanumeric characters, dots, hyphens, and underscores are allowed.' } }];\n}\n\nif (username.length > 64) {\n  return [{ json: { error: true, message: 'Username too long. Maximum 64 characters allowed.' } }];\n}\n\nreturn [{ json: { user_to_search: username, response_channel: channel, requested_by: requestedBy } }];"
+      },
+      "id": "98633b8c-a5bc-4074-b968-6dc8b742c5a5",
+      "name": "Parse Username",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        32,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "check-error",
+              "leftValue": "={{ $json.error }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "58c3160a-64a4-4ca6-a40a-e33a5dd9d283",
+      "name": "Is Input Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        304,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "={{ $('Parse Username').item.json.response_channel }}",
+          "mode": "id"
+        },
+        "text": "=⚠️ *Input Validation Error*\n━━━━━━━━━━━━━━━━━━━━━━\n{{ $('Parse Username').item.json.message }}\n\nPlease provide a valid JumpCloud username.",
+        "otherOptions": {}
+      },
+      "id": "02fb368a-a26a-489d-b105-5a3c4606cbd0",
+      "name": "Respond - Invalid Input",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2,
+      "position": [
+        592,
+        -64
+      ],
+      "webhookId": "87cb25c7-25d2-47d7-bef4-cab83d44c43f",
+      "credentials": {
+        "slackApi": {
+          "id": "obEYVo8oQOJ22JqX",
+          "name": "AD Admin Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json[\"stderr\"]}}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "id": "7304af36-0444-4ba1-85a8-9ad80745439b",
+      "name": "SSH Error?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        864,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "={{ $('Parse Username').item.json.response_channel }}",
+          "mode": "id"
+        },
+        "text": "=⚠️ *Connection Error*\n━━━━━━━━━━━━━━━━━━━━━━\nFailed to connect to the server.\n\n*Error:* ```{{ $json.stderr }}```\n\n*Requested by:* @{{ $('Parse Username').item.json.requested_by }}\n\nPlease contact IT if this issue persists.",
+        "otherOptions": {}
+      },
+      "id": "981244c8-bca2-4f03-aa78-f0a6d6c6290c",
+      "name": "Respond - SSH Error",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2,
+      "position": [
+        1136,
+        160
+      ],
+      "webhookId": "e270c006-f9f9-4d05-80fb-a95d05aecd4d",
+      "credentials": {
+        "slackApi": {
+          "id": "obEYVo8oQOJ22JqX",
+          "name": "AD Admin Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = items[0].json;\n\nif (item.error || !item.stdout || item.stdout.trim() === '') {\n  return [{ json: { status: 'error', message: item.stderr || 'No output from script.' } }];\n}\n\nlet parsedData = null;\n\ntry {\n  parsedData = JSON.parse(item.stdout);\n} catch (parseError) {\n  const jsonMatch = item.stdout.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    try {\n      parsedData = JSON.parse(jsonMatch[0]);\n    } catch (e) {\n      return [{ json: { status: 'error', message: 'Failed to parse output: ' + item.stdout.substring(0, 200) } }];\n    }\n  } else {\n    return [{ json: { status: 'error', message: 'Unexpected response format.' } }];\n  }\n}\n\nif (!parsedData || !parsedData.status) {\n  return [{ json: { status: 'error', message: 'Response missing status field.' } }];\n}\n\nreturn [{ json: parsedData }];"
+      },
+      "id": "61692947-aeba-43a9-a182-40abcb612fb4",
+      "name": "Parse JC Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1136,
+        608
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json[\"status\"]}}",
+              "value2": "success"
+            }
+          ]
+        }
+      },
+      "id": "fc51f1ea-634b-4a12-8f97-9cf6c56763d7",
+      "name": "Is User Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1408,
+        608
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "={{ $('Parse Username').item.json.response_channel }}",
+          "mode": "id"
+        },
+        "text": "=☁️ *JumpCloud User Information*\n━━━━━━━━━━━━━━━━━━━━━━\n🆔 *Username:* `{{ $json.data.username }}`\n🔢 *Employee ID:* {{ $json.data.employeeNumber || 'N/A' }}\n📛 *Full Name:* {{ $json.data.fullName }}\n📧 *Email:* {{ $json.data.email }}\n💼 *Title:* {{ $json.data.jobTitle || 'N/A' }}\n🏢 *Department:* {{ $json.data.department || 'N/A' }}\n👔 *Manager:* {{ $json.data.manager }}\n📍 *Office Location:* {{ $json.data.officeLocation }}\n📞 *Office Phone:* {{ $json.data.officePhone }}\n⚙️ *Account Enabled:* {{ $json.data.enabled ? '✅ Yes' : '❌ No' }}\n🔐 *Account Locked:* {{ $json.data.locked ? '🔒 Yes (Locked)' : '🔓 No' }}\n🛡️ *MFA Enabled:* {{ $json.data.mfaEnabled ? '✅ Yes' : '❌ No' }}\n🕒 *Last Login:* {{ $json.data.lastLogin }}\n📅 *Account Created:* {{ $json.data.created }}\n🆔 *JC User ID:* `{{ $json.data.jcUserId }}`\n━━━━━━━━━━━━━━━━━━━━━━\n👥 *Group Memberships:*\n{{ $json.data.groups.length > 0 ? $json.data.groups.map(g => `• ${g}`).join('\\n') : '• None' }}\n━━━━━━━━━━━━━━━━━━━━━━\n🖥️ *Bound Systems:*\n{{ $json.data.systems.length > 0 ? $json.data.systems.map(s => `• ${s}`).join('\\n') : '• None' }}\n━━━━━━━━━━━━━━━━━━━━━━\n🔎 *Requested by:* @{{ $('Parse Username').item.json.requested_by }}",
+        "otherOptions": {}
+      },
+      "id": "47067bd5-11b6-4c76-98f8-26e423fb5171",
+      "name": "Respond - User Found",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        384
+      ],
+      "webhookId": "7a74ce9b-290e-4602-b78c-f3af877d7659",
+      "credentials": {
+        "slackApi": {
+          "id": "obEYVo8oQOJ22JqX",
+          "name": "AD Admin Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "={{ $('Parse Username').item.json.response_channel }}",
+          "mode": "id"
+        },
+        "text": "=❌ *User Not Found*\n━━━━━━━━━━━━━━━━━━━━━━\n{{ $json.message }}\n\nPlease check the username and try again.\n\n🔎 *Requested by:* @{{ $('Parse Username').item.json.requested_by }}",
+        "otherOptions": {}
+      },
+      "id": "59927a70-933c-4d99-aac7-1b15a92813d8",
+      "name": "Respond - Not Found",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        832
+      ],
+      "webhookId": "278c1175-33ff-4bc6-b6ab-0bca8c993fc9",
+      "credentials": {
+        "slackApi": {
+          "id": "obEYVo8oQOJ22JqX",
+          "name": "AD Admin Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "=powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"C:\\Scripts\\Get-JCUserInfo.ps1\" -Username \"{{$json.user_to_search}}\"",
+        "cwd": "="
+      },
+      "id": "19fc4556-6582-4c2f-b5ca-23acaef8b23d",
+      "name": "SSH to JC",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        592,
+        384
+      ],
+      "credentials": {
+        "sshPassword": {
+          "id": "umWU43lA8b3R4GcA",
+          "name": "SSH Password account"
+        }
+      },
+      "continueOnFail": true
+    }
+  ],
+  "connections": {
+    "Slack Webhook": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond to Webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse Username",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Username": {
+      "main": [
+        [
+          {
+            "node": "Is Input Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Input Valid?": {
+      "main": [
+        [
+          {
+            "node": "Respond - Invalid Input",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "SSH to JC",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH Error?": {
+      "main": [
+        [
+          {
+            "node": "Respond - SSH Error",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Parse JC Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse JC Response": {
+      "main": [
+        [
+          {
+            "node": "Is User Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is User Found?": {
+      "main": [
+        [
+          {
+            "node": "Respond - User Found",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond - Not Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH to JC": {
+      "main": [
+        [
+          {
+            "node": "SSH Error?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "timezone": "Asia/Jerusalem",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "c0ff9181-5efd-4800-b673-2309667fc027",
+  "activeVersionId": "c0ff9181-5efd-4800-b673-2309667fc027",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-02-23T19:42:10.943Z",
+      "createdAt": "2026-02-23T19:42:10.943Z",
+      "role": "workflow:owner",
+      "workflowId": "MqTJlk1YyldDChBZ",
+      "projectId": "pWTWmuHnmIHw48U9"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-02-23T19:47:53.000Z",
+    "createdAt": "2026-02-23T19:47:47.781Z",
+    "versionId": "c0ff9181-5efd-4800-b673-2309667fc027",
+    "workflowId": "MqTJlk1YyldDChBZ",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "slack/get-jc-user",
+          "responseMode": "responseNode",
+          "options": {}
+        },
+        "id": "480ab9a0-a961-4436-940a-b19346ddb903",
+        "name": "Slack Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 1,
+        "position": [
+          -544,
+          160
+        ],
+        "webhookId": "get-jc-user-webhook"
+      },
+      {
+        "parameters": {
+          "respondWith": "text",
+          "responseBody": "🔍 Looking up JumpCloud user... please wait.",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.5,
+        "position": [
+          -256,
+          160
+        ],
+        "id": "47338b1b-878e-4a98-b265-a34d53b060a6",
+        "name": "Respond to Webhook"
+      },
+      {
+        "parameters": {
+          "jsCode": "const body = items[0].json.body;\nconst text = body.text || '';\nconst channel = body.channel_id || '';\nconst requestedBy = body.user_name || 'unknown';\n\nconst username = text.trim().replace(/[^a-zA-Z0-9._-]/g, '');\n\nif (!username || username.length === 0) {\n  return [{ json: { error: true, message: 'Invalid username provided. Only alphanumeric characters, dots, hyphens, and underscores are allowed.' } }];\n}\n\nif (username.length > 64) {\n  return [{ json: { error: true, message: 'Username too long. Maximum 64 characters allowed.' } }];\n}\n\nreturn [{ json: { user_to_search: username, response_channel: channel, requested_by: requestedBy } }];"
+        },
+        "id": "98633b8c-a5bc-4074-b968-6dc8b742c5a5",
+        "name": "Parse Username",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          32,
+          160
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 1
+            },
+            "conditions": [
+              {
+                "id": "check-error",
+                "leftValue": "={{ $json.error }}",
+                "rightValue": "true",
+                "operator": {
+                  "type": "string",
+                  "operation": "equals"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "58c3160a-64a4-4ca6-a40a-e33a5dd9d283",
+        "name": "Is Input Valid?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [
+          304,
+          160
+        ]
+      },
+      {
+        "parameters": {
+          "select": "channel",
+          "channelId": {
+            "__rl": true,
+            "value": "={{ $('Parse Username').item.json.response_channel }}",
+            "mode": "id"
+          },
+          "text": "=⚠️ *Input Validation Error*\n━━━━━━━━━━━━━━━━━━━━━━\n{{ $('Parse Username').item.json.message }}\n\nPlease provide a valid JumpCloud username.",
+          "otherOptions": {}
+        },
+        "id": "02fb368a-a26a-489d-b105-5a3c4606cbd0",
+        "name": "Respond - Invalid Input",
+        "type": "n8n-nodes-base.slack",
+        "typeVersion": 2,
+        "position": [
+          592,
+          -64
+        ],
+        "webhookId": "87cb25c7-25d2-47d7-bef4-cab83d44c43f",
+        "credentials": {
+          "slackApi": {
+            "id": "obEYVo8oQOJ22JqX",
+            "name": "AD Admin Bot"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "string": [
+              {
+                "value1": "={{$json[\"stderr\"]}}",
+                "operation": "isNotEmpty"
+              }
+            ]
+          }
+        },
+        "id": "7304af36-0444-4ba1-85a8-9ad80745439b",
+        "name": "SSH Error?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 1,
+        "position": [
+          864,
+          384
+        ]
+      },
+      {
+        "parameters": {
+          "select": "channel",
+          "channelId": {
+            "__rl": true,
+            "value": "={{ $('Parse Username').item.json.response_channel }}",
+            "mode": "id"
+          },
+          "text": "=⚠️ *Connection Error*\n━━━━━━━━━━━━━━━━━━━━━━\nFailed to connect to the server.\n\n*Error:* ```{{ $json.stderr }}```\n\n*Requested by:* @{{ $('Parse Username').item.json.requested_by }}\n\nPlease contact IT if this issue persists.",
+          "otherOptions": {}
+        },
+        "id": "981244c8-bca2-4f03-aa78-f0a6d6c6290c",
+        "name": "Respond - SSH Error",
+        "type": "n8n-nodes-base.slack",
+        "typeVersion": 2,
+        "position": [
+          1136,
+          160
+        ],
+        "webhookId": "e270c006-f9f9-4d05-80fb-a95d05aecd4d",
+        "credentials": {
+          "slackApi": {
+            "id": "obEYVo8oQOJ22JqX",
+            "name": "AD Admin Bot"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "const item = items[0].json;\n\nif (item.error || !item.stdout || item.stdout.trim() === '') {\n  return [{ json: { status: 'error', message: item.stderr || 'No output from script.' } }];\n}\n\nlet parsedData = null;\n\ntry {\n  parsedData = JSON.parse(item.stdout);\n} catch (parseError) {\n  const jsonMatch = item.stdout.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    try {\n      parsedData = JSON.parse(jsonMatch[0]);\n    } catch (e) {\n      return [{ json: { status: 'error', message: 'Failed to parse output: ' + item.stdout.substring(0, 200) } }];\n    }\n  } else {\n    return [{ json: { status: 'error', message: 'Unexpected response format.' } }];\n  }\n}\n\nif (!parsedData || !parsedData.status) {\n  return [{ json: { status: 'error', message: 'Response missing status field.' } }];\n}\n\nreturn [{ json: parsedData }];"
+        },
+        "id": "61692947-aeba-43a9-a182-40abcb612fb4",
+        "name": "Parse JC Response",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1136,
+          608
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "string": [
+              {
+                "value1": "={{$json[\"status\"]}}",
+                "value2": "success"
+              }
+            ]
+          }
+        },
+        "id": "fc51f1ea-634b-4a12-8f97-9cf6c56763d7",
+        "name": "Is User Found?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 1,
+        "position": [
+          1408,
+          608
+        ]
+      },
+      {
+        "parameters": {
+          "select": "channel",
+          "channelId": {
+            "__rl": true,
+            "value": "={{ $('Parse Username').item.json.response_channel }}",
+            "mode": "id"
+          },
+          "text": "=☁️ *JumpCloud User Information*\n━━━━━━━━━━━━━━━━━━━━━━\n🆔 *Username:* `{{ $json.data.username }}`\n🔢 *Employee ID:* {{ $json.data.employeeNumber || 'N/A' }}\n📛 *Full Name:* {{ $json.data.fullName }}\n📧 *Email:* {{ $json.data.email }}\n💼 *Title:* {{ $json.data.jobTitle || 'N/A' }}\n🏢 *Department:* {{ $json.data.department || 'N/A' }}\n👔 *Manager:* {{ $json.data.manager }}\n📍 *Office Location:* {{ $json.data.officeLocation }}\n📞 *Office Phone:* {{ $json.data.officePhone }}\n⚙️ *Account Enabled:* {{ $json.data.enabled ? '✅ Yes' : '❌ No' }}\n🔐 *Account Locked:* {{ $json.data.locked ? '🔒 Yes (Locked)' : '🔓 No' }}\n🛡️ *MFA Enabled:* {{ $json.data.mfaEnabled ? '✅ Yes' : '❌ No' }}\n🕒 *Last Login:* {{ $json.data.lastLogin }}\n📅 *Account Created:* {{ $json.data.created }}\n🆔 *JC User ID:* `{{ $json.data.jcUserId }}`\n━━━━━━━━━━━━━━━━━━━━━━\n👥 *Group Memberships:*\n{{ $json.data.groups.length > 0 ? $json.data.groups.map(g => `• ${g}`).join('\\n') : '• None' }}\n━━━━━━━━━━━━━━━━━━━━━━\n🖥️ *Bound Systems:*\n{{ $json.data.systems.length > 0 ? $json.data.systems.map(s => `• ${s}`).join('\\n') : '• None' }}\n━━━━━━━━━━━━━━━━━━━━━━\n🔎 *Requested by:* @{{ $('Parse Username').item.json.requested_by }}",
+          "otherOptions": {}
+        },
+        "id": "47067bd5-11b6-4c76-98f8-26e423fb5171",
+        "name": "Respond - User Found",
+        "type": "n8n-nodes-base.slack",
+        "typeVersion": 2,
+        "position": [
+          1680,
+          384
+        ],
+        "webhookId": "7a74ce9b-290e-4602-b78c-f3af877d7659",
+        "credentials": {
+          "slackApi": {
+            "id": "obEYVo8oQOJ22JqX",
+            "name": "AD Admin Bot"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "select": "channel",
+          "channelId": {
+            "__rl": true,
+            "value": "={{ $('Parse Username').item.json.response_channel }}",
+            "mode": "id"
+          },
+          "text": "=❌ *User Not Found*\n━━━━━━━━━━━━━━━━━━━━━━\n{{ $json.message }}\n\nPlease check the username and try again.\n\n🔎 *Requested by:* @{{ $('Parse Username').item.json.requested_by }}",
+          "otherOptions": {}
+        },
+        "id": "59927a70-933c-4d99-aac7-1b15a92813d8",
+        "name": "Respond - Not Found",
+        "type": "n8n-nodes-base.slack",
+        "typeVersion": 2,
+        "position": [
+          1680,
+          832
+        ],
+        "webhookId": "278c1175-33ff-4bc6-b6ab-0bca8c993fc9",
+        "credentials": {
+          "slackApi": {
+            "id": "obEYVo8oQOJ22JqX",
+            "name": "AD Admin Bot"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "command": "=powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"C:\\Scripts\\Get-JCUserInfo.ps1\" -Username \"{{$json.user_to_search}}\"",
+          "cwd": "="
+        },
+        "id": "19fc4556-6582-4c2f-b5ca-23acaef8b23d",
+        "name": "SSH to JC",
+        "type": "n8n-nodes-base.ssh",
+        "typeVersion": 1,
+        "position": [
+          592,
+          384
+        ],
+        "credentials": {
+          "sshPassword": {
+            "id": "umWU43lA8b3R4GcA",
+            "name": "SSH Password account"
+          }
+        },
+        "continueOnFail": true
+      }
+    ],
+    "connections": {
+      "Slack Webhook": {
+        "main": [
+          [
+            {
+              "node": "Respond to Webhook",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Respond to Webhook": {
+        "main": [
+          [
+            {
+              "node": "Parse Username",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Parse Username": {
+        "main": [
+          [
+            {
+              "node": "Is Input Valid?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Is Input Valid?": {
+        "main": [
+          [
+            {
+              "node": "Respond - Invalid Input",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "SSH to JC",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "SSH Error?": {
+        "main": [
+          [
+            {
+              "node": "Respond - SSH Error",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Parse JC Response",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Parse JC Response": {
+        "main": [
+          [
+            {
+              "node": "Is User Found?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Is User Found?": {
+        "main": [
+          [
+            {
+              "node": "Respond - User Found",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Respond - Not Found",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "SSH to JC": {
+        "main": [
+          [
+            {
+              "node": "SSH Error?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Alex Vinokur",
+    "name": "Version c0ff9181",
+    "description": "",
+    "autosaved": true
+  },
+  "tags": []
+}
