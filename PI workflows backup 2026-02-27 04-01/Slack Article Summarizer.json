@@ -1,0 +1,1247 @@
+{
+  "updatedAt": "2026-02-26T20:59:11.041Z",
+  "createdAt": "2025-09-02T14:14:42.893Z",
+  "id": "GzAlS0kt9q4YI0n7",
+  "name": "Slack Article Summarizer",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "url-verify-check",
+              "leftValue": "={{$json[\"body\"][\"type\"]}}",
+              "rightValue": "url_verification",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -4384,
+        3024
+      ],
+      "id": "9ff3632f-9619-4817-a825-34bb35001ec0",
+      "name": "Is URL Verification?"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { challenge: $json.body.challenge } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4144,
+        2928
+      ],
+      "id": "81232339-d51d-4469-b9f8-ec79b7da2166",
+      "name": "Return Challenge"
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        -3904,
+        2928
+      ],
+      "id": "48a1e24e-1230-4176-915e-93fb5deb6a33",
+      "name": "Respond 200 (Challenge)"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        -4144,
+        3120
+      ],
+      "id": "5f9634d0-17e6-403a-b5ac-46a6db3db04c",
+      "name": "Respond 200 (Ack)"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body || $json;\nconst event = body.event || {};\nconst headers = $json.headers || {};\n\nif (headers['x-slack-retry-num']) return [];\n\nconst skipSubtypes = ['bot_message','message_deleted','channel_join','channel_leave','channel_topic','channel_purpose','file_share','pinned_item','unpinned_item'];\nif (event.subtype && skipSubtypes.includes(event.subtype)) return [];\n\nif (event.subtype === 'message_changed') {\n  const prev = event.previous_message?.text || '';\n  const curr = event.message?.text || '';\n  if (prev === curr) return [];\n}\n\nconst BOT_USER_ID = 'U07K8QJ9XYZ';\nif (event.type !== 'message' || event.bot_id || event.user === BOT_USER_ID || !event.text) return [];\n\nconst text = event.text || '';\nconst urls = new Set();\n\nconst slackRx = /<(https?:\\/\\/[^>|]+)(\\|[^>]+)?>/g;\nlet m;\nwhile ((m = slackRx.exec(text)) !== null) urls.add(m[1]);\n\nconst plainRx = /https?:\\/\\/[^\\s<>\"'\\[\\]{}]+/g;\nwhile ((m = plainRx.exec(text)) !== null) urls.add(m[0].replace(/[.,;:)]+$/, ''));\n\nconst firstUrl = [...urls].find(u => u.match(/^https?:\\/\\/.+\\..+/));\nif (!firstUrl) return [];\n\nconst staticData = $getWorkflowStaticData('global');\nif (!staticData.processedUrls) staticData.processedUrls = {};\nif (!staticData.processedMsgs) staticData.processedMsgs = {};\n\nconst msgKey = `${event.user}_${event.ts}`;\nif (staticData.processedMsgs[msgKey]) return [];\nstaticData.processedMsgs[msgKey] = Date.now();\n\nconst fourHoursAgo = Date.now() - 14400000;\nconst isDuplicate = staticData.processedUrls[firstUrl] > fourHoursAgo;\nif (!isDuplicate) staticData.processedUrls[firstUrl] = Date.now();\n\nconst twoDaysAgo = Date.now() - 172800000;\nfor (const k of Object.keys(staticData.processedUrls)) {\n  if (staticData.processedUrls[k] < twoDaysAgo) delete staticData.processedUrls[k];\n}\nfor (const k of Object.keys(staticData.processedMsgs)) {\n  if (staticData.processedMsgs[k] < twoDaysAgo) delete staticData.processedMsgs[k];\n}\n\nreturn [{ json: { isDuplicate, url: firstUrl, slack_channel: event.channel, slack_user: event.user, slack_ts: event.ts } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3904,
+        3120
+      ],
+      "id": "2c031ea8-5c35-437c-b5ea-1096e3a68313",
+      "name": "Extract URL & Deduplicate"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "dup-check",
+              "leftValue": "={{ $json.isDuplicate }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -3664,
+        3120
+      ],
+      "id": "23c82883-6bad-41e9-b7b3-a5440fc0e3b6",
+      "name": "Is Duplicate?"
+    },
+    {
+      "parameters": {
+        "url": "={{$json.url}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            },
+            {
+              "name": "Accept",
+              "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+            },
+            {
+              "name": "Accept-Language",
+              "value": "en-US,en;q=0.9,he;q=0.8,ru;q=0.7"
+            }
+          ]
+        },
+        "options": {
+          "redirect": {
+            "redirect": {
+              "maxRedirects": 5
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -3424,
+        3216
+      ],
+      "id": "9d4b290f-5f7c-4ccb-829a-aa30fd29bb20",
+      "name": "Fetch Page",
+      "retryOnFail": true,
+      "maxTries": 2
+    },
+    {
+      "parameters": {
+        "jsCode": "const html = $json.data || $json.html || $json.body || $json.content || '';\nconst url = $('Is Duplicate?').first().json.url || '';\n\nif (!html || html.length < 100) return [{ json: { error: 'No HTML content received', url } }];\n\nconst MAX_LEN = 12000;\nlet text = '';\n\ntry {\n  const ld = html.match(/<script[^>]*type=[\"']application\\/ld\\+json[\"'][^>]*>([\\s\\S]*?)<\\/script>/i);\n  if (ld) { const d = JSON.parse(ld[1]); if (d.articleBody && d.articleBody.length > 300) text = d.articleBody; }\n} catch (e) {}\n\nif (text.length < 300) {\n  const art = html.match(/<article[^>]*>([\\s\\S]*?)<\\/article>/i);\n  if (art) {\n    const ex = art[1].replace(/<script[\\s\\S]*?<\\/script>/gi,'').replace(/<style[\\s\\S]*?<\\/style>/gi,'').replace(/<nav[\\s\\S]*?<\\/nav>/gi,'').replace(/<aside[\\s\\S]*?<\\/aside>/gi,'').replace(/<footer[\\s\\S]*?<\\/footer>/gi,'').replace(/<[^>]+>/g,' ').replace(/\\s+/g,' ').trim();\n    if (ex.length > text.length) text = ex;\n  }\n}\n\nif (text.length < 300) {\n  const main = html.match(/<main[^>]*>([\\s\\S]*?)<\\/main>/i);\n  if (main) {\n    const ex = main[1].replace(/<script[\\s\\S]*?<\\/script>/gi,'').replace(/<style[\\s\\S]*?<\\/style>/gi,'').replace(/<nav[\\s\\S]*?<\\/nav>/gi,'').replace(/<[^>]+>/g,' ').replace(/\\s+/g,' ').trim();\n    if (ex.length > text.length) text = ex;\n  }\n}\n\nif (text.length < 300) {\n  const pat = /<div[^>]*class=\"[^\"]*(?:art_body|article_text|article-body|post-content|entry-content|story-body|article__content|content-body)[^\"]*\"[^>]*>([\\s\\S]*?)<\\/div>/i;\n  const match = html.match(pat);\n  if (match) { const ex = match[1].replace(/<[^>]+>/g,' ').replace(/\\s+/g,' ').trim(); if (ex.length > text.length) text = ex; }\n}\n\nif (text.length < 300) {\n  const paras = html.match(/<p[^>]*>(.*?)<\\/p>/gis);\n  if (paras && paras.length > 3) {\n    const good = paras.map(p => p.replace(/<[^>]+>/g,'').trim()).filter(p => p.length > 40 && !/cookie|privacy|subscribe|newsletter|הרשמה|פרטיות/i.test(p));\n    if (good.length >= 3) text = good.join('\\n\\n');\n  }\n}\n\ntext = text.replace(/all rights reserved|כל הזכויות שמורות|copyright \\d{4}|©\\s*\\d{4}/gi,'').replace(/follow us on.*|עקבו אחרינו.*/gi,'').replace(/\\s+/g,' ').trim();\n\nif (!text || text.length < 200) {\n  let reason = 'Could not extract article text.';\n  if (html.includes('נדרשת הרשמה') || html.includes('subscription')) reason += ' Site may require login.';\n  else if (html.length < 5000) reason += ' Page too small — may be blocked.';\n  else reason += ' Site may use JS rendering.';\n  return [{ json: { error: reason, url } }];\n}\n\nconst israeliSites = ['walla.co.il','ynet.co.il','mako.co.il','haaretz.co.il','calcalist.co.il','globes.co.il','maariv.co.il','sport5.co.il','kan.org.il','n12.co.il','reshet13.co.il','ice.co.il','arutz7.co.il','hidabroot.com'];\nconst russianSites = ['rbc.ru','lenta.ru','ria.ru','tass.ru','kommersant.ru','meduza.io','novayagazeta.ru','iz.ru'];\n\nlet language = 'en';\nif (israeliSites.some(s => url.includes(s))) language = 'he';\nelse if (russianSites.some(s => url.includes(s))) language = 'ru';\nelse {\n  const heb = (text.match(/[\\u0590-\\u05FF]/g) || []).length;\n  const cyr = (text.match(/[\\u0400-\\u04FF]/g) || []).length;\n  const total = text.length;\n  if (heb / total > 0.08) language = 'he';\n  else if (cyr / total > 0.08) language = 'ru';\n}\n\nif (text.length > MAX_LEN) text = text.substring(0, MAX_LEN) + '... [truncated]';\n\nreturn [{ json: { article: text, url, language, charCount: text.length } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3184,
+        3216
+      ],
+      "id": "833666b0-2dc9-487a-8fef-8b73b9d7fdae",
+      "name": "Extract Text & Detect Language"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "error-check",
+              "leftValue": "={{ $json.error }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -2944,
+        3216
+      ],
+      "id": "7e514d18-62a9-4365-b790-f5b7d222ab50",
+      "name": "Has Error?"
+    },
+    {
+      "parameters": {
+        "jsCode": "const err = $json.error || 'Unknown error';\nconst url = $json.url || '';\nconst lang = $json.language || 'en';\nconst msgs = { he: '⚠️ נכשל בסיכום המאמר', ru: '⚠️ Не удалось обобщить статью', en: '⚠️ Failed to summarize article' };\nconst reasons = { he: 'סיבה:', ru: 'Причина:', en: 'Reason:' };\nreturn [{ json: { text: `${msgs[lang] || msgs.en}\\n${reasons[lang] || reasons.en} ${err}\\n\\n${url ? `<${url}|Link>` : ''}` } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2704,
+        3120
+      ],
+      "id": "82bb718a-80f2-4e07-8cfb-e3a14ac4793f",
+      "name": "Format Error"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build the prompt with the correct language injected\nconst article = $json.article || '';\nconst language = $json.language || 'en';\nconst url = $json.url || '';\n\nconst langNames = { he: 'Hebrew', ru: 'Russian', en: 'English' };\nconst langName = langNames[language] || 'English';\n\nconst prompt = `/no_think\nSummarize the following article in ${langName}.\n\nRules:\n- Output ONLY valid JSON, no markdown fences, no extra text.\n- Return a short title and exactly 5 bullet points.\n- Each bullet: 2-4 sentences, 30-60 words, with specific details (names, dates, numbers, locations).\n- Do NOT include bullet characters in the bullets array.\n- Do NOT include filler like \"no further details available\".\n- The title and all bullets MUST be written in ${langName}.\n\nFormat:\n{\"title\": \"Short descriptive title\", \"bullets\": [\"Point 1...\", \"Point 2...\", \"Point 3...\", \"Point 4...\", \"Point 5...\"]}\n\nArticle:\n${article}`;\n\nreturn [{ json: { prompt, language, url } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2704,
+        3312
+      ],
+      "id": "84000267-4c40-4bc2-bce7-fd9c5e49f20a",
+      "name": "Build Prompt"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.prompt }}",
+        "options": {
+          "systemMessage": "You are an expert article summarizer. Output ONLY valid JSON — no markdown fences, no preamble, no thinking."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -2464,
+        3312
+      ],
+      "id": "2ed681da-c859-4f05-8061-adf4c2344ee2",
+      "name": "AI Summarizer"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "google/gemma-3-27b",
+          "mode": "list",
+          "cachedResultName": "google/gemma-3-27b"
+        },
+        "options": {
+          "frequencyPenalty": 0.3,
+          "maxTokens": 2500,
+          "presencePenalty": 0.1,
+          "temperature": 0.2,
+          "timeout": 300000,
+          "topP": 0.9
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -2592,
+        3552
+      ],
+      "id": "0feac43f-b5bd-4f0c-bf36-28e46a7b67f3",
+      "name": "Local LLM",
+      "credentials": {
+        "openAiApi": {
+          "id": "WJsCuec8UzGRGVIc",
+          "name": "Macbook ProM1 Pro"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-4o-mini",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        -2416,
+        3552
+      ],
+      "id": "3d20834b-a76f-4fd4-8590-42e688dbd1f5",
+      "name": "OpenRouter Fallback",
+      "credentials": {
+        "openRouterApi": {
+          "id": "hGAnvpSAhWRbFktq",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "let raw = $json.output || $json.text || $json.content || '';\nif (typeof raw !== 'string') raw = JSON.stringify(raw);\n\nconst url = $('Build Prompt').first().json.url || '';\nconst language = $('Build Prompt').first().json.language || 'en';\n\n// Strip <think>...</think> blocks\nraw = raw.replace(/<think>[\\s\\S]*?<\\/think>/gi, '').trim();\n\nlet s = raw.replace(/```json\\s*/gi, '').replace(/```\\s*/g, '');\nconst si = s.indexOf('{');\nconst ei = s.lastIndexOf('}');\nif (si > -1 && ei > si) s = s.substring(si, ei + 1);\ns = s.replace(/[\\r\\n]+/g, ' ').replace(/[\\u2018\\u2019]/g, \"'\").replace(/[\\u201C\\u201D]/g, '\"').trim();\n\nlet title = 'Summary';\nlet bullets = [];\n\ntry {\n  const obj = JSON.parse(s);\n  title = obj.title || 'Summary';\n  bullets = Array.isArray(obj.bullets) ? obj.bullets : [];\n} catch (e) {\n  const tm = s.match(/\"title\"\\s*:\\s*\"([^\"]+)\"/);\n  const bm = s.match(/\"bullets\"\\s*:\\s*\\[([\\s\\S]*?)\\]/);\n  if (tm) title = tm[1];\n  if (bm) bullets = [...bm[1].matchAll(/\"([^\"]+)\"/g)].map(m => m[1]).filter(b => b.length > 15);\n}\n\nbullets = bullets\n  .map(b => String(b).replace(/^[•\\-\\s]+/, '').replace(/\\.{2,}/g, '.').replace(/\\s+/g, ' ').trim())\n  .filter(b => {\n    if (!b || b.length < 25) return false;\n    const lc = b.toLowerCase();\n    return !lc.includes('no further details') && !lc.includes('no additional details') &&\n           !lc.includes('לא נמצאו פרטים') && !lc.includes('אין פרטים') &&\n           !lc.includes('информация недоступна');\n  });\n\nif (bullets.length === 0) {\n  const noContent = { he: 'לא הצלחתי לחלץ מידע מהמאמר', ru: 'Не удалось извлечь информацию', en: 'Could not extract summary from article' };\n  return [{ json: { text: `⚠️ ${noContent[language] || noContent.en}\\n\\n${url ? `<${url}|Link>` : ''}` } }];\n}\n\nconst RLM = '\\u200F';\nconst LRM = '\\u200E';\nconst wrapLatin = t => t.replace(/([A-Za-z0-9]+(?:[.,:/\\-][A-Za-z0-9]+)*)/g, `${LRM}$1${LRM}`);\n\nlet titleLine, bulletLines;\n\nif (language === 'he') {\n  const wt = wrapLatin(title);\n  titleLine = url ? `${RLM}:brain: <${url}|${wt}>` : `${RLM}:brain: ${wt}`;\n  bulletLines = bullets.map(b => `${RLM}• ${wrapLatin(b)}`);\n} else if (language === 'ru') {\n  titleLine = url ? `:brain: <${url}|${title}>` : `:brain: ${title}`;\n  bulletLines = bullets.map(b => `• ${b}`);\n} else {\n  titleLine = url ? `:brain: Summary: <${url}|${title}>` : `:brain: Summary: ${title}`;\n  bulletLines = bullets.map(b => `• ${b}`);\n}\n\nreturn [{ json: { text: [titleLine, '', ...bulletLines].join('\\n') } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2080,
+        3312
+      ],
+      "id": "0720cc59-4e0b-472a-bfab-65943d0dcc00",
+      "name": "Validate & Format"
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C09BFKKCMQ8",
+          "mode": "list",
+          "cachedResultName": "n8n-sammarize"
+        },
+        "text": "={{$json.text}}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        -1968,
+        3120
+      ],
+      "id": "530f73c5-9ab7-4153-8528-d0ff3024a0e7",
+      "name": "Send to Slack",
+      "webhookId": "946820e3-d85c-43a1-a0e5-58777a4a0c86",
+      "credentials": {
+        "slackApi": {
+          "id": "I5astSkOODZZU76Y",
+          "name": "n8n Summery"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "slack-events",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -4640,
+        3024
+      ],
+      "id": "6d34cad7-82e2-4ba4-a211-92ba2df24eea",
+      "name": "Webhook",
+      "webhookId": "d63266c1-1b49-4fc1-8530-cbdb5e8fb27f"
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C09BFKKCMQ8",
+          "mode": "list",
+          "cachedResultName": "n8n-sammarize"
+        },
+        "text": "=ℹ️ This URL was already summarized recently.\n\n<{{$json.url}}|{{$json.url}}>",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        -3424,
+        3024
+      ],
+      "id": "859edab7-2c35-4f42-9afa-e6ec07aba92c",
+      "name": "Send Duplicate Notice",
+      "webhookId": "4c109572-f287-4e64-9bda-ffb85c1243de",
+      "credentials": {
+        "slackApi": {
+          "id": "I5astSkOODZZU76Y",
+          "name": "n8n Summery"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Is URL Verification?": {
+      "main": [
+        [
+          {
+            "node": "Return Challenge",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond 200 (Ack)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return Challenge": {
+      "main": [
+        [
+          {
+            "node": "Respond 200 (Challenge)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond 200 (Ack)": {
+      "main": [
+        [
+          {
+            "node": "Extract URL & Deduplicate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract URL & Deduplicate": {
+      "main": [
+        [
+          {
+            "node": "Is Duplicate?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Duplicate?": {
+      "main": [
+        [
+          {
+            "node": "Send Duplicate Notice",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fetch Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Page": {
+      "main": [
+        [
+          {
+            "node": "Extract Text & Detect Language",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Text & Detect Language": {
+      "main": [
+        [
+          {
+            "node": "Has Error?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Error?": {
+      "main": [
+        [
+          {
+            "node": "Format Error",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Error": {
+      "main": [
+        [
+          {
+            "node": "Send to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Prompt": {
+      "main": [
+        [
+          {
+            "node": "AI Summarizer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Summarizer": {
+      "main": [
+        [
+          {
+            "node": "Validate & Format",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Local LLM": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Summarizer",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate & Format": {
+      "main": [
+        [
+          {
+            "node": "Send to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Is URL Verification?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Jerusalem",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "binaryMode": "separate"
+  },
+  "staticData": {
+    "global": {
+      "metrics": {
+        "total": 216,
+        "success": 216
+      },
+      "processedUrls": {
+        "https://sports.walla.co.il/item/3819935": 1772135020336,
+        "https://travel.walla.co.il/item/3815039": 1772135406311,
+        "https://gizmodo.com/rumored-cheap-macbook-could-be-like-a-chromebook-in-more-ways-than-one-2000727022": 1772135653813,
+        "https://gizmodo.com/google-rolls-out-nano-banana-2-now-faster-than-ever-2000727117": 1772135881883,
+        "https://gizmodo.com/samsung-galaxy-s26-vs-iphone-17-is-it-all-about-ai-2000726526": 1772136078134,
+        "https://www.jpost.com/international/article-888045": 1772136524436,
+        "https://www.jpost.com/israel-news/article-888150": 1772136656780,
+        "https://www.jpost.com/israel-news/article-888096": 1772136794719,
+        "https://www.jpost.com/israel-news/article-888166": 1772137042658,
+        "https://www.jpost.com/opinion/article-888172": 1772137140511,
+        "https://www.jpost.com/international/article-888170": 1772137457776,
+        "https://news.walla.co.il/item/3819733": 1772137648567,
+        "https://food.walla.co.il/item/3769532": 1772137954392,
+        "https://fashion.walla.co.il/item/3816154": 1772138169778,
+        "https://food.walla.co.il/item/3683573": 1772138287982,
+        "https://sports.walla.co.il/item/3819679": 1772138793706,
+        "https://celebs.walla.co.il/item/3819774": 1772138947559,
+        "https://food.walla.co.il/item/3729924": 1772139294132,
+        "https://gizmodo.com/surveillance-with-a-smile-burger-king-will-use-ai-to-track-if-employees-say-please-and-thank-you-2000727068": 1772139458606
+      },
+      "processedEvents": {
+        "1762243942.321019-undefined": 1762243945452
+      },
+      "processedMessages": {
+        "U08AYDL2FQD_1771354645.863239": 1771354647255
+      },
+      "processedMsgs": {
+        "U08AYDL2FQD_1772135019.049729": 1772135020336,
+        "U08AYDL2FQD_1772135405.158699": 1772135406311,
+        "U08AYDL2FQD_1772135652.649929": 1772135653813,
+        "U08AYDL2FQD_1772135880.507479": 1772135881883,
+        "U08AYDL2FQD_1772136076.301189": 1772136078134,
+        "U08AYDL2FQD_1772136523.058289": 1772136524436,
+        "U08AYDL2FQD_1772136654.944609": 1772136656780,
+        "U08AYDL2FQD_1772136789.854169": 1772136794719,
+        "U08AYDL2FQD_1772137041.646879": 1772137042658,
+        "U08AYDL2FQD_1772137138.943249": 1772137140511,
+        "U08AYDL2FQD_1772137456.832939": 1772137457776,
+        "U08AYDL2FQD_1772137647.203459": 1772137648567,
+        "U08AYDL2FQD_1772137953.426289": 1772137954392,
+        "U08AYDL2FQD_1772138144.628949": 1772138145793,
+        "U08AYDL2FQD_1772138168.592659": 1772138169778,
+        "U08AYDL2FQD_1772138286.681039": 1772138287982,
+        "U08AYDL2FQD_1772138792.248239": 1772138793706,
+        "U08AYDL2FQD_1772138945.912159": 1772138947559,
+        "U08AYDL2FQD_1772139292.471069": 1772139294132,
+        "U08AYDL2FQD_1772139457.615499": 1772139458606,
+        "U08AYDL2FQD_1772139567.444489": 1772139568479
+      }
+    }
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "2e247d73-a251-4061-bdba-6ad8e8adf355",
+  "activeVersionId": "2e247d73-a251-4061-bdba-6ad8e8adf355",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2025-10-31T09:14:00.820Z",
+      "createdAt": "2025-10-31T09:14:00.820Z",
+      "role": "workflow:owner",
+      "workflowId": "GzAlS0kt9q4YI0n7",
+      "projectId": "pWTWmuHnmIHw48U9"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-02-26T20:59:12.000Z",
+    "createdAt": "2026-02-26T20:59:11.043Z",
+    "versionId": "2e247d73-a251-4061-bdba-6ad8e8adf355",
+    "workflowId": "GzAlS0kt9q4YI0n7",
+    "nodes": [
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "id": "url-verify-check",
+                "leftValue": "={{$json[\"body\"][\"type\"]}}",
+                "rightValue": "url_verification",
+                "operator": {
+                  "type": "string",
+                  "operation": "equals"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [
+          -4384,
+          3024
+        ],
+        "id": "9ff3632f-9619-4817-a825-34bb35001ec0",
+        "name": "Is URL Verification?"
+      },
+      {
+        "parameters": {
+          "jsCode": "return [{ json: { challenge: $json.body.challenge } }];"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -4144,
+          2928
+        ],
+        "id": "81232339-d51d-4469-b9f8-ec79b7da2166",
+        "name": "Return Challenge"
+      },
+      {
+        "parameters": {
+          "options": {
+            "responseCode": 200
+          }
+        },
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.4,
+        "position": [
+          -3904,
+          2928
+        ],
+        "id": "48a1e24e-1230-4176-915e-93fb5deb6a33",
+        "name": "Respond 200 (Challenge)"
+      },
+      {
+        "parameters": {
+          "respondWith": "text",
+          "options": {
+            "responseCode": 200
+          }
+        },
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.4,
+        "position": [
+          -4144,
+          3120
+        ],
+        "id": "5f9634d0-17e6-403a-b5ac-46a6db3db04c",
+        "name": "Respond 200 (Ack)"
+      },
+      {
+        "parameters": {
+          "jsCode": "const body = $json.body || $json;\nconst event = body.event || {};\nconst headers = $json.headers || {};\n\nif (headers['x-slack-retry-num']) return [];\n\nconst skipSubtypes = ['bot_message','message_deleted','channel_join','channel_leave','channel_topic','channel_purpose','file_share','pinned_item','unpinned_item'];\nif (event.subtype && skipSubtypes.includes(event.subtype)) return [];\n\nif (event.subtype === 'message_changed') {\n  const prev = event.previous_message?.text || '';\n  const curr = event.message?.text || '';\n  if (prev === curr) return [];\n}\n\nconst BOT_USER_ID = 'U07K8QJ9XYZ';\nif (event.type !== 'message' || event.bot_id || event.user === BOT_USER_ID || !event.text) return [];\n\nconst text = event.text || '';\nconst urls = new Set();\n\nconst slackRx = /<(https?:\\/\\/[^>|]+)(\\|[^>]+)?>/g;\nlet m;\nwhile ((m = slackRx.exec(text)) !== null) urls.add(m[1]);\n\nconst plainRx = /https?:\\/\\/[^\\s<>\"'\\[\\]{}]+/g;\nwhile ((m = plainRx.exec(text)) !== null) urls.add(m[0].replace(/[.,;:)]+$/, ''));\n\nconst firstUrl = [...urls].find(u => u.match(/^https?:\\/\\/.+\\..+/));\nif (!firstUrl) return [];\n\nconst staticData = $getWorkflowStaticData('global');\nif (!staticData.processedUrls) staticData.processedUrls = {};\nif (!staticData.processedMsgs) staticData.processedMsgs = {};\n\nconst msgKey = `${event.user}_${event.ts}`;\nif (staticData.processedMsgs[msgKey]) return [];\nstaticData.processedMsgs[msgKey] = Date.now();\n\nconst fourHoursAgo = Date.now() - 14400000;\nconst isDuplicate = staticData.processedUrls[firstUrl] > fourHoursAgo;\nif (!isDuplicate) staticData.processedUrls[firstUrl] = Date.now();\n\nconst twoDaysAgo = Date.now() - 172800000;\nfor (const k of Object.keys(staticData.processedUrls)) {\n  if (staticData.processedUrls[k] < twoDaysAgo) delete staticData.processedUrls[k];\n}\nfor (const k of Object.keys(staticData.processedMsgs)) {\n  if (staticData.processedMsgs[k] < twoDaysAgo) delete staticData.processedMsgs[k];\n}\n\nreturn [{ json: { isDuplicate, url: firstUrl, slack_channel: event.channel, slack_user: event.user, slack_ts: event.ts } }];"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -3904,
+          3120
+        ],
+        "id": "2c031ea8-5c35-437c-b5ea-1096e3a68313",
+        "name": "Extract URL & Deduplicate"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "id": "dup-check",
+                "leftValue": "={{ $json.isDuplicate }}",
+                "rightValue": "true",
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [
+          -3664,
+          3120
+        ],
+        "id": "23c82883-6bad-41e9-b7b3-a5440fc0e3b6",
+        "name": "Is Duplicate?"
+      },
+      {
+        "parameters": {
+          "url": "={{$json.url}}",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "User-Agent",
+                "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+              },
+              {
+                "name": "Accept",
+                "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+              },
+              {
+                "name": "Accept-Language",
+                "value": "en-US,en;q=0.9,he;q=0.8,ru;q=0.7"
+              }
+            ]
+          },
+          "options": {
+            "redirect": {
+              "redirect": {
+                "maxRedirects": 5
+              }
+            },
+            "timeout": 15000
+          }
+        },
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          -3424,
+          3216
+        ],
+        "id": "9d4b290f-5f7c-4ccb-829a-aa30fd29bb20",
+        "name": "Fetch Page",
+        "retryOnFail": true,
+        "maxTries": 2
+      },
+      {
+        "parameters": {
+          "jsCode": "const html = $json.data || $json.html || $json.body || $json.content || '';\nconst url = $('Is Duplicate?').first().json.url || '';\n\nif (!html || html.length < 100) return [{ json: { error: 'No HTML content received', url } }];\n\nconst MAX_LEN = 12000;\nlet text = '';\n\ntry {\n  const ld = html.match(/<script[^>]*type=[\"']application\\/ld\\+json[\"'][^>]*>([\\s\\S]*?)<\\/script>/i);\n  if (ld) { const d = JSON.parse(ld[1]); if (d.articleBody && d.articleBody.length > 300) text = d.articleBody; }\n} catch (e) {}\n\nif (text.length < 300) {\n  const art = html.match(/<article[^>]*>([\\s\\S]*?)<\\/article>/i);\n  if (art) {\n    const ex = art[1].replace(/<script[\\s\\S]*?<\\/script>/gi,'').replace(/<style[\\s\\S]*?<\\/style>/gi,'').replace(/<nav[\\s\\S]*?<\\/nav>/gi,'').replace(/<aside[\\s\\S]*?<\\/aside>/gi,'').replace(/<footer[\\s\\S]*?<\\/footer>/gi,'').replace(/<[^>]+>/g,' ').replace(/\\s+/g,' ').trim();\n    if (ex.length > text.length) text = ex;\n  }\n}\n\nif (text.length < 300) {\n  const main = html.match(/<main[^>]*>([\\s\\S]*?)<\\/main>/i);\n  if (main) {\n    const ex = main[1].replace(/<script[\\s\\S]*?<\\/script>/gi,'').replace(/<style[\\s\\S]*?<\\/style>/gi,'').replace(/<nav[\\s\\S]*?<\\/nav>/gi,'').replace(/<[^>]+>/g,' ').replace(/\\s+/g,' ').trim();\n    if (ex.length > text.length) text = ex;\n  }\n}\n\nif (text.length < 300) {\n  const pat = /<div[^>]*class=\"[^\"]*(?:art_body|article_text|article-body|post-content|entry-content|story-body|article__content|content-body)[^\"]*\"[^>]*>([\\s\\S]*?)<\\/div>/i;\n  const match = html.match(pat);\n  if (match) { const ex = match[1].replace(/<[^>]+>/g,' ').replace(/\\s+/g,' ').trim(); if (ex.length > text.length) text = ex; }\n}\n\nif (text.length < 300) {\n  const paras = html.match(/<p[^>]*>(.*?)<\\/p>/gis);\n  if (paras && paras.length > 3) {\n    const good = paras.map(p => p.replace(/<[^>]+>/g,'').trim()).filter(p => p.length > 40 && !/cookie|privacy|subscribe|newsletter|הרשמה|פרטיות/i.test(p));\n    if (good.length >= 3) text = good.join('\\n\\n');\n  }\n}\n\ntext = text.replace(/all rights reserved|כל הזכויות שמורות|copyright \\d{4}|©\\s*\\d{4}/gi,'').replace(/follow us on.*|עקבו אחרינו.*/gi,'').replace(/\\s+/g,' ').trim();\n\nif (!text || text.length < 200) {\n  let reason = 'Could not extract article text.';\n  if (html.includes('נדרשת הרשמה') || html.includes('subscription')) reason += ' Site may require login.';\n  else if (html.length < 5000) reason += ' Page too small — may be blocked.';\n  else reason += ' Site may use JS rendering.';\n  return [{ json: { error: reason, url } }];\n}\n\nconst israeliSites = ['walla.co.il','ynet.co.il','mako.co.il','haaretz.co.il','calcalist.co.il','globes.co.il','maariv.co.il','sport5.co.il','kan.org.il','n12.co.il','reshet13.co.il','ice.co.il','arutz7.co.il','hidabroot.com'];\nconst russianSites = ['rbc.ru','lenta.ru','ria.ru','tass.ru','kommersant.ru','meduza.io','novayagazeta.ru','iz.ru'];\n\nlet language = 'en';\nif (israeliSites.some(s => url.includes(s))) language = 'he';\nelse if (russianSites.some(s => url.includes(s))) language = 'ru';\nelse {\n  const heb = (text.match(/[\\u0590-\\u05FF]/g) || []).length;\n  const cyr = (text.match(/[\\u0400-\\u04FF]/g) || []).length;\n  const total = text.length;\n  if (heb / total > 0.08) language = 'he';\n  else if (cyr / total > 0.08) language = 'ru';\n}\n\nif (text.length > MAX_LEN) text = text.substring(0, MAX_LEN) + '... [truncated]';\n\nreturn [{ json: { article: text, url, language, charCount: text.length } }];"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -3184,
+          3216
+        ],
+        "id": "833666b0-2dc9-487a-8fef-8b73b9d7fdae",
+        "name": "Extract Text & Detect Language"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "id": "error-check",
+                "leftValue": "={{ $json.error }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "string",
+                  "operation": "notEmpty",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [
+          -2944,
+          3216
+        ],
+        "id": "7e514d18-62a9-4365-b790-f5b7d222ab50",
+        "name": "Has Error?"
+      },
+      {
+        "parameters": {
+          "jsCode": "const err = $json.error || 'Unknown error';\nconst url = $json.url || '';\nconst lang = $json.language || 'en';\nconst msgs = { he: '⚠️ נכשל בסיכום המאמר', ru: '⚠️ Не удалось обобщить статью', en: '⚠️ Failed to summarize article' };\nconst reasons = { he: 'סיבה:', ru: 'Причина:', en: 'Reason:' };\nreturn [{ json: { text: `${msgs[lang] || msgs.en}\\n${reasons[lang] || reasons.en} ${err}\\n\\n${url ? `<${url}|Link>` : ''}` } }];"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -2704,
+          3120
+        ],
+        "id": "82bb718a-80f2-4e07-8cfb-e3a14ac4793f",
+        "name": "Format Error"
+      },
+      {
+        "parameters": {
+          "jsCode": "// Build the prompt with the correct language injected\nconst article = $json.article || '';\nconst language = $json.language || 'en';\nconst url = $json.url || '';\n\nconst langNames = { he: 'Hebrew', ru: 'Russian', en: 'English' };\nconst langName = langNames[language] || 'English';\n\nconst prompt = `/no_think\nSummarize the following article in ${langName}.\n\nRules:\n- Output ONLY valid JSON, no markdown fences, no extra text.\n- Return a short title and exactly 5 bullet points.\n- Each bullet: 2-4 sentences, 30-60 words, with specific details (names, dates, numbers, locations).\n- Do NOT include bullet characters in the bullets array.\n- Do NOT include filler like \"no further details available\".\n- The title and all bullets MUST be written in ${langName}.\n\nFormat:\n{\"title\": \"Short descriptive title\", \"bullets\": [\"Point 1...\", \"Point 2...\", \"Point 3...\", \"Point 4...\", \"Point 5...\"]}\n\nArticle:\n${article}`;\n\nreturn [{ json: { prompt, language, url } }];"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -2704,
+          3312
+        ],
+        "id": "84000267-4c40-4bc2-bce7-fd9c5e49f20a",
+        "name": "Build Prompt"
+      },
+      {
+        "parameters": {
+          "promptType": "define",
+          "text": "={{ $json.prompt }}",
+          "options": {
+            "systemMessage": "You are an expert article summarizer. Output ONLY valid JSON — no markdown fences, no preamble, no thinking."
+          }
+        },
+        "type": "@n8n/n8n-nodes-langchain.agent",
+        "typeVersion": 3.1,
+        "position": [
+          -2464,
+          3312
+        ],
+        "id": "2ed681da-c859-4f05-8061-adf4c2344ee2",
+        "name": "AI Summarizer"
+      },
+      {
+        "parameters": {
+          "model": {
+            "__rl": true,
+            "value": "google/gemma-3-27b",
+            "mode": "list",
+            "cachedResultName": "google/gemma-3-27b"
+          },
+          "options": {
+            "frequencyPenalty": 0.3,
+            "maxTokens": 2500,
+            "presencePenalty": 0.1,
+            "temperature": 0.2,
+            "timeout": 300000,
+            "topP": 0.9
+          }
+        },
+        "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+        "typeVersion": 1.2,
+        "position": [
+          -2592,
+          3552
+        ],
+        "id": "0feac43f-b5bd-4f0c-bf36-28e46a7b67f3",
+        "name": "Local LLM",
+        "credentials": {
+          "openAiApi": {
+            "id": "WJsCuec8UzGRGVIc",
+            "name": "Macbook ProM1 Pro"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "model": "openai/gpt-4o-mini",
+          "options": {}
+        },
+        "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+        "typeVersion": 1,
+        "position": [
+          -2416,
+          3552
+        ],
+        "id": "3d20834b-a76f-4fd4-8590-42e688dbd1f5",
+        "name": "OpenRouter Fallback",
+        "credentials": {
+          "openRouterApi": {
+            "id": "hGAnvpSAhWRbFktq",
+            "name": "OpenRouter account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "let raw = $json.output || $json.text || $json.content || '';\nif (typeof raw !== 'string') raw = JSON.stringify(raw);\n\nconst url = $('Build Prompt').first().json.url || '';\nconst language = $('Build Prompt').first().json.language || 'en';\n\n// Strip <think>...</think> blocks\nraw = raw.replace(/<think>[\\s\\S]*?<\\/think>/gi, '').trim();\n\nlet s = raw.replace(/```json\\s*/gi, '').replace(/```\\s*/g, '');\nconst si = s.indexOf('{');\nconst ei = s.lastIndexOf('}');\nif (si > -1 && ei > si) s = s.substring(si, ei + 1);\ns = s.replace(/[\\r\\n]+/g, ' ').replace(/[\\u2018\\u2019]/g, \"'\").replace(/[\\u201C\\u201D]/g, '\"').trim();\n\nlet title = 'Summary';\nlet bullets = [];\n\ntry {\n  const obj = JSON.parse(s);\n  title = obj.title || 'Summary';\n  bullets = Array.isArray(obj.bullets) ? obj.bullets : [];\n} catch (e) {\n  const tm = s.match(/\"title\"\\s*:\\s*\"([^\"]+)\"/);\n  const bm = s.match(/\"bullets\"\\s*:\\s*\\[([\\s\\S]*?)\\]/);\n  if (tm) title = tm[1];\n  if (bm) bullets = [...bm[1].matchAll(/\"([^\"]+)\"/g)].map(m => m[1]).filter(b => b.length > 15);\n}\n\nbullets = bullets\n  .map(b => String(b).replace(/^[•\\-\\s]+/, '').replace(/\\.{2,}/g, '.').replace(/\\s+/g, ' ').trim())\n  .filter(b => {\n    if (!b || b.length < 25) return false;\n    const lc = b.toLowerCase();\n    return !lc.includes('no further details') && !lc.includes('no additional details') &&\n           !lc.includes('לא נמצאו פרטים') && !lc.includes('אין פרטים') &&\n           !lc.includes('информация недоступна');\n  });\n\nif (bullets.length === 0) {\n  const noContent = { he: 'לא הצלחתי לחלץ מידע מהמאמר', ru: 'Не удалось извлечь информацию', en: 'Could not extract summary from article' };\n  return [{ json: { text: `⚠️ ${noContent[language] || noContent.en}\\n\\n${url ? `<${url}|Link>` : ''}` } }];\n}\n\nconst RLM = '\\u200F';\nconst LRM = '\\u200E';\nconst wrapLatin = t => t.replace(/([A-Za-z0-9]+(?:[.,:/\\-][A-Za-z0-9]+)*)/g, `${LRM}$1${LRM}`);\n\nlet titleLine, bulletLines;\n\nif (language === 'he') {\n  const wt = wrapLatin(title);\n  titleLine = url ? `${RLM}:brain: <${url}|${wt}>` : `${RLM}:brain: ${wt}`;\n  bulletLines = bullets.map(b => `${RLM}• ${wrapLatin(b)}`);\n} else if (language === 'ru') {\n  titleLine = url ? `:brain: <${url}|${title}>` : `:brain: ${title}`;\n  bulletLines = bullets.map(b => `• ${b}`);\n} else {\n  titleLine = url ? `:brain: Summary: <${url}|${title}>` : `:brain: Summary: ${title}`;\n  bulletLines = bullets.map(b => `• ${b}`);\n}\n\nreturn [{ json: { text: [titleLine, '', ...bulletLines].join('\\n') } }];"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -2080,
+          3312
+        ],
+        "id": "0720cc59-4e0b-472a-bfab-65943d0dcc00",
+        "name": "Validate & Format"
+      },
+      {
+        "parameters": {
+          "select": "channel",
+          "channelId": {
+            "__rl": true,
+            "value": "C09BFKKCMQ8",
+            "mode": "list",
+            "cachedResultName": "n8n-sammarize"
+          },
+          "text": "={{$json.text}}",
+          "otherOptions": {
+            "includeLinkToWorkflow": false
+          }
+        },
+        "type": "n8n-nodes-base.slack",
+        "typeVersion": 2.3,
+        "position": [
+          -1968,
+          3120
+        ],
+        "id": "530f73c5-9ab7-4153-8528-d0ff3024a0e7",
+        "name": "Send to Slack",
+        "webhookId": "946820e3-d85c-43a1-a0e5-58777a4a0c86",
+        "credentials": {
+          "slackApi": {
+            "id": "I5astSkOODZZU76Y",
+            "name": "n8n Summery"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "slack-events",
+          "responseMode": "responseNode",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2.1,
+        "position": [
+          -4640,
+          3024
+        ],
+        "id": "6d34cad7-82e2-4ba4-a211-92ba2df24eea",
+        "name": "Webhook",
+        "webhookId": "d63266c1-1b49-4fc1-8530-cbdb5e8fb27f"
+      },
+      {
+        "parameters": {
+          "select": "channel",
+          "channelId": {
+            "__rl": true,
+            "value": "C09BFKKCMQ8",
+            "mode": "list",
+            "cachedResultName": "n8n-sammarize"
+          },
+          "text": "=ℹ️ This URL was already summarized recently.\n\n<{{$json.url}}|{{$json.url}}>",
+          "otherOptions": {}
+        },
+        "type": "n8n-nodes-base.slack",
+        "typeVersion": 2.3,
+        "position": [
+          -3424,
+          3024
+        ],
+        "id": "859edab7-2c35-4f42-9afa-e6ec07aba92c",
+        "name": "Send Duplicate Notice",
+        "webhookId": "4c109572-f287-4e64-9bda-ffb85c1243de",
+        "credentials": {
+          "slackApi": {
+            "id": "I5astSkOODZZU76Y",
+            "name": "n8n Summery"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Is URL Verification?": {
+        "main": [
+          [
+            {
+              "node": "Return Challenge",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Respond 200 (Ack)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Return Challenge": {
+        "main": [
+          [
+            {
+              "node": "Respond 200 (Challenge)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Respond 200 (Ack)": {
+        "main": [
+          [
+            {
+              "node": "Extract URL & Deduplicate",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Extract URL & Deduplicate": {
+        "main": [
+          [
+            {
+              "node": "Is Duplicate?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Is Duplicate?": {
+        "main": [
+          [
+            {
+              "node": "Send Duplicate Notice",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Fetch Page",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Fetch Page": {
+        "main": [
+          [
+            {
+              "node": "Extract Text & Detect Language",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Extract Text & Detect Language": {
+        "main": [
+          [
+            {
+              "node": "Has Error?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Has Error?": {
+        "main": [
+          [
+            {
+              "node": "Format Error",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Build Prompt",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Format Error": {
+        "main": [
+          [
+            {
+              "node": "Send to Slack",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build Prompt": {
+        "main": [
+          [
+            {
+              "node": "AI Summarizer",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "AI Summarizer": {
+        "main": [
+          [
+            {
+              "node": "Validate & Format",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Local LLM": {
+        "ai_languageModel": [
+          [
+            {
+              "node": "AI Summarizer",
+              "type": "ai_languageModel",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Validate & Format": {
+        "main": [
+          [
+            {
+              "node": "Send to Slack",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Is URL Verification?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Alex Vinokur",
+    "name": "Version 2e247d73",
+    "description": "",
+    "autosaved": false
+  },
+  "tags": []
+}
