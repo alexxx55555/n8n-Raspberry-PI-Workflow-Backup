@@ -1,0 +1,743 @@
+{
+  "updatedAt": "2026-03-01T21:12:18.201Z",
+  "createdAt": "2026-03-01T20:07:04.724Z",
+  "id": "XYPCR7pM2qaWQB3O",
+  "name": "My workflow",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "jc-group-membership-change",
+        "options": {}
+      },
+      "id": "2458308f-af5c-4050-81b4-ac7e63e95d38",
+      "name": "Webhook - Receive JC Event",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1104,
+        16
+      ],
+      "webhookId": "jc-group-membership-change"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "verify-secret-header",
+              "leftValue": "={{ $json.headers['x-webhook-secret'] }}",
+              "rightValue": "jca_3M9T6aWP4uM9wpLjmvQh8cdT8nhpn6DvJ63z",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "1ad4e7de-df48-425a-8ba1-3618a65c8a88",
+      "name": "Verify Webhook Secret",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [
+        -832,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "action-type",
+              "name": "actionType",
+              "value": "={{ $json.body.type }}",
+              "type": "string"
+            },
+            {
+              "id": "affected-user",
+              "name": "affectedUser",
+              "value": "={{ ($json.body.changes || []).find(c => c.field === 'username' || c.field === 'email')?.to || ($json.body.changes || [])[0]?.to || 'N/A' }}",
+              "type": "string"
+            },
+            {
+              "id": "affected-display-name",
+              "name": "affectedDisplayName",
+              "value": "={{ ($json.body.changes || []).find(c => c.field === 'displayName')?.to || 'N/A' }}",
+              "type": "string"
+            },
+            {
+              "id": "group-name",
+              "name": "groupName",
+              "value": "={{ $json.body.resource?.displayName || 'N/A' }}",
+              "type": "string"
+            },
+            {
+              "id": "group-type",
+              "name": "groupType",
+              "value": "={{ $json.body.resource?.type || 'N/A' }}",
+              "type": "string"
+            },
+            {
+              "id": "performed-by",
+              "name": "performedBy",
+              "value": "={{ $json.body.initiated_by?.email || $json.body.initiated_by?.username || 'N/A' }}",
+              "type": "string"
+            },
+            {
+              "id": "performer-type",
+              "name": "performerType",
+              "value": "={{ $json.body.initiated_by?.type || 'N/A' }}",
+              "type": "string"
+            },
+            {
+              "id": "event-type",
+              "name": "eventType",
+              "value": "={{ $json.body.event_type || 'association_change' }}",
+              "type": "string"
+            },
+            {
+              "id": "timestamp",
+              "name": "timestamp",
+              "value": "={{ $json.body.timestamp }}",
+              "type": "string"
+            },
+            {
+              "id": "service",
+              "name": "service",
+              "value": "={{ $json.body.service || 'directory' }}",
+              "type": "string"
+            },
+            {
+              "id": "changes-raw",
+              "name": "changesRaw",
+              "value": "={{ JSON.stringify($json.body.changes || []) }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c4650a10-a1f0-4c5b-a89c-639e00bbe5ab",
+      "name": "Extract Event Details",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -576,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "sensitive-group-check",
+              "leftValue": "={{ ['Test','Admin'].includes($json.groupName) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "05054471-0e55-496e-9709-6506390a246d",
+      "name": "Filter: Sensitive Groups Only",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [
+        -352,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.actionType }}",
+                    "rightValue": "user_group_member_add",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "switch-add"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.actionType }}",
+                    "rightValue": "user_group_member_remove",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "switch-remove"
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b33de23f-411f-44bf-af65-8736a4e020ab",
+      "name": "Switch: Add or Remove",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -64,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "#security-alerts",
+          "mode": "name"
+        },
+        "text": "=🔴 *JUMPCLOUD — Sensitive Group Member Added*\n\n• *User:* {{ $json.affectedUser }}\n• *Name:* {{ $json.affectedDisplayName !== 'N/A' ? $json.affectedDisplayName : 'N/A' }}\n• *Group:* {{ $json.groupName }} ({{ $json.groupType }})\n• *Performed By:* {{ $json.performedBy }} ({{ $json.performerType }})\n• *Source:* JumpCloud Directory\n• *Time:* {{ new Date($json.timestamp).toLocaleDateString('en-GB', {day:'numeric',month:'numeric',year:'numeric'}) + ' ' + new Date($json.timestamp).toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit',hour12:true}) }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "id": "9786aedb-1eaf-42d2-a340-c47a3ac7b9fe",
+      "name": "Slack - Member Added Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        272,
+        -80
+      ],
+      "webhookId": "5abfea90-83ec-4185-b046-90161c655ecd",
+      "credentials": {
+        "slackApi": {
+          "id": "6ZeCMu3zrEgj1Omk",
+          "name": "Secuiry Alert"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "#security-alerts",
+          "mode": "name"
+        },
+        "text": "=🟢 *JUMPCLOUD — Sensitive Group Member Removed*\n\n• *User:* {{ $json.affectedUser }}\n• *Name:* {{ $json.affectedDisplayName !== 'N/A' ? $json.affectedDisplayName : 'N/A' }}\n• *Group:* {{ $json.groupName }} ({{ $json.groupType }})\n• *Performed By:* {{ $json.performedBy }} ({{ $json.performerType }})\n• *Source:* JumpCloud Directory\n• *Time:* {{ new Date($json.timestamp).toLocaleDateString('en-GB', {day:'numeric',month:'numeric',year:'numeric'}) + ' ' + new Date($json.timestamp).toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit',hour12:true}) }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "id": "2aecbe2b-2cb0-4097-96c6-db418fb80004",
+      "name": "Slack - Member Removed Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        272,
+        144
+      ],
+      "webhookId": "78340376-3a1c-40e9-947a-547c92923134",
+      "credentials": {
+        "slackApi": {
+          "id": "6ZeCMu3zrEgj1Omk",
+          "name": "Secuiry Alert"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook - Receive JC Event": {
+      "main": [
+        [
+          {
+            "node": "Verify Webhook Secret",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Webhook Secret": {
+      "main": [
+        [
+          {
+            "node": "Extract Event Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Event Details": {
+      "main": [
+        [
+          {
+            "node": "Filter: Sensitive Groups Only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter: Sensitive Groups Only": {
+      "main": [
+        [
+          {
+            "node": "Switch: Add or Remove",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch: Add or Remove": {
+      "main": [
+        [
+          {
+            "node": "Slack - Member Added Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Slack - Member Removed Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "f878c2d4-060e-457d-967d-c664d10f129a",
+  "activeVersionId": "f878c2d4-060e-457d-967d-c664d10f129a",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-01T20:07:04.730Z",
+      "createdAt": "2026-03-01T20:07:04.730Z",
+      "role": "workflow:owner",
+      "workflowId": "XYPCR7pM2qaWQB3O",
+      "projectId": "pWTWmuHnmIHw48U9"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-03-01T21:12:20.000Z",
+    "createdAt": "2026-03-01T21:12:18.202Z",
+    "versionId": "f878c2d4-060e-457d-967d-c664d10f129a",
+    "workflowId": "XYPCR7pM2qaWQB3O",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "jc-group-membership-change",
+          "options": {}
+        },
+        "id": "2458308f-af5c-4050-81b4-ac7e63e95d38",
+        "name": "Webhook - Receive JC Event",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          -1104,
+          16
+        ],
+        "webhookId": "jc-group-membership-change"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 1
+            },
+            "conditions": [
+              {
+                "id": "verify-secret-header",
+                "leftValue": "={{ $json.headers['x-webhook-secret'] }}",
+                "rightValue": "jca_3M9T6aWP4uM9wpLjmvQh8cdT8nhpn6DvJ63z",
+                "operator": {
+                  "type": "string",
+                  "operation": "equals"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "1ad4e7de-df48-425a-8ba1-3618a65c8a88",
+        "name": "Verify Webhook Secret",
+        "type": "n8n-nodes-base.filter",
+        "typeVersion": 2,
+        "position": [
+          -832,
+          16
+        ]
+      },
+      {
+        "parameters": {
+          "assignments": {
+            "assignments": [
+              {
+                "id": "action-type",
+                "name": "actionType",
+                "value": "={{ $json.body.type }}",
+                "type": "string"
+              },
+              {
+                "id": "affected-user",
+                "name": "affectedUser",
+                "value": "={{ ($json.body.changes || []).find(c => c.field === 'username' || c.field === 'email')?.to || ($json.body.changes || [])[0]?.to || 'N/A' }}",
+                "type": "string"
+              },
+              {
+                "id": "affected-display-name",
+                "name": "affectedDisplayName",
+                "value": "={{ ($json.body.changes || []).find(c => c.field === 'displayName')?.to || 'N/A' }}",
+                "type": "string"
+              },
+              {
+                "id": "group-name",
+                "name": "groupName",
+                "value": "={{ $json.body.resource?.displayName || 'N/A' }}",
+                "type": "string"
+              },
+              {
+                "id": "group-type",
+                "name": "groupType",
+                "value": "={{ $json.body.resource?.type || 'N/A' }}",
+                "type": "string"
+              },
+              {
+                "id": "performed-by",
+                "name": "performedBy",
+                "value": "={{ $json.body.initiated_by?.email || $json.body.initiated_by?.username || 'N/A' }}",
+                "type": "string"
+              },
+              {
+                "id": "performer-type",
+                "name": "performerType",
+                "value": "={{ $json.body.initiated_by?.type || 'N/A' }}",
+                "type": "string"
+              },
+              {
+                "id": "event-type",
+                "name": "eventType",
+                "value": "={{ $json.body.event_type || 'association_change' }}",
+                "type": "string"
+              },
+              {
+                "id": "timestamp",
+                "name": "timestamp",
+                "value": "={{ $json.body.timestamp }}",
+                "type": "string"
+              },
+              {
+                "id": "service",
+                "name": "service",
+                "value": "={{ $json.body.service || 'directory' }}",
+                "type": "string"
+              },
+              {
+                "id": "changes-raw",
+                "name": "changesRaw",
+                "value": "={{ JSON.stringify($json.body.changes || []) }}",
+                "type": "string"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "c4650a10-a1f0-4c5b-a89c-639e00bbe5ab",
+        "name": "Extract Event Details",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [
+          -576,
+          16
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 1
+            },
+            "conditions": [
+              {
+                "id": "sensitive-group-check",
+                "leftValue": "={{ ['Test','Admin'].includes($json.groupName) }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "05054471-0e55-496e-9709-6506390a246d",
+        "name": "Filter: Sensitive Groups Only",
+        "type": "n8n-nodes-base.filter",
+        "typeVersion": 2,
+        "position": [
+          -352,
+          16
+        ]
+      },
+      {
+        "parameters": {
+          "rules": {
+            "values": [
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "strict",
+                    "version": 2
+                  },
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.actionType }}",
+                      "rightValue": "user_group_member_add",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      },
+                      "id": "switch-add"
+                    }
+                  ],
+                  "combinator": "and"
+                }
+              },
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "strict",
+                    "version": 2
+                  },
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.actionType }}",
+                      "rightValue": "user_group_member_remove",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      },
+                      "id": "switch-remove"
+                    }
+                  ],
+                  "combinator": "and"
+                }
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "b33de23f-411f-44bf-af65-8736a4e020ab",
+        "name": "Switch: Add or Remove",
+        "type": "n8n-nodes-base.switch",
+        "typeVersion": 3.2,
+        "position": [
+          -64,
+          16
+        ]
+      },
+      {
+        "parameters": {
+          "select": "channel",
+          "channelId": {
+            "__rl": true,
+            "value": "#security-alerts",
+            "mode": "name"
+          },
+          "text": "=🔴 *JUMPCLOUD — Sensitive Group Member Added*\n\n• *User:* {{ $json.affectedUser }}\n• *Name:* {{ $json.affectedDisplayName !== 'N/A' ? $json.affectedDisplayName : 'N/A' }}\n• *Group:* {{ $json.groupName }} ({{ $json.groupType }})\n• *Performed By:* {{ $json.performedBy }} ({{ $json.performerType }})\n• *Source:* JumpCloud Directory\n• *Time:* {{ new Date($json.timestamp).toLocaleDateString('en-GB', {day:'numeric',month:'numeric',year:'numeric'}) + ' ' + new Date($json.timestamp).toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit',hour12:true}) }}",
+          "otherOptions": {
+            "includeLinkToWorkflow": false
+          }
+        },
+        "id": "9786aedb-1eaf-42d2-a340-c47a3ac7b9fe",
+        "name": "Slack - Member Added Alert",
+        "type": "n8n-nodes-base.slack",
+        "typeVersion": 2.2,
+        "position": [
+          272,
+          -80
+        ],
+        "webhookId": "5abfea90-83ec-4185-b046-90161c655ecd",
+        "credentials": {
+          "slackApi": {
+            "id": "6ZeCMu3zrEgj1Omk",
+            "name": "Secuiry Alert"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "select": "channel",
+          "channelId": {
+            "__rl": true,
+            "value": "#security-alerts",
+            "mode": "name"
+          },
+          "text": "=🟢 *JUMPCLOUD — Sensitive Group Member Removed*\n\n• *User:* {{ $json.affectedUser }}\n• *Name:* {{ $json.affectedDisplayName !== 'N/A' ? $json.affectedDisplayName : 'N/A' }}\n• *Group:* {{ $json.groupName }} ({{ $json.groupType }})\n• *Performed By:* {{ $json.performedBy }} ({{ $json.performerType }})\n• *Source:* JumpCloud Directory\n• *Time:* {{ new Date($json.timestamp).toLocaleDateString('en-GB', {day:'numeric',month:'numeric',year:'numeric'}) + ' ' + new Date($json.timestamp).toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit',hour12:true}) }}",
+          "otherOptions": {
+            "includeLinkToWorkflow": false
+          }
+        },
+        "id": "2aecbe2b-2cb0-4097-96c6-db418fb80004",
+        "name": "Slack - Member Removed Alert",
+        "type": "n8n-nodes-base.slack",
+        "typeVersion": 2.2,
+        "position": [
+          272,
+          144
+        ],
+        "webhookId": "78340376-3a1c-40e9-947a-547c92923134",
+        "credentials": {
+          "slackApi": {
+            "id": "6ZeCMu3zrEgj1Omk",
+            "name": "Secuiry Alert"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Webhook - Receive JC Event": {
+        "main": [
+          [
+            {
+              "node": "Verify Webhook Secret",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Verify Webhook Secret": {
+        "main": [
+          [
+            {
+              "node": "Extract Event Details",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Extract Event Details": {
+        "main": [
+          [
+            {
+              "node": "Filter: Sensitive Groups Only",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Filter: Sensitive Groups Only": {
+        "main": [
+          [
+            {
+              "node": "Switch: Add or Remove",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Switch: Add or Remove": {
+        "main": [
+          [
+            {
+              "node": "Slack - Member Added Alert",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Slack - Member Removed Alert",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Alex Vinokur",
+    "name": "Version f878c2d4",
+    "description": "",
+    "autosaved": true
+  },
+  "tags": []
+}
