@@ -1,0 +1,2725 @@
+{
+  "updatedAt": "2026-03-03T21:29:17.172Z",
+  "createdAt": "2025-08-31T19:35:34.809Z",
+  "id": "lIAp2PZeA0MG7QiE",
+  "name": "PI workflows backup to Google Drive & GitHub",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "queryString": "PI workflows backup",
+        "returnAll": true,
+        "filter": {},
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -17696,
+        -128
+      ],
+      "id": "a3b1e0ef-bca4-44ee-b1f9-3d833c348ee3",
+      "name": "Search Drive Folders",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "92XkOPWlG0thbyjc",
+          "name": "Google Drive account"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "resource": "folder",
+        "operation": "deleteFolder",
+        "folderNoRootId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -17488,
+        -128
+      ],
+      "id": "600f892f-9fc5-47fc-81b1-01ab20a5b2ba",
+      "name": "Delete Old Drive Folder",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "92XkOPWlG0thbyjc",
+          "name": "Google Drive account"
+        }
+      },
+      "disabled": true,
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "resource": "folder",
+        "name": "=PI workflows backup {{ $now.setZone('Asia/Jerusalem').toFormat('yyyy-MM-dd HH-mm') }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "root",
+          "cachedResultName": "/ (Root folder)"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -17296,
+        -128
+      ],
+      "id": "72b65c9e-cd31-42ed-a726-7b4777aa6db4",
+      "name": "Create Drive Folder",
+      "executeOnce": true,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "92XkOPWlG0thbyjc",
+          "name": "Google Drive account"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Generate timestamp ONCE at the top\nconst dt = $now.setZone('Asia/Jerusalem');\nconst folderName = `PI workflows backup ${dt.toFormat('yyyy-MM-dd HH-mm')}`;\nconst timestamp = dt.toFormat('yyyy-MM-dd HH:mm');\n\nreturn $items().map((item) => {\n  const json = item.json || {};\n  const bin  = item.binary || {};\n  const data = bin.data || {};\n\n  const orig = (data.fileName || (json.name ? json.name + '.json' : 'workflow.json')).toString();\n\n  const safe = orig\n    .replace(/[\\/\\\\]+/g, '-')\n    .replace(/\\s+/g, ' ')\n    .trim();\n\n  bin.data = Object.assign({}, data, { fileName: safe });\n\n  json.workflowName = json.name || safe.replace('.json', '');\n  json.folderName = folderName;\n  json.timestamp = timestamp;\n\n  return { json, binary: bin };\n});"
+      },
+      "id": "6c1ae048-5ae9-45e2-a99d-6e4be39b9888",
+      "name": "Normalize Filename",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -16496,
+        -128
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 4
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -17888,
+        -128
+      ],
+      "id": "2dae7221-6c87-4e9f-9dc5-0643414ae962",
+      "name": "Schedule Trigger1",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "filters": {},
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-base.n8n",
+      "typeVersion": 1,
+      "position": [
+        -17088,
+        -128
+      ],
+      "id": "3e8f0a70-0ffd-4bca-863e-d98f28eb1db4",
+      "name": "Get many workflows1",
+      "credentials": {
+        "n8nApi": {
+          "id": "SKAlyF2lhIc4Qqwz",
+          "name": "n8n account"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -16896,
+        -128
+      ],
+      "id": "36e3122b-bb1f-4fc2-a509-fb37c41cf13b",
+      "name": "Loop Over Items1",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const name = $json.name || 'workflow-backup';\nconst filename = name + '.json';\nconst fileContent = JSON.stringify($json, null, 2);\n\nreturn {\n  json: { name: name },\n  binary: {\n    data: {\n      data: Buffer.from(fileContent).toString('base64'),\n      mimeType: 'application/json',\n      fileName: filename\n    }\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -16688,
+        -128
+      ],
+      "id": "38b64898-fad0-48f3-88ee-23ca09eb28ce",
+      "name": "workflow Export1",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "name": "=",
+        "driveId": {
+          "__rl": true,
+          "value": "My Drive",
+          "mode": "list",
+          "cachedResultName": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{ $items('Create Drive Folder')[0].json['id'] }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -16288,
+        -240
+      ],
+      "id": "9606f7dc-ba1a-4af5-b02c-701a86de8da8",
+      "name": "Upload file1",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "92XkOPWlG0thbyjc",
+          "name": "Google Drive account"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "owner": {
+          "__rl": true,
+          "value": "alexxx55555",
+          "mode": "name"
+        },
+        "repository": {
+          "__rl": true,
+          "value": "n8n-Raspberry-PI-Workflow-Backup",
+          "mode": "list",
+          "cachedResultName": "n8n-Raspberry-PI-Workflow-Backup",
+          "cachedResultUrl": "https://github.com/alexxx55555/n8n-Raspberry-PI-Workflow-Backup"
+        },
+        "filePath": "={{ $json.folderName }}/{{ $binary.data.fileName }}",
+        "binaryData": true,
+        "commitMessage": "=PI workflows backup: {{ $json.name }} - {{ $now.setZone('Asia/Jerusalem').toFormat('yyyy-MM-dd HH:mm') }}",
+        "additionalParameters": {
+          "author": {
+            "name": "PI workflows backup",
+            "email": "vinokura@alex-it.net"
+          }
+        }
+      },
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [
+        -16288,
+        -32
+      ],
+      "id": "92d8355e-d0b5-48a5-bbfc-2f1232bee797",
+      "name": "GitHub Backup (sanitized)1",
+      "webhookId": "114a3d57-956f-449c-8f2a-4f795d6a79b4",
+      "credentials": {
+        "githubApi": {
+          "id": "A8VxApqWkWn0Bbxk",
+          "name": "GitHub account"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Aggregate ALL items after the loop finishes\nconst allItems = $items('Normalize Filename') || [];\n\nconst folderName = allItems[0]?.json?.folderName || 'PI workflows backup';\nconst timestamp  = allItems[0]?.json?.timestamp  || $now.setZone('Asia/Jerusalem').toFormat('yyyy-MM-dd HH:mm');\n\nconst workflowNames = allItems\n  .map(i => i.json?.workflowName)\n  .filter(Boolean);\n\nconst OWNER  = 'alexxx55555';\nconst REPO   = 'n8n-Raspberry-PI-Workflow-Backup';\nconst BRANCH = 'main';\n\n// Build correctly encoded URL — spaces → %20, colons → %3A\nconst encodedFolder = encodeURIComponent(folderName);\nconst ghUrl = `https://github.com/${OWNER}/${REPO}/tree/${BRANCH}/${encodedFolder}`;\n\nconst readme = `# n8n-Raspberry-PI-Workflow-Backup\n\n## Latest Backup: ${timestamp}\n\n### Backup URL\n${ghUrl}\n\n### Workflows Backed Up (${workflowNames.length} total)\n${workflowNames.length\n  ? workflowNames.map(n => `- ${n}`).join('\\n')\n  : '- (no workflows found)'}\n\n---\n*Backup generated automatically by n8n*`;\n\nreturn [{ json: { readme, timestamp, folderName, ghUrl, workflowCount: workflowNames.length } }];"
+      },
+      "id": "2a9e64a1-4903-4fb6-9e92-b70a8098cdd6",
+      "name": "Create README Text1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -15888,
+        -32
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "get",
+        "owner": "alexxx55555",
+        "repository": {
+          "__rl": true,
+          "value": "n8n-Raspberry-PI-Workflow-Backup",
+          "mode": "list",
+          "cachedResultName": "n8n-Raspberry-PI-Workflow-Backup",
+          "cachedResultUrl": "https://github.com/alexxx55555/n8n-Raspberry-PI-Workflow-Backup"
+        },
+        "filePath": "README.md",
+        "additionalParameters": {}
+      },
+      "id": "0d0c2d36-fa47-4641-aa9c-dcdaf1556491",
+      "name": "GitHub Get README1",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [
+        -15696,
+        -32
+      ],
+      "webhookId": "d736aee6-56dc-42a6-a349-c0eaa710f0d2",
+      "credentials": {
+        "githubApi": {
+          "id": "A8VxApqWkWn0Bbxk",
+          "name": "GitHub account"
+        }
+      },
+      "disabled": true,
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const text = ($json.readme || '# PI workflows backup\\n\\n(empty)')\n  .replace(/\\r?\\n/g, '\\n');\n\nconst getReadmeItem = $item(0, 'GitHub Get README');\nconst sha = getReadmeItem?.json?.sha || '';\n\nreturn {\n  json: { sha },\n  binary: {\n    data: {\n      data: Buffer.from(text, 'utf8').toString('base64'),\n      fileName: 'README.md',\n      mimeType: 'text/markdown'\n    }\n  }\n};"
+      },
+      "id": "584c1646-91bc-47cd-8586-f25559325e7b",
+      "name": "Make README Binary1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -15488,
+        -32
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.sha }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "54999d79-f096-47a3-9849-06de46b92e72",
+      "name": "IF README exists?1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -15296,
+        -32
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "edit",
+        "owner": "alexxx55555",
+        "repository": {
+          "__rl": true,
+          "value": "n8n-Raspberry-PI-Workflow-Backup",
+          "mode": "list",
+          "cachedResultName": "n8n-Raspberry-PI-Workflow-Backup",
+          "cachedResultUrl": "https://github.com/alexxx55555/n8n-Raspberry-PI-Workflow-Backup"
+        },
+        "filePath": "README.md",
+        "binaryData": true,
+        "commitMessage": "Update README with latest backup summary"
+      },
+      "id": "40059532-15ee-4904-92e6-02c50382300c",
+      "name": "GitHub Edit README (binary)1",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [
+        -15088,
+        -128
+      ],
+      "webhookId": "05ff000e-8b2c-4937-b7cb-93dd8a896623",
+      "credentials": {
+        "githubApi": {
+          "id": "A8VxApqWkWn0Bbxk",
+          "name": "GitHub account"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "owner": "alexxx55555",
+        "repository": {
+          "__rl": true,
+          "value": "n8n-Raspberry-PI-Workflow-Backup",
+          "mode": "list",
+          "cachedResultName": "n8n-Raspberry-PI-Workflow-Backup",
+          "cachedResultUrl": "https://github.com/alexxx55555/n8n-Raspberry-PI-Workflow-Backup"
+        },
+        "filePath": "README.md",
+        "binaryData": true,
+        "commitMessage": "Create README with latest backup summary"
+      },
+      "id": "d97030dd-d87e-4e69-b751-f94a01160d45",
+      "name": "GitHub Create README (binary)1",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [
+        -15088,
+        64
+      ],
+      "webhookId": "2d48f044-b3d5-4525-9bb5-ad95c88713d8",
+      "credentials": {
+        "githubApi": {
+          "id": "A8VxApqWkWn0Bbxk",
+          "name": "GitHub account"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "list",
+        "owner": "alexxx55555",
+        "repository": {
+          "__rl": true,
+          "value": "n8n-Raspberry-PI-Workflow-Backup",
+          "mode": "list",
+          "cachedResultName": "n8n-Raspberry-PI-Workflow-Backup",
+          "cachedResultUrl": "https://github.com/alexxx55555/n8n-Raspberry-PI-Workflow-Backup"
+        }
+      },
+      "id": "fc576c6f-51ca-4c1f-aa21-1fa9a7291c64",
+      "name": "GitHub List Backup Folders (root)1",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [
+        -14784,
+        -32
+      ],
+      "webhookId": "1e8231ce-81e7-4996-887a-4350ee5cc069",
+      "credentials": {
+        "githubApi": {
+          "id": "A8VxApqWkWn0Bbxk",
+          "name": "GitHub account"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const folders = $items()\n  .filter(i => i.json?.type === 'dir' && i.json?.name?.startsWith('PI workflows backup '))\n  .map(i => ({ name: i.json.name, path: i.json.path }));\n\nif (folders.length <= 1) {\n  return [];\n}\n\n// Parse date from folder name: \"PI workflows backup yyyy-MM-dd HH-mm\"\nconst parseDate = (name) => {\n  const match = name.match(/(\\d{4}-\\d{2}-\\d{2}) (\\d{2})-(\\d{2})$/);\n  if (!match) return new Date('1900-01-01');\n  try {\n    return new Date(`${match[1]}T${match[2]}:${match[3]}:00`);\n  } catch {\n    return new Date('1900-01-01');\n  }\n};\n\nconst sorted = folders\n  .map(f => ({ ...f, date: parseDate(f.name) }))\n  .sort((a, b) => b.date - a.date);\n\n// Keep newest, delete everything else\nconst toDelete = sorted.slice(1);\n\nreturn toDelete.map(f => ({ json: { path: f.path, name: f.name } }));"
+      },
+      "id": "213d2de6-aa2e-4347-8520-ec748aad44fe",
+      "name": "Filter Old GH Backup Folders (keep newest)1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -14592,
+        -32
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "list",
+        "owner": "alexxx55555",
+        "repository": {
+          "__rl": true,
+          "value": "n8n-Raspberry-PI-Workflow-Backup",
+          "mode": "list",
+          "cachedResultName": "n8n-Raspberry-PI-Workflow-Backup",
+          "cachedResultUrl": "https://github.com/alexxx55555/n8n-Raspberry-PI-Workflow-Backup"
+        },
+        "filePath": "={{ $json.path }}"
+      },
+      "id": "d55985f6-b393-4a52-bd1f-17a3f26c6548",
+      "name": "GH List Files In Old Folder1",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [
+        -14384,
+        -32
+      ],
+      "webhookId": "747bc648-6d4a-4730-be63-a90383c026e9",
+      "credentials": {
+        "githubApi": {
+          "id": "A8VxApqWkWn0Bbxk",
+          "name": "GitHub account"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json['type'] }}",
+              "rightValue": "file",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "id": "isfile"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "12fd3036-01f7-4473-8b7c-6222c49195b1",
+      "name": "IF Is File?1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -14192,
+        -32
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "return $items().filter(i => i.json && i.json.type === 'file' && i.json.path && i.json.sha).map(i => ({ json: { path: i.json.path, sha: i.json.sha } }));"
+      },
+      "id": "090fcb48-acc6-483d-9ae0-9bea7600b03a",
+      "name": "To Files (root)1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -13984,
+        -128
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "list",
+        "owner": "alexxx55555",
+        "repository": {
+          "__rl": true,
+          "value": "n8n-Raspberry-PI-Workflow-Backup",
+          "mode": "list",
+          "cachedResultName": "n8n-Raspberry-PI-Workflow-Backup",
+          "cachedResultUrl": "https://github.com/alexxx55555/n8n-Raspberry-PI-Workflow-Backup"
+        },
+        "filePath": "={{ $json.path }}"
+      },
+      "id": "2e6b6335-6762-485b-8771-5de9d92c2de4",
+      "name": "GH List Files In Subfolder1",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [
+        -13984,
+        64
+      ],
+      "webhookId": "0e3b3f41-c2ff-4ae9-aa8e-d74f5b217588",
+      "credentials": {
+        "githubApi": {
+          "id": "A8VxApqWkWn0Bbxk",
+          "name": "GitHub account"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "return $items().filter(i => i.json && i.json.type === 'file' && i.json.path && i.json.sha).map(i => ({ json: { path: i.json.path, sha: i.json.sha } }));"
+      },
+      "id": "06c86893-eb99-452c-ba3e-66e1bfc7c738",
+      "name": "To Files (subfolder)1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -13760,
+        64
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "delete",
+        "owner": "alexxx55555",
+        "repository": {
+          "__rl": true,
+          "value": "n8n-Raspberry-PI-Workflow-Backup",
+          "mode": "list",
+          "cachedResultName": "n8n-Raspberry-PI-Workflow-Backup",
+          "cachedResultUrl": "https://github.com/alexxx55555/n8n-Raspberry-PI-Workflow-Backup"
+        },
+        "filePath": "={{ $json.path }}",
+        "commitMessage": "=Cleanup old backup file {{ $json.path }}"
+      },
+      "id": "efe04279-1e32-4342-9730-25bdf5b94084",
+      "name": "GH Delete File1",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [
+        -13776,
+        -128
+      ],
+      "webhookId": "e025f017-c79c-43d7-9d57-876995308d6e",
+      "credentials": {
+        "githubApi": {
+          "id": "A8VxApqWkWn0Bbxk",
+          "name": "GitHub account"
+        }
+      },
+      "disabled": true,
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0AJC2985U2",
+          "mode": "id"
+        },
+        "text": "=✅ *PI Workflows Backup Complete*\n\n📁 *Folder:* `{{ $('Create README Text').item.json.folderName }}`\n🔢 *Workflows backed up:* {{ $('Create README Text').item.json.workflowCount }}\n🔗 *GitHub:* {{ $('Create README Text').item.json.ghUrl }}\n🕐 *Time:* {{ $now.setZone('Asia/Jerusalem').toFormat('yyyy-MM-dd HH:mm') }}",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        -18384,
+        2864
+      ],
+      "id": "b934f442-0483-4c20-a6c1-1d9fe8fd95d3",
+      "name": "Slack Backup Complete",
+      "webhookId": "ae0474ea-5ed2-42f2-87c5-73e6b0c98c70",
+      "credentials": {
+        "slackApi": {
+          "id": "obEYVo8oQOJ22JqX",
+          "name": "AD Admin Bot"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        -18064,
+        3344
+      ],
+      "id": "0d600ac3-c50e-407d-a91e-ca595d354ddb",
+      "name": "Error Trigger Backup",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0AJC2985U2",
+          "mode": "id"
+        },
+        "text": "=❌ *PI Workflows Backup FAILED*\n\n🔴 *Error:* {{ $json.execution.error.message }}\n📍 *Failed node:* {{ $json.execution.lastNodeExecuted }}\n🆔 *Execution ID:* {{ $json.execution.id }}\n🔗 *Execution URL:* https://n8n.pi.alex-it.net/executions/{{ $json.execution.id }}\n🕐 *Time:* {{ $now.setZone('Asia/Jerusalem').toFormat('yyyy-MM-dd HH:mm') }}",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        -17824,
+        3344
+      ],
+      "id": "8350e2af-4977-4620-ba04-baf61bdc2ccd",
+      "name": "Slack Backup Error",
+      "webhookId": "176c4a72-790c-4b2e-a0e9-984f83192b23",
+      "credentials": {
+        "slackApi": {
+          "id": "obEYVo8oQOJ22JqX",
+          "name": "AD Admin Bot"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "queryString": "PI workflows backup",
+        "returnAll": true,
+        "filter": {},
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -22272,
+        3584
+      ],
+      "id": "1a0b9bb0-a7f6-4f12-a98f-98c26ada6c01",
+      "name": "Search Drive Folders1",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "92XkOPWlG0thbyjc",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "folder",
+        "operation": "deleteFolder",
+        "folderNoRootId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -22064,
+        3584
+      ],
+      "id": "d5e3ced6-92a5-416c-ae3e-c47b1e6c842a",
+      "name": "Delete Old Drive Folder1",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "92XkOPWlG0thbyjc",
+          "name": "Google Drive account"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "resource": "folder",
+        "name": "=PI workflows backup {{ $now.setZone('Asia/Jerusalem').toFormat('yyyy-MM-dd HH-mm') }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "root",
+          "cachedResultName": "/ (Root folder)"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -21872,
+        3584
+      ],
+      "id": "31f5aa3d-c9e1-4562-a2a4-27477a17634a",
+      "name": "Create Drive Folder1",
+      "executeOnce": true,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "92XkOPWlG0thbyjc",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Generate timestamp ONCE at the top\nconst dt = $now.setZone('Asia/Jerusalem');\nconst folderName = `PI workflows backup ${dt.toFormat('yyyy-MM-dd HH-mm')}`;\nconst timestamp = dt.toFormat('yyyy-MM-dd HH:mm');\n\nreturn $items().map((item) => {\n  const json = item.json || {};\n  const bin  = item.binary || {};\n  const data = bin.data || {};\n\n  const orig = (data.fileName || (json.name ? json.name + '.json' : 'workflow.json')).toString();\n\n  const safe = orig\n    .replace(/[\\/\\\\]+/g, '-')\n    .replace(/\\s+/g, ' ')\n    .trim();\n\n  bin.data = Object.assign({}, data, { fileName: safe });\n\n  json.workflowName = json.name || safe.replace('.json', '');\n  json.folderName = folderName;\n  json.timestamp = timestamp;\n\n  return { json, binary: bin };\n});"
+      },
+      "id": "b1ecf22f-4edf-41e6-9eea-43c3fa2cffb3",
+      "name": "Normalize Filename1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -21072,
+        3584
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 4
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -22464,
+        3584
+      ],
+      "id": "721c0e44-9eee-4f78-9eba-e967051dc44a",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "filters": {},
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-base.n8n",
+      "typeVersion": 1,
+      "position": [
+        -21664,
+        3584
+      ],
+      "id": "3d055266-21d8-46a8-84c8-5adac120cd23",
+      "name": "Get many workflows",
+      "credentials": {
+        "n8nApi": {
+          "id": "SKAlyF2lhIc4Qqwz",
+          "name": "n8n account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -21472,
+        3584
+      ],
+      "id": "fa7d5c5a-c149-499f-8a77-411144767507",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const name = $json.name || 'workflow-backup';\nconst filename = name + '.json';\nconst fileContent = JSON.stringify($json, null, 2);\n\nreturn {\n  json: { name: name },\n  binary: {\n    data: {\n      data: Buffer.from(fileContent).toString('base64'),\n      mimeType: 'application/json',\n      fileName: filename\n    }\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -21264,
+        3584
+      ],
+      "id": "36fc027b-53e0-4ca9-89c9-cda14b808f4a",
+      "name": "workflow Export"
+    },
+    {
+      "parameters": {
+        "name": "=",
+        "driveId": {
+          "__rl": true,
+          "value": "My Drive",
+          "mode": "list",
+          "cachedResultName": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{ $items('Create Drive Folder1')[0].json['id'] }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -20864,
+        3472
+      ],
+      "id": "871d52d8-804b-4047-9419-520e5fca2e89",
+      "name": "Upload file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "92XkOPWlG0thbyjc",
+          "name": "Google Drive account"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "owner": {
+          "__rl": true,
+          "value": "alexxx55555",
+          "mode": "name"
+        },
+        "repository": {
+          "__rl": true,
+          "value": "n8n-Raspberry-PI-Workflow-Backup",
+          "mode": "list",
+          "cachedResultName": "n8n-Raspberry-PI-Workflow-Backup",
+          "cachedResultUrl": "https://github.com/alexxx55555/n8n-Raspberry-PI-Workflow-Backup"
+        },
+        "filePath": "={{ $json.folderName }}/{{ $binary.data.fileName }}",
+        "binaryData": true,
+        "commitMessage": "=PI workflows backup: {{ $json.name }} - {{ $now.setZone('Asia/Jerusalem').toFormat('yyyy-MM-dd HH:mm') }}",
+        "additionalParameters": {
+          "author": {
+            "name": "PI workflows backup",
+            "email": "vinokura@alex-it.net"
+          }
+        }
+      },
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [
+        -20864,
+        3680
+      ],
+      "id": "84670bed-183c-43be-a790-0b5d78b2bb0c",
+      "name": "GitHub Backup (sanitized)",
+      "webhookId": "114a3d57-956f-449c-8f2a-4f795d6a79b4",
+      "credentials": {
+        "githubApi": {
+          "id": "A8VxApqWkWn0Bbxk",
+          "name": "GitHub account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Aggregate ALL items after the loop finishes\nconst allItems = $items('Normalize Filename1') || [];\n\nconst folderName = allItems[0]?.json?.folderName || 'PI workflows backup';\nconst timestamp  = allItems[0]?.json?.timestamp  || $now.setZone('Asia/Jerusalem').toFormat('yyyy-MM-dd HH:mm');\n\nconst workflowNames = allItems\n  .map(i => i.json?.workflowName)\n  .filter(Boolean);\n\nconst OWNER  = 'alexxx55555';\nconst REPO   = 'n8n-Raspberry-PI-Workflow-Backup';\nconst BRANCH = 'main';\n\n// Build correctly encoded URL — spaces → %20, colons → %3A\nconst encodedFolder = encodeURIComponent(folderName);\nconst ghUrl = `https://github.com/${OWNER}/${REPO}/tree/${BRANCH}/${encodedFolder}`;\n\nconst readme = `# n8n-Raspberry-PI-Workflow-Backup\n\n## Latest Backup: ${timestamp}\n\n### Backup URL\n${ghUrl}\n\n### Workflows Backed Up (${workflowNames.length} total)\n${workflowNames.length\n  ? workflowNames.map(n => `- ${n}`).join('\\n')\n  : '- (no workflows found)'}\n\n---\n*Backup generated automatically by n8n*`;\n\nreturn [{ json: { readme, timestamp, folderName, ghUrl, workflowCount: workflowNames.length } }];"
+      },
+      "id": "8045d51a-30a1-4f24-bb12-adb6bc60484b",
+      "name": "Create README Text",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -20464,
+        3680
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "get",
+        "owner": "alexxx55555",
+        "repository": {
+          "__rl": true,
+          "value": "n8n-Raspberry-PI-Workflow-Backup",
+          "mode": "list",
+          "cachedResultName": "n8n-Raspberry-PI-Workflow-Backup",
+          "cachedResultUrl": "https://github.com/alexxx55555/n8n-Raspberry-PI-Workflow-Backup"
+        },
+        "filePath": "README.md",
+        "additionalParameters": {}
+      },
+      "id": "dc948453-78bd-436f-a6f0-4f3d431db934",
+      "name": "GitHub Get README",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [
+        -20272,
+        3680
+      ],
+      "webhookId": "d736aee6-56dc-42a6-a349-c0eaa710f0d2",
+      "credentials": {
+        "githubApi": {
+          "id": "A8VxApqWkWn0Bbxk",
+          "name": "GitHub account"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const text = ($json.readme || '# PI workflows backup\\n\\n(empty)')\n  .replace(/\\r?\\n/g, '\\n');\n\nconst getReadmeItem = $item(0, 'GitHub Get README1');\nconst sha = getReadmeItem?.json?.sha || '';\n\nreturn {\n  json: { sha },\n  binary: {\n    data: {\n      data: Buffer.from(text, 'utf8').toString('base64'),\n      fileName: 'README.md',\n      mimeType: 'text/markdown'\n    }\n  }\n};"
+      },
+      "id": "1b04ed2d-eeef-4bad-be84-1c4a088c0de0",
+      "name": "Make README Binary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -20064,
+        3680
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.sha }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2c1bcc31-2984-4eed-bf3b-be509c4fbc46",
+      "name": "IF README exists?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -19872,
+        3680
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "edit",
+        "owner": "alexxx55555",
+        "repository": {
+          "__rl": true,
+          "value": "n8n-Raspberry-PI-Workflow-Backup",
+          "mode": "list",
+          "cachedResultName": "n8n-Raspberry-PI-Workflow-Backup",
+          "cachedResultUrl": "https://github.com/alexxx55555/n8n-Raspberry-PI-Workflow-Backup"
+        },
+        "filePath": "README.md",
+        "binaryData": true,
+        "commitMessage": "Update README with latest backup summary"
+      },
+      "id": "1445c0e4-2d4c-48e3-971c-a86cda97ba94",
+      "name": "GitHub Edit README (binary)",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [
+        -19664,
+        3584
+      ],
+      "webhookId": "05ff000e-8b2c-4937-b7cb-93dd8a896623",
+      "credentials": {
+        "githubApi": {
+          "id": "A8VxApqWkWn0Bbxk",
+          "name": "GitHub account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "owner": "alexxx55555",
+        "repository": {
+          "__rl": true,
+          "value": "n8n-Raspberry-PI-Workflow-Backup",
+          "mode": "list",
+          "cachedResultName": "n8n-Raspberry-PI-Workflow-Backup",
+          "cachedResultUrl": "https://github.com/alexxx55555/n8n-Raspberry-PI-Workflow-Backup"
+        },
+        "filePath": "README.md",
+        "binaryData": true,
+        "commitMessage": "Create README with latest backup summary"
+      },
+      "id": "486377c8-9d73-4fea-bce5-ee6f92d919bd",
+      "name": "GitHub Create README (binary)",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [
+        -19664,
+        3776
+      ],
+      "webhookId": "2d48f044-b3d5-4525-9bb5-ad95c88713d8",
+      "credentials": {
+        "githubApi": {
+          "id": "A8VxApqWkWn0Bbxk",
+          "name": "GitHub account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "list",
+        "owner": "alexxx55555",
+        "repository": {
+          "__rl": true,
+          "value": "n8n-Raspberry-PI-Workflow-Backup",
+          "mode": "list",
+          "cachedResultName": "n8n-Raspberry-PI-Workflow-Backup",
+          "cachedResultUrl": "https://github.com/alexxx55555/n8n-Raspberry-PI-Workflow-Backup"
+        }
+      },
+      "id": "61d3e1d3-10bd-412b-931d-24caf4863c9e",
+      "name": "GitHub List Backup Folders (root)",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [
+        -19360,
+        3680
+      ],
+      "webhookId": "1e8231ce-81e7-4996-887a-4350ee5cc069",
+      "credentials": {
+        "githubApi": {
+          "id": "A8VxApqWkWn0Bbxk",
+          "name": "GitHub account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const folders = $items()\n  .filter(i => i.json?.type === 'dir' && i.json?.name?.startsWith('PI workflows backup '))\n  .map(i => ({ name: i.json.name, path: i.json.path }));\n\nif (folders.length <= 1) {\n  return [];\n}\n\n// Parse date from folder name: \"PI workflows backup yyyy-MM-dd HH-mm\"\nconst parseDate = (name) => {\n  const match = name.match(/(\\d{4}-\\d{2}-\\d{2}) (\\d{2})-(\\d{2})$/);\n  if (!match) return new Date('1900-01-01');\n  try {\n    return new Date(`${match[1]}T${match[2]}:${match[3]}:00`);\n  } catch {\n    return new Date('1900-01-01');\n  }\n};\n\nconst sorted = folders\n  .map(f => ({ ...f, date: parseDate(f.name) }))\n  .sort((a, b) => b.date - a.date);\n\n// Keep newest, delete everything else\nconst toDelete = sorted.slice(1);\n\nreturn toDelete.map(f => ({ json: { path: f.path, name: f.name } }));"
+      },
+      "id": "ba7e09c6-3008-4648-b6b8-22c45536414a",
+      "name": "Filter Old GH Backup Folders (keep newest)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -19168,
+        3680
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "list",
+        "owner": "alexxx55555",
+        "repository": {
+          "__rl": true,
+          "value": "n8n-Raspberry-PI-Workflow-Backup",
+          "mode": "list",
+          "cachedResultName": "n8n-Raspberry-PI-Workflow-Backup",
+          "cachedResultUrl": "https://github.com/alexxx55555/n8n-Raspberry-PI-Workflow-Backup"
+        },
+        "filePath": "={{ $json.path }}"
+      },
+      "id": "b2e0fac0-f72a-4768-9bfa-b39f77f50937",
+      "name": "GH List Files In Old Folder",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [
+        -18960,
+        3680
+      ],
+      "webhookId": "747bc648-6d4a-4730-be63-a90383c026e9",
+      "credentials": {
+        "githubApi": {
+          "id": "A8VxApqWkWn0Bbxk",
+          "name": "GitHub account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json['type'] }}",
+              "rightValue": "file",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "id": "isfile"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f82f9b4e-e2e6-4666-8b5f-33df4fd9ed4d",
+      "name": "IF Is File?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -18768,
+        3680
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $items().filter(i => i.json && i.json.type === 'file' && i.json.path && i.json.sha).map(i => ({ json: { path: i.json.path, sha: i.json.sha } }));"
+      },
+      "id": "0267fc77-6f73-4d52-8e06-2e580c9e5b66",
+      "name": "To Files (root)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -18560,
+        3584
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "list",
+        "owner": "alexxx55555",
+        "repository": {
+          "__rl": true,
+          "value": "n8n-Raspberry-PI-Workflow-Backup",
+          "mode": "list",
+          "cachedResultName": "n8n-Raspberry-PI-Workflow-Backup",
+          "cachedResultUrl": "https://github.com/alexxx55555/n8n-Raspberry-PI-Workflow-Backup"
+        },
+        "filePath": "={{ $json.path }}"
+      },
+      "id": "92a6811a-dbaa-4a0b-9cc6-4c5e685214ac",
+      "name": "GH List Files In Subfolder",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [
+        -18560,
+        3776
+      ],
+      "webhookId": "0e3b3f41-c2ff-4ae9-aa8e-d74f5b217588",
+      "credentials": {
+        "githubApi": {
+          "id": "A8VxApqWkWn0Bbxk",
+          "name": "GitHub account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return $items().filter(i => i.json && i.json.type === 'file' && i.json.path && i.json.sha).map(i => ({ json: { path: i.json.path, sha: i.json.sha } }));"
+      },
+      "id": "edfbe07a-08f1-4664-8b2c-f4ace94191c9",
+      "name": "To Files (subfolder)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -18336,
+        3776
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "delete",
+        "owner": "alexxx55555",
+        "repository": {
+          "__rl": true,
+          "value": "n8n-Raspberry-PI-Workflow-Backup",
+          "mode": "list",
+          "cachedResultName": "n8n-Raspberry-PI-Workflow-Backup",
+          "cachedResultUrl": "https://github.com/alexxx55555/n8n-Raspberry-PI-Workflow-Backup"
+        },
+        "filePath": "={{ $json.path }}",
+        "commitMessage": "=Cleanup old backup file {{ $json.path }}"
+      },
+      "id": "1f5df4b6-613d-4f3e-be35-0cb31b83eea1",
+      "name": "GH Delete File",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [
+        -18352,
+        3584
+      ],
+      "webhookId": "e025f017-c79c-43d7-9d57-876995308d6e",
+      "credentials": {
+        "githubApi": {
+          "id": "A8VxApqWkWn0Bbxk",
+          "name": "GitHub account"
+        }
+      },
+      "continueOnFail": true
+    }
+  ],
+  "connections": {
+    "Search Drive Folders": {
+      "main": [
+        [
+          {
+            "node": "Delete Old Drive Folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Old Drive Folder": {
+      "main": [
+        [
+          {
+            "node": "Create Drive Folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Drive Folder": {
+      "main": [
+        [
+          {
+            "node": "Get many workflows1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Filename": {
+      "main": [
+        [
+          {
+            "node": "Upload file1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "GitHub Backup (sanitized)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger1": {
+      "main": [
+        [
+          {
+            "node": "Search Drive Folders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many workflows1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items1": {
+      "main": [
+        [
+          {
+            "node": "workflow Export1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "workflow Export1": {
+      "main": [
+        [
+          {
+            "node": "Normalize Filename",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GitHub Backup (sanitized)1": {
+      "main": [
+        [
+          {
+            "node": "Create README Text1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create README Text1": {
+      "main": [
+        [
+          {
+            "node": "GitHub Get README1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GitHub Get README1": {
+      "main": [
+        [
+          {
+            "node": "Make README Binary1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Make README Binary1": {
+      "main": [
+        [
+          {
+            "node": "IF README exists?1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF README exists?1": {
+      "main": [
+        [
+          {
+            "node": "GitHub Edit README (binary)1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "GitHub Create README (binary)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GitHub Edit README (binary)1": {
+      "main": [
+        [
+          {
+            "node": "GitHub List Backup Folders (root)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GitHub Create README (binary)1": {
+      "main": [
+        [
+          {
+            "node": "GitHub List Backup Folders (root)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GitHub List Backup Folders (root)1": {
+      "main": [
+        [
+          {
+            "node": "Filter Old GH Backup Folders (keep newest)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Old GH Backup Folders (keep newest)1": {
+      "main": [
+        [
+          {
+            "node": "GH List Files In Old Folder1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GH List Files In Old Folder1": {
+      "main": [
+        [
+          {
+            "node": "IF Is File?1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Is File?1": {
+      "main": [
+        [
+          {
+            "node": "To Files (root)1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "GH List Files In Subfolder1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "To Files (root)1": {
+      "main": [
+        [
+          {
+            "node": "GH Delete File1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GH List Files In Subfolder1": {
+      "main": [
+        [
+          {
+            "node": "To Files (subfolder)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "To Files (subfolder)1": {
+      "main": [
+        [
+          {
+            "node": "GH Delete File1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Search Drive Folders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Trigger Backup": {
+      "main": [
+        [
+          {
+            "node": "Slack Backup Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Drive Folders1": {
+      "main": [
+        [
+          {
+            "node": "Delete Old Drive Folder1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Old Drive Folder1": {
+      "main": [
+        [
+          {
+            "node": "Create Drive Folder1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Drive Folder1": {
+      "main": [
+        [
+          {
+            "node": "Get many workflows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Filename1": {
+      "main": [
+        [
+          {
+            "node": "Upload file",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "GitHub Backup (sanitized)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Search Drive Folders1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many workflows": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "workflow Export",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "workflow Export": {
+      "main": [
+        [
+          {
+            "node": "Normalize Filename1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GitHub Backup (sanitized)": {
+      "main": [
+        [
+          {
+            "node": "Create README Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create README Text": {
+      "main": [
+        [
+          {
+            "node": "GitHub Get README",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GitHub Get README": {
+      "main": [
+        [
+          {
+            "node": "Make README Binary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Make README Binary": {
+      "main": [
+        [
+          {
+            "node": "IF README exists?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF README exists?": {
+      "main": [
+        [
+          {
+            "node": "GitHub Edit README (binary)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "GitHub Create README (binary)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GitHub Edit README (binary)": {
+      "main": [
+        [
+          {
+            "node": "GitHub List Backup Folders (root)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Slack Backup Complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GitHub Create README (binary)": {
+      "main": [
+        [
+          {
+            "node": "GitHub List Backup Folders (root)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Slack Backup Complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GitHub List Backup Folders (root)": {
+      "main": [
+        [
+          {
+            "node": "Filter Old GH Backup Folders (keep newest)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Old GH Backup Folders (keep newest)": {
+      "main": [
+        [
+          {
+            "node": "GH List Files In Old Folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GH List Files In Old Folder": {
+      "main": [
+        [
+          {
+            "node": "IF Is File?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Is File?": {
+      "main": [
+        [
+          {
+            "node": "To Files (root)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "GH List Files In Subfolder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "To Files (root)": {
+      "main": [
+        [
+          {
+            "node": "GH Delete File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GH List Files In Subfolder": {
+      "main": [
+        [
+          {
+            "node": "To Files (subfolder)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "To Files (subfolder)": {
+      "main": [
+        [
+          {
+            "node": "GH Delete File",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Search Drive Folders1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GH Delete File": {
+      "main": [
+        [
+          {
+            "node": "Slack Backup Complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Jerusalem",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": {
+    "node:Schedule Trigger": {
+      "recurrenceRules": [
+        12
+      ]
+    },
+    "node:Schedule Trigger1": {
+      "recurrenceRules": [
+        20
+      ]
+    }
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "ba34a5b1-b2c6-4085-88c8-5b2c109aab06",
+  "activeVersionId": "cae17d53-79c9-4f02-a4fc-7c85316adda9",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2025-10-31T09:14:00.800Z",
+      "createdAt": "2025-10-31T09:14:00.800Z",
+      "role": "workflow:owner",
+      "workflowId": "lIAp2PZeA0MG7QiE",
+      "projectId": "pWTWmuHnmIHw48U9"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-03-03T19:45:44.000Z",
+    "createdAt": "2026-03-03T19:45:43.694Z",
+    "versionId": "cae17d53-79c9-4f02-a4fc-7c85316adda9",
+    "workflowId": "lIAp2PZeA0MG7QiE",
+    "nodes": [
+      {
+        "parameters": {
+          "resource": "fileFolder",
+          "queryString": "PI workflows backup",
+          "returnAll": true,
+          "filter": {},
+          "options": {}
+        },
+        "type": "n8n-nodes-base.googleDrive",
+        "typeVersion": 3,
+        "position": [
+          -22608,
+          2640
+        ],
+        "id": "a3b1e0ef-bca4-44ee-b1f9-3d833c348ee3",
+        "name": "Search Drive Folders",
+        "credentials": {
+          "googleDriveOAuth2Api": {
+            "id": "92XkOPWlG0thbyjc",
+            "name": "Google Drive account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "resource": "folder",
+          "operation": "deleteFolder",
+          "folderNoRootId": {
+            "__rl": true,
+            "value": "={{ $json.id }}",
+            "mode": "id"
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.googleDrive",
+        "typeVersion": 3,
+        "position": [
+          -22400,
+          2640
+        ],
+        "id": "600f892f-9fc5-47fc-81b1-01ab20a5b2ba",
+        "name": "Delete Old Drive Folder",
+        "credentials": {
+          "googleDriveOAuth2Api": {
+            "id": "92XkOPWlG0thbyjc",
+            "name": "Google Drive account"
+          }
+        },
+        "continueOnFail": true
+      },
+      {
+        "parameters": {
+          "resource": "folder",
+          "name": "=PI workflows backup {{ $now.setZone('Asia/Jerusalem').toFormat('yyyy-MM-dd HH-mm') }}",
+          "driveId": {
+            "__rl": true,
+            "mode": "list",
+            "value": "My Drive"
+          },
+          "folderId": {
+            "__rl": true,
+            "mode": "list",
+            "value": "root",
+            "cachedResultName": "/ (Root folder)"
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.googleDrive",
+        "typeVersion": 3,
+        "position": [
+          -22208,
+          2640
+        ],
+        "id": "72b65c9e-cd31-42ed-a726-7b4777aa6db4",
+        "name": "Create Drive Folder",
+        "executeOnce": true,
+        "credentials": {
+          "googleDriveOAuth2Api": {
+            "id": "92XkOPWlG0thbyjc",
+            "name": "Google Drive account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "// Generate timestamp ONCE at the top\nconst dt = $now.setZone('Asia/Jerusalem');\nconst folderName = `PI workflows backup ${dt.toFormat('yyyy-MM-dd HH-mm')}`;\nconst timestamp = dt.toFormat('yyyy-MM-dd HH:mm');\n\nreturn $items().map((item) => {\n  const json = item.json || {};\n  const bin  = item.binary || {};\n  const data = bin.data || {};\n\n  const orig = (data.fileName || (json.name ? json.name + '.json' : 'workflow.json')).toString();\n\n  const safe = orig\n    .replace(/[\\/\\\\]+/g, '-')\n    .replace(/\\s+/g, ' ')\n    .trim();\n\n  bin.data = Object.assign({}, data, { fileName: safe });\n\n  json.workflowName = json.name || safe.replace('.json', '');\n  json.folderName = folderName;\n  json.timestamp = timestamp;\n\n  return { json, binary: bin };\n});"
+        },
+        "id": "6c1ae048-5ae9-45e2-a99d-6e4be39b9888",
+        "name": "Normalize Filename",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -21408,
+          2640
+        ]
+      },
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "hours",
+                "hoursInterval": 4
+              }
+            ]
+          }
+        },
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          -22800,
+          2640
+        ],
+        "id": "2dae7221-6c87-4e9f-9dc5-0643414ae962",
+        "name": "Schedule Trigger1"
+      },
+      {
+        "parameters": {
+          "filters": {},
+          "requestOptions": {}
+        },
+        "type": "n8n-nodes-base.n8n",
+        "typeVersion": 1,
+        "position": [
+          -22000,
+          2640
+        ],
+        "id": "3e8f0a70-0ffd-4bca-863e-d98f28eb1db4",
+        "name": "Get many workflows1",
+        "credentials": {
+          "n8nApi": {
+            "id": "SKAlyF2lhIc4Qqwz",
+            "name": "n8n account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "options": {}
+        },
+        "type": "n8n-nodes-base.splitInBatches",
+        "typeVersion": 3,
+        "position": [
+          -21808,
+          2640
+        ],
+        "id": "36e3122b-bb1f-4fc2-a509-fb37c41cf13b",
+        "name": "Loop Over Items1"
+      },
+      {
+        "parameters": {
+          "mode": "runOnceForEachItem",
+          "jsCode": "const name = $json.name || 'workflow-backup';\nconst filename = name + '.json';\nconst fileContent = JSON.stringify($json, null, 2);\n\nreturn {\n  json: { name: name },\n  binary: {\n    data: {\n      data: Buffer.from(fileContent).toString('base64'),\n      mimeType: 'application/json',\n      fileName: filename\n    }\n  }\n};"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -21600,
+          2640
+        ],
+        "id": "38b64898-fad0-48f3-88ee-23ca09eb28ce",
+        "name": "workflow Export1"
+      },
+      {
+        "parameters": {
+          "name": "=",
+          "driveId": {
+            "__rl": true,
+            "value": "My Drive",
+            "mode": "list",
+            "cachedResultName": "My Drive"
+          },
+          "folderId": {
+            "__rl": true,
+            "value": "={{ $items('Create Drive Folder')[0].json['id'] }}",
+            "mode": "id"
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.googleDrive",
+        "typeVersion": 3,
+        "position": [
+          -21200,
+          2528
+        ],
+        "id": "9606f7dc-ba1a-4af5-b02c-701a86de8da8",
+        "name": "Upload file1",
+        "credentials": {
+          "googleDriveOAuth2Api": {
+            "id": "92XkOPWlG0thbyjc",
+            "name": "Google Drive account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "resource": "file",
+          "owner": {
+            "__rl": true,
+            "value": "alexxx55555",
+            "mode": "name"
+          },
+          "repository": {
+            "__rl": true,
+            "value": "n8n-Raspberry-PI-Workflow-Backup",
+            "mode": "list",
+            "cachedResultName": "n8n-Raspberry-PI-Workflow-Backup",
+            "cachedResultUrl": "https://github.com/alexxx55555/n8n-Raspberry-PI-Workflow-Backup"
+          },
+          "filePath": "={{ $json.folderName }}/{{ $binary.data.fileName }}",
+          "binaryData": true,
+          "commitMessage": "=PI workflows backup: {{ $json.name }} - {{ $now.setZone('Asia/Jerusalem').toFormat('yyyy-MM-dd HH:mm') }}",
+          "additionalParameters": {
+            "author": {
+              "name": "PI workflows backup",
+              "email": "vinokura@alex-it.net"
+            }
+          }
+        },
+        "type": "n8n-nodes-base.github",
+        "typeVersion": 1,
+        "position": [
+          -21200,
+          2736
+        ],
+        "id": "92d8355e-d0b5-48a5-bbfc-2f1232bee797",
+        "name": "GitHub Backup (sanitized)1",
+        "webhookId": "114a3d57-956f-449c-8f2a-4f795d6a79b4",
+        "credentials": {
+          "githubApi": {
+            "id": "A8VxApqWkWn0Bbxk",
+            "name": "GitHub account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "// Aggregate ALL items after the loop finishes\nconst allItems = $items('Normalize Filename') || [];\n\nconst folderName = allItems[0]?.json?.folderName || 'PI workflows backup';\nconst timestamp  = allItems[0]?.json?.timestamp  || $now.setZone('Asia/Jerusalem').toFormat('yyyy-MM-dd HH:mm');\n\nconst workflowNames = allItems\n  .map(i => i.json?.workflowName)\n  .filter(Boolean);\n\nconst OWNER  = 'alexxx55555';\nconst REPO   = 'n8n-Raspberry-PI-Workflow-Backup';\nconst BRANCH = 'main';\n\n// Build correctly encoded URL — spaces → %20, colons → %3A\nconst encodedFolder = encodeURIComponent(folderName);\nconst ghUrl = `https://github.com/${OWNER}/${REPO}/tree/${BRANCH}/${encodedFolder}`;\n\nconst readme = `# n8n-Raspberry-PI-Workflow-Backup\n\n## Latest Backup: ${timestamp}\n\n### Backup URL\n${ghUrl}\n\n### Workflows Backed Up (${workflowNames.length} total)\n${workflowNames.length\n  ? workflowNames.map(n => `- ${n}`).join('\\n')\n  : '- (no workflows found)'}\n\n---\n*Backup generated automatically by n8n*`;\n\nreturn [{ json: { readme, timestamp, folderName, ghUrl, workflowCount: workflowNames.length } }];"
+        },
+        "id": "2a9e64a1-4903-4fb6-9e92-b70a8098cdd6",
+        "name": "Create README Text1",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -20800,
+          2736
+        ]
+      },
+      {
+        "parameters": {
+          "resource": "file",
+          "operation": "get",
+          "owner": "alexxx55555",
+          "repository": {
+            "__rl": true,
+            "value": "n8n-Raspberry-PI-Workflow-Backup",
+            "mode": "list",
+            "cachedResultName": "n8n-Raspberry-PI-Workflow-Backup",
+            "cachedResultUrl": "https://github.com/alexxx55555/n8n-Raspberry-PI-Workflow-Backup"
+          },
+          "filePath": "README.md",
+          "additionalParameters": {}
+        },
+        "id": "0d0c2d36-fa47-4641-aa9c-dcdaf1556491",
+        "name": "GitHub Get README1",
+        "type": "n8n-nodes-base.github",
+        "typeVersion": 1,
+        "position": [
+          -20608,
+          2736
+        ],
+        "webhookId": "d736aee6-56dc-42a6-a349-c0eaa710f0d2",
+        "credentials": {
+          "githubApi": {
+            "id": "A8VxApqWkWn0Bbxk",
+            "name": "GitHub account"
+          }
+        },
+        "continueOnFail": true
+      },
+      {
+        "parameters": {
+          "jsCode": "const text = ($json.readme || '# PI workflows backup\\n\\n(empty)')\n  .replace(/\\r?\\n/g, '\\n');\n\nconst getReadmeItem = $item(0, 'GitHub Get README');\nconst sha = getReadmeItem?.json?.sha || '';\n\nreturn {\n  json: { sha },\n  binary: {\n    data: {\n      data: Buffer.from(text, 'utf8').toString('base64'),\n      fileName: 'README.md',\n      mimeType: 'text/markdown'\n    }\n  }\n};"
+        },
+        "id": "584c1646-91bc-47cd-8586-f25559325e7b",
+        "name": "Make README Binary1",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -20400,
+          2736
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "conditions": [
+              {
+                "leftValue": "={{ $json.sha }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "string",
+                  "operation": "notEmpty"
+                }
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "54999d79-f096-47a3-9849-06de46b92e72",
+        "name": "IF README exists?1",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [
+          -20208,
+          2736
+        ]
+      },
+      {
+        "parameters": {
+          "resource": "file",
+          "operation": "edit",
+          "owner": "alexxx55555",
+          "repository": {
+            "__rl": true,
+            "value": "n8n-Raspberry-PI-Workflow-Backup",
+            "mode": "list",
+            "cachedResultName": "n8n-Raspberry-PI-Workflow-Backup",
+            "cachedResultUrl": "https://github.com/alexxx55555/n8n-Raspberry-PI-Workflow-Backup"
+          },
+          "filePath": "README.md",
+          "binaryData": true,
+          "commitMessage": "Update README with latest backup summary"
+        },
+        "id": "40059532-15ee-4904-92e6-02c50382300c",
+        "name": "GitHub Edit README (binary)1",
+        "type": "n8n-nodes-base.github",
+        "typeVersion": 1,
+        "position": [
+          -20000,
+          2640
+        ],
+        "webhookId": "05ff000e-8b2c-4937-b7cb-93dd8a896623",
+        "credentials": {
+          "githubApi": {
+            "id": "A8VxApqWkWn0Bbxk",
+            "name": "GitHub account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "resource": "file",
+          "owner": "alexxx55555",
+          "repository": {
+            "__rl": true,
+            "value": "n8n-Raspberry-PI-Workflow-Backup",
+            "mode": "list",
+            "cachedResultName": "n8n-Raspberry-PI-Workflow-Backup",
+            "cachedResultUrl": "https://github.com/alexxx55555/n8n-Raspberry-PI-Workflow-Backup"
+          },
+          "filePath": "README.md",
+          "binaryData": true,
+          "commitMessage": "Create README with latest backup summary"
+        },
+        "id": "d97030dd-d87e-4e69-b751-f94a01160d45",
+        "name": "GitHub Create README (binary)1",
+        "type": "n8n-nodes-base.github",
+        "typeVersion": 1,
+        "position": [
+          -20000,
+          2832
+        ],
+        "webhookId": "2d48f044-b3d5-4525-9bb5-ad95c88713d8",
+        "credentials": {
+          "githubApi": {
+            "id": "A8VxApqWkWn0Bbxk",
+            "name": "GitHub account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "resource": "file",
+          "operation": "list",
+          "owner": "alexxx55555",
+          "repository": {
+            "__rl": true,
+            "value": "n8n-Raspberry-PI-Workflow-Backup",
+            "mode": "list",
+            "cachedResultName": "n8n-Raspberry-PI-Workflow-Backup",
+            "cachedResultUrl": "https://github.com/alexxx55555/n8n-Raspberry-PI-Workflow-Backup"
+          }
+        },
+        "id": "fc576c6f-51ca-4c1f-aa21-1fa9a7291c64",
+        "name": "GitHub List Backup Folders (root)1",
+        "type": "n8n-nodes-base.github",
+        "typeVersion": 1,
+        "position": [
+          -19696,
+          2736
+        ],
+        "webhookId": "1e8231ce-81e7-4996-887a-4350ee5cc069",
+        "credentials": {
+          "githubApi": {
+            "id": "A8VxApqWkWn0Bbxk",
+            "name": "GitHub account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "const folders = $items()\n  .filter(i => i.json?.type === 'dir' && i.json?.name?.startsWith('PI workflows backup '))\n  .map(i => ({ name: i.json.name, path: i.json.path }));\n\nif (folders.length <= 1) {\n  return [];\n}\n\n// Parse date from folder name: \"PI workflows backup yyyy-MM-dd HH-mm\"\nconst parseDate = (name) => {\n  const match = name.match(/(\\d{4}-\\d{2}-\\d{2}) (\\d{2})-(\\d{2})$/);\n  if (!match) return new Date('1900-01-01');\n  try {\n    return new Date(`${match[1]}T${match[2]}:${match[3]}:00`);\n  } catch {\n    return new Date('1900-01-01');\n  }\n};\n\nconst sorted = folders\n  .map(f => ({ ...f, date: parseDate(f.name) }))\n  .sort((a, b) => b.date - a.date);\n\n// Keep newest, delete everything else\nconst toDelete = sorted.slice(1);\n\nreturn toDelete.map(f => ({ json: { path: f.path, name: f.name } }));"
+        },
+        "id": "213d2de6-aa2e-4347-8520-ec748aad44fe",
+        "name": "Filter Old GH Backup Folders (keep newest)1",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -19504,
+          2736
+        ]
+      },
+      {
+        "parameters": {
+          "resource": "file",
+          "operation": "list",
+          "owner": "alexxx55555",
+          "repository": {
+            "__rl": true,
+            "value": "n8n-Raspberry-PI-Workflow-Backup",
+            "mode": "list",
+            "cachedResultName": "n8n-Raspberry-PI-Workflow-Backup",
+            "cachedResultUrl": "https://github.com/alexxx55555/n8n-Raspberry-PI-Workflow-Backup"
+          },
+          "filePath": "={{ $json.path }}"
+        },
+        "id": "d55985f6-b393-4a52-bd1f-17a3f26c6548",
+        "name": "GH List Files In Old Folder1",
+        "type": "n8n-nodes-base.github",
+        "typeVersion": 1,
+        "position": [
+          -19296,
+          2736
+        ],
+        "webhookId": "747bc648-6d4a-4730-be63-a90383c026e9",
+        "credentials": {
+          "githubApi": {
+            "id": "A8VxApqWkWn0Bbxk",
+            "name": "GitHub account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 1
+            },
+            "conditions": [
+              {
+                "leftValue": "={{ $json['type'] }}",
+                "rightValue": "file",
+                "operator": {
+                  "type": "string",
+                  "operation": "equals"
+                },
+                "id": "isfile"
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "12fd3036-01f7-4473-8b7c-6222c49195b1",
+        "name": "IF Is File?1",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [
+          -19104,
+          2736
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "return $items().filter(i => i.json && i.json.type === 'file' && i.json.path && i.json.sha).map(i => ({ json: { path: i.json.path, sha: i.json.sha } }));"
+        },
+        "id": "090fcb48-acc6-483d-9ae0-9bea7600b03a",
+        "name": "To Files (root)1",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -18896,
+          2640
+        ]
+      },
+      {
+        "parameters": {
+          "resource": "file",
+          "operation": "list",
+          "owner": "alexxx55555",
+          "repository": {
+            "__rl": true,
+            "value": "n8n-Raspberry-PI-Workflow-Backup",
+            "mode": "list",
+            "cachedResultName": "n8n-Raspberry-PI-Workflow-Backup",
+            "cachedResultUrl": "https://github.com/alexxx55555/n8n-Raspberry-PI-Workflow-Backup"
+          },
+          "filePath": "={{ $json.path }}"
+        },
+        "id": "2e6b6335-6762-485b-8771-5de9d92c2de4",
+        "name": "GH List Files In Subfolder1",
+        "type": "n8n-nodes-base.github",
+        "typeVersion": 1,
+        "position": [
+          -18896,
+          2832
+        ],
+        "webhookId": "0e3b3f41-c2ff-4ae9-aa8e-d74f5b217588",
+        "credentials": {
+          "githubApi": {
+            "id": "A8VxApqWkWn0Bbxk",
+            "name": "GitHub account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "return $items().filter(i => i.json && i.json.type === 'file' && i.json.path && i.json.sha).map(i => ({ json: { path: i.json.path, sha: i.json.sha } }));"
+        },
+        "id": "06c86893-eb99-452c-ba3e-66e1bfc7c738",
+        "name": "To Files (subfolder)1",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -18704,
+          2832
+        ]
+      },
+      {
+        "parameters": {
+          "resource": "file",
+          "operation": "delete",
+          "owner": "alexxx55555",
+          "repository": {
+            "__rl": true,
+            "value": "n8n-Raspberry-PI-Workflow-Backup",
+            "mode": "list",
+            "cachedResultName": "n8n-Raspberry-PI-Workflow-Backup",
+            "cachedResultUrl": "https://github.com/alexxx55555/n8n-Raspberry-PI-Workflow-Backup"
+          },
+          "filePath": "={{ $json.path }}",
+          "commitMessage": "=Cleanup old backup file {{ $json.path }}"
+        },
+        "id": "efe04279-1e32-4342-9730-25bdf5b94084",
+        "name": "GH Delete File1",
+        "type": "n8n-nodes-base.github",
+        "typeVersion": 1,
+        "position": [
+          -18704,
+          2640
+        ],
+        "webhookId": "e025f017-c79c-43d7-9d57-876995308d6e",
+        "credentials": {
+          "githubApi": {
+            "id": "A8VxApqWkWn0Bbxk",
+            "name": "GitHub account"
+          }
+        },
+        "continueOnFail": true
+      }
+    ],
+    "connections": {
+      "Search Drive Folders": {
+        "main": [
+          [
+            {
+              "node": "Delete Old Drive Folder",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Delete Old Drive Folder": {
+        "main": [
+          [
+            {
+              "node": "Create Drive Folder",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Create Drive Folder": {
+        "main": [
+          [
+            {
+              "node": "Get many workflows1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Normalize Filename": {
+        "main": [
+          [
+            {
+              "node": "Upload file1",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "GitHub Backup (sanitized)1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Schedule Trigger1": {
+        "main": [
+          [
+            {
+              "node": "Search Drive Folders",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get many workflows1": {
+        "main": [
+          [
+            {
+              "node": "Loop Over Items1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Loop Over Items1": {
+        "main": [
+          [
+            {
+              "node": "workflow Export1",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Loop Over Items1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "workflow Export1": {
+        "main": [
+          [
+            {
+              "node": "Normalize Filename",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "GitHub Backup (sanitized)1": {
+        "main": [
+          [
+            {
+              "node": "Create README Text1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Create README Text1": {
+        "main": [
+          [
+            {
+              "node": "GitHub Get README1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "GitHub Get README1": {
+        "main": [
+          [
+            {
+              "node": "Make README Binary1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Make README Binary1": {
+        "main": [
+          [
+            {
+              "node": "IF README exists?1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "IF README exists?1": {
+        "main": [
+          [
+            {
+              "node": "GitHub Edit README (binary)1",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "GitHub Create README (binary)1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "GitHub Edit README (binary)1": {
+        "main": [
+          [
+            {
+              "node": "GitHub List Backup Folders (root)1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "GitHub Create README (binary)1": {
+        "main": [
+          [
+            {
+              "node": "GitHub List Backup Folders (root)1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "GitHub List Backup Folders (root)1": {
+        "main": [
+          [
+            {
+              "node": "Filter Old GH Backup Folders (keep newest)1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Filter Old GH Backup Folders (keep newest)1": {
+        "main": [
+          [
+            {
+              "node": "GH List Files In Old Folder1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "GH List Files In Old Folder1": {
+        "main": [
+          [
+            {
+              "node": "IF Is File?1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "IF Is File?1": {
+        "main": [
+          [
+            {
+              "node": "To Files (root)1",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "GH List Files In Subfolder1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "To Files (root)1": {
+        "main": [
+          [
+            {
+              "node": "GH Delete File1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "GH List Files In Subfolder1": {
+        "main": [
+          [
+            {
+              "node": "To Files (subfolder)1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "To Files (subfolder)1": {
+        "main": [
+          [
+            {
+              "node": "GH Delete File1",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Search Drive Folders",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Alex Vinokur",
+    "name": "Version cae17d53",
+    "description": "",
+    "autosaved": false
+  },
+  "tags": []
+}
