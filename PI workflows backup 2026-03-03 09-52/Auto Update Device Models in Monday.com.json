@@ -1,0 +1,449 @@
+{
+  "updatedAt": "2025-10-31T09:20:09.000Z",
+  "createdAt": "2025-09-28T16:51:52.912Z",
+  "id": "WvXu0pxOgmwwtlqd",
+  "name": "Auto Update Device Models in Monday.com",
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -512,
+        64
+      ],
+      "id": "39d5281a-e235-4d27-84fe-082fdd4bbd96",
+      "name": "When clicking 'Execute workflow'"
+    },
+    {
+      "parameters": {
+        "resource": "boardItem",
+        "operation": "getAll",
+        "boardId": "1153799458",
+        "groupId": "new_group51051",
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.mondayCom",
+      "typeVersion": 1,
+      "position": [
+        -176,
+        64
+      ],
+      "id": "becf5501-6c15-4089-9968-2a3e1d3b26a4",
+      "name": "Get Monday Items Lenovo",
+      "credentials": {
+        "mondayComApi": {
+          "id": "tL56OUnJPXJjPxm4",
+          "name": "Monday.com account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst itemsToProcess = [];\nconst skippedDevices = [];\nconst alreadyFilledDevices = [];\n\nfunction getDeviceType(serial) {\n  if (serial.startsWith('C02') && serial.length >= 10) return 'Apple';\n  if (serial.startsWith('CND')) return 'Dell';\n  if (serial.match(/^(PC|PF|PG|MP|R)/)) return 'Lenovo';\n  if (serial.match(/^\\d+[A-Z]+$/)) return 'Lenovo';\n  if (serial.startsWith('MP')) return 'Unknown';\n  return 'Unknown';\n}\n\nfunction hasModel(item) {\n  if (item.json.cells && Array.isArray(item.json.cells)) {\n    const modelCell = item.json.cells.find(cell => cell.id === 'text_mkw78a6r');\n    if (modelCell && modelCell.value && modelCell.value.trim() !== '') {\n      return modelCell.value;\n    }\n  }\n  return null;\n}\n\nconsole.log(`🔍 Processing ALL devices from Monday.com...`);\nconsole.log(`📋 Found ${items.length} total items in Monday.com`);\n\nitems.forEach(item => {\n  const serial = item.json.name?.trim();\n  if (!serial) return;\n\n  const deviceType = getDeviceType(serial);\n  \n  // Check if model already exists\n  const existingModel = hasModel(item);\n  \n  if (existingModel) {\n    console.log(`⏸️ ${serial} - Model already exists: \"${existingModel}\" (skipped)`);\n    alreadyFilledDevices.push({\n      serial: serial,\n      existingModel: existingModel,\n      reason: 'Model already filled'\n    });\n  } else if (deviceType === 'Lenovo') {\n    console.log(`✅ ${serial} - Lenovo device (ID: ${item.json.id})`);\n    itemsToProcess.push({\n      json: {\n        itemId: item.json.id,\n        itemName: item.json.name,\n        serialNumber: serial,\n        deviceType\n      }\n    });\n  } else {\n    console.log(`⏭️ ${serial} - ${deviceType} device (skipped)`);\n    skippedDevices.push({\n      serial: serial,\n      type: deviceType,\n      reason: 'Not Lenovo device'\n    });\n  }\n});\n\nconsole.log(`\\n📊 PROCESSING SUMMARY:`);\nconsole.log(`   ✅ Lenovo devices to process: ${itemsToProcess.length}`);\nconsole.log(`   ⏸️ Already filled models: ${alreadyFilledDevices.length}`);\nconsole.log(`   ⏭️ Non-Lenovo devices skipped: ${skippedDevices.length}`);\n\nif (alreadyFilledDevices.length > 0) {\n  console.log(`\\n⏸️ ALREADY FILLED (Skipped):`);\n  alreadyFilledDevices.forEach(dev => console.log(`   - ${dev.serial}: \"${dev.existingModel}\"`));\n}\n\nif (skippedDevices.length > 0) {\n  console.log(`\\n⏭️ SKIPPED DEVICES (Non-Lenovo):`);\n  skippedDevices.forEach(dev => console.log(`   - ${dev.serial} (${dev.type})`));\n}\n\nif (itemsToProcess.length > 0) {\n  console.log(`\\n🚀 PROCESSING ${itemsToProcess.length} LENOVO DEVICES...`);\n  return itemsToProcess;\n} else {\n  return [{\n    json: {\n      message: \"No Lenovo devices found to process\",\n      summary: {\n        total: items.length,\n        lenovo: itemsToProcess.length,\n        alreadyFilled: alreadyFilledDevices.length,\n        skipped: skippedDevices.length\n      },\n      alreadyFilledDevices,\n      skippedDevices\n    }\n  }];\n}"
+      },
+      "id": "107da51d-510f-4a7c-b360-25718fdbad3f",
+      "name": "Filter Target Items Lenovo",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        128,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "command": "=powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"Invoke-WebRequest 'https://pcsupport.lenovo.com/gb/en/api/v4/mse/getproducts?productId={{ $json.serialNumber }}' | Select-Object -ExpandProperty Content | Out-String | Write-Output\"",
+        "cwd": "="
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        512,
+        64
+      ],
+      "id": "cc84a9f1-436f-451c-8aca-0fbd6dca422f",
+      "name": "Get Model Lenovo",
+      "credentials": {
+        "sshPassword": {
+          "id": "umWU43lA8b3R4GcA",
+          "name": "SSH Password account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Parse Lenovo API response\nconst lenovoData = JSON.parse($json.stdout);\n\n// Get the itemId and serialNumber from Filter Target Items1 node\nconst itemId = $('Filter Target Items Lenovo').item.json.itemId;\nconst serialNumber = $('Filter Target Items Lenovo').item.json.serialNumber;\n\nconsole.log(`Processing ${serialNumber} for item ${itemId}`);\n\nlet bestResult = null;\n\nif (Array.isArray(lenovoData) && lenovoData.length > 0) {\n  bestResult = lenovoData.reduce((best, current) => {\n    const currentName = current.Name || '';\n    const bestName = best ? (best.Name || '') : '';\n    \n    if (currentName.includes('THINKPAD') || currentName.includes('IDEAPAD') || currentName.includes('YOGA')) {\n      return current;\n    }\n    \n    if (currentName.length > bestName.length) {\n      return current;\n    }\n    \n    return best || current;\n  }, null);\n  \n} else if (lenovoData && !Array.isArray(lenovoData)) {\n  bestResult = lenovoData;\n} else {\n  console.log(`No valid data from Lenovo API for ${serialNumber}`);\n  return {\n    itemId,\n    serialNumber,\n    Name: 'Model Not Found',\n    error: 'No data from Lenovo API'\n  };\n}\n\n// Clean up model name\nlet modelName = bestResult.Name || 'Unknown Model';\n\nif (modelName.includes('X1 Carbon')) {\n  const carbonMatch = modelName.match(/(X1 Carbon \\d+\\w* Gen)/i);\n  if (carbonMatch) modelName = carbonMatch[1];\n} else if (modelName.includes('T490s')) {\n  modelName = 'ThinkPad T490s';\n} else if (modelName.includes('T490')) {\n  modelName = 'ThinkPad T490';\n} else if (modelName.includes('T480')) {\n  modelName = 'ThinkPad T480s';\n}\n\nmodelName = modelName\n  .replace(/[-_]/g, ' ')\n  .replace(/\\s+/g, ' ')\n  .replace(/\\s*\\(.*?\\)\\s*/g, ' ')\n  .trim();\n\nconsole.log(`Final: ${serialNumber} -> \"${modelName}\" (Item: ${itemId})`);\n\nreturn {\n  itemId,\n  serialNumber,\n  Name: modelName\n};"
+      },
+      "id": "b45392e7-7ffd-4ac5-9cb3-b21806824f52",
+      "name": "Parse Success Output Lenovo",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        864,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.monday.com/v2",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "mondayComApi",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "query",
+              "value": "=mutation {\n  change_multiple_column_values(\n    board_id: 1153799458,\n    item_id: {{$json.itemId}},\n    column_values: \"{\\\"text_mkw7ts22\\\": \\\"{{$json.Name}}\\\"}\"\n  ) {\n    id\n  }\n}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1136,
+        64
+      ],
+      "id": "d6b5f09b-b808-467d-87c0-5441fcd004f4",
+      "name": "HTTP Request Lenovo",
+      "credentials": {
+        "mondayComApi": {
+          "id": "tL56OUnJPXJjPxm4",
+          "name": "Monday.com account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Add this as a new Code node after HTTP Request\nconst response = $json;\nconsole.log('Monday.com response:', JSON.stringify(response, null, 2));\n\nif (response.data && response.data.change_multiple_column_values) {\n  return [{\n    json: {\n      status: \"SUCCESS\",\n      message: \"Model updated successfully\",\n      itemId: response.data.change_multiple_column_values.id\n    }\n  }];\n} else {\n  return [{\n    json: {\n      status: \"ERROR\", \n      message: \"Update may have failed\",\n      response: response\n    }\n  }];\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1376,
+        64
+      ],
+      "id": "e96912df-12ad-4bfd-9c78-2276be5c5b80",
+      "name": "Check Update Status Lenovo"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Summary of all processed devices\nconst allExecutions = $input.all();\nconst summary = {\n  totalProcessed: allExecutions.length,\n  devices: allExecutions.map(exec => ({\n    serial: exec.json.serialNumber || 'unknown',\n    status: exec.json.status || 'unknown',\n    itemId: exec.json.itemId || 'unknown'\n  }))\n};\n\nconsole.log('=== FINAL SUMMARY ===');\nconsole.log(`Processed ${summary.totalProcessed} devices`);\nsummary.devices.forEach(device => {\n  console.log(`${device.serial}: ${device.status} (Item: ${device.itemId})`);\n});\n\nreturn [{ json: summary }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1584,
+        64
+      ],
+      "id": "a3767b04-bb21-4de6-afec-f11e4af4a8f2",
+      "name": "Final Summary Lenovo"
+    },
+    {
+      "parameters": {
+        "resource": "boardItem",
+        "operation": "getAll",
+        "boardId": "1153799458",
+        "groupId": "new_group51051",
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.mondayCom",
+      "typeVersion": 1,
+      "position": [
+        -176,
+        272
+      ],
+      "id": "d682f270-c914-4180-b541-76b9af7ae0b3",
+      "name": "Get Monday Items Mac",
+      "credentials": {
+        "mondayComApi": {
+          "id": "tL56OUnJPXJjPxm4",
+          "name": "Monday.com account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst itemsToProcess = [];\nconst skippedDevices = [];\nconst alreadyFilledDevices = [];\n\nfunction getDeviceType(serial) {\n  const upper = serial.toUpperCase();\n  if (/^[A-Z0-9]{10,12}$/.test(upper)) return 'Apple';\n  return 'Unknown';\n}\n\nfunction hasModel(item) {\n  if (item.json.cells && Array.isArray(item.json.cells)) {\n    const modelCell = item.json.cells.find(cell => cell.id === 'text_mkw7ts22');\n    if (modelCell && modelCell.value && modelCell.value.trim() !== '') {\n      return modelCell.value;\n    }\n  }\n  return null;\n}\n\nconsole.log(`🔍 Processing ALL devices from Monday.com...`);\nconsole.log(`📋 Found ${items.length} total items in Monday.com`);\n\nitems.forEach(item => {\n  const serial = item.json.name?.trim();\n  if (!serial) return;\n\n  const deviceType = getDeviceType(serial);\n  \n  // Check if model already exists\n  const existingModel = hasModel(item);\n  \n  if (existingModel) {\n    console.log(`⏸️ ${serial} - Model already exists: \"${existingModel}\" (skipped)`);\n    alreadyFilledDevices.push({\n      serial: serial,\n      existingModel: existingModel,\n      reason: 'Model already filled'\n    });\n  } else if (deviceType === 'Apple') {\n    console.log(`✅ ${serial} - Apple device (ID: ${item.json.id})`);\n    itemsToProcess.push({\n      json: {\n        itemId: item.json.id,\n        itemName: item.json.name,\n        serialNumber: serial,\n        deviceType\n      }\n    });\n  } else {\n    console.log(`⏭️ ${serial} - ${deviceType} device (skipped)`);\n    skippedDevices.push({\n      serial: serial,\n      type: deviceType,\n      reason: 'Not Apple device'\n    });\n  }\n});\n\nconsole.log(`\\n📊 PROCESSING SUMMARY:`);\nconsole.log(`   ✅ Apple devices to process: ${itemsToProcess.length}`);\nconsole.log(`   ⏸️ Already filled models: ${alreadyFilledDevices.length}`);\nconsole.log(`   ⏭️ Non-Apple devices skipped: ${skippedDevices.length}`);\n\nif (alreadyFilledDevices.length > 0) {\n  console.log(`\\n⏸️ ALREADY FILLED (Skipped):`);\n  alreadyFilledDevices.forEach(dev => console.log(`   - ${dev.serial}: \"${dev.existingModel}\"`));\n}\n\nif (skippedDevices.length > 0) {\n  console.log(`\\n⏭️ SKIPPED DEVICES (Non-Apple):`);\n  skippedDevices.forEach(dev => console.log(`   - ${dev.serial} (${dev.type})`));\n}\n\nif (itemsToProcess.length > 0) {\n  console.log(`\\n🚀 PROCESSING ${itemsToProcess.length} APPLE DEVICES...`);\n  return itemsToProcess;\n} else {\n  return [{\n    json: {\n      message: \"No Apple devices found to process\",\n      summary: {\n        total: items.length,\n        apple: itemsToProcess.length,\n        alreadyFilled: alreadyFilledDevices.length,\n        skipped: skippedDevices.length\n      },\n      alreadyFilledDevices,\n      skippedDevices\n    }\n  }];\n}"
+      },
+      "id": "12eb223f-4e2a-4d39-bf23-d16bd0aa1fa6",
+      "name": "Filter Target Items Mac",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        128,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const itemId = $('Filter Target Items Mac').item.json.itemId;\nconst serialNumber = $('Filter Target Items Mac').item.json.serialNumber;\n\nconsole.log(`Processing ${serialNumber} for item ${itemId}`);\n\nlet modelName = 'MacBook Pro'; // Changed default\n\ntry {\n  const response = $json;\n  \n  let xmlString = '';\n  \n  // Extract XML string from various response formats\n  if (typeof response === 'string') {\n    xmlString = response;\n  } else if (response.body && typeof response.body === 'string') {\n    xmlString = response.body;\n  } else if (response.data && typeof response.data === 'string') {\n    xmlString = response.data;\n  } else {\n    xmlString = JSON.stringify(response);\n  }\n  \n  // Try to get model from XML configCode\n  if (xmlString.includes('<configCode>') && !xmlString.includes('<error>')) {\n    const configMatch = xmlString.match(/<configCode>([^<]+)<\\/configCode>/);\n    if (configMatch && configMatch[1]) {\n      modelName = configMatch[1].trim();\n      console.log(`Found from API: ${modelName}`);\n      return {\n        itemId,\n        serialNumber,\n        Name: modelName\n      };\n    }\n  }\n  \n  // API returned error or no configCode - use serial pattern matching\n  const serial = serialNumber.toUpperCase();\n  \n  // M3/M4 MacBook Pro patterns\n  if (serial.startsWith('JNH')) modelName = 'MacBook Pro (M3 Pro)';\n  else if (serial.startsWith('JMQ')) modelName = 'MacBook Pro (M4 Pro)';\n  else if (serial.startsWith('JMR')) modelName = 'MacBook Pro (M4 Max)';\n  // M3/M2 MacBook Air patterns\n  else if (serial.startsWith('JLC')) modelName = 'MacBook Air (M3)';\n  else if (serial.startsWith('JH')) modelName = 'MacBook Air (M2)';\n  // Older patterns\n  else if (serial.startsWith('FVFGK3')) modelName = 'MacBook Pro (M3 Pro)';\n  else if (serial.startsWith('FVFGN')) modelName = 'MacBook Pro (M3 Max)';\n  else if (serial.startsWith('FVFGL')) modelName = 'MacBook Air (M3)';\n  else if (serial.startsWith('H66')) modelName = 'Mac mini (M1)';\n  else if (serial.startsWith('C02')) modelName = 'MacBook Pro (Intel)';\n  else if (serial.startsWith('CF')) modelName = 'MacBook Air (Intel)';\n  // If no pattern matches, keep default 'MacBook Pro'\n  \n  console.log(`Result: ${modelName}`);\n  \n} catch (error) {\n  console.log(`Error: ${error.message}`);\n  // modelName stays as 'MacBook Pro'\n}\n\nconsole.log(`Final: ${serialNumber} -> \"${modelName}\" (Item: ${itemId})`);\n\nreturn {\n  itemId,\n  serialNumber,\n  Name: modelName\n};"
+      },
+      "id": "da5c7514-01be-4e70-9e21-b873259c6449",
+      "name": "Parse Success Output Mac",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        864,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Add this as a new Code node after HTTP Request\nconst response = $json;\nconsole.log('Monday.com response:', JSON.stringify(response, null, 2));\n\nif (response.data && response.data.change_multiple_column_values) {\n  return [{\n    json: {\n      status: \"SUCCESS\",\n      message: \"Model updated successfully\",\n      itemId: response.data.change_multiple_column_values.id\n    }\n  }];\n} else {\n  return [{\n    json: {\n      status: \"ERROR\", \n      message: \"Update may have failed\",\n      response: response\n    }\n  }];\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1392,
+        272
+      ],
+      "id": "158e3a48-5cbd-4fc9-ad85-4ee73feeda0b",
+      "name": "Check Update Status Mac"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Summary of all processed devices\nconst allExecutions = $input.all();\nconst summary = {\n  totalProcessed: allExecutions.length,\n  devices: allExecutions.map(exec => ({\n    serial: exec.json.serialNumber || 'unknown',\n    status: exec.json.status || 'unknown',\n    itemId: exec.json.itemId || 'unknown'\n  }))\n};\n\nconsole.log('=== FINAL SUMMARY ===');\nconsole.log(`Processed ${summary.totalProcessed} devices`);\nsummary.devices.forEach(device => {\n  console.log(`${device.serial}: ${device.status} (Item: ${device.itemId})`);\n});\n\nreturn [{ json: summary }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1600,
+        272
+      ],
+      "id": "1f48ec6f-0f87-4332-8f21-bd1c20d37a09",
+      "name": "Final Summary Mac"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.monday.com/v2",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "mondayComApi",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "query",
+              "value": "=mutation {\n  change_multiple_column_values(\n    board_id: 1153799458,\n    item_id: {{$json.itemId}},\n    column_values: \"{\\\"text_mkw7ts22\\\": \\\"{{$json.Name}}\\\"}\"\n  ) {\n    id\n  }\n}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1136,
+        272
+      ],
+      "id": "cbc221a3-9216-4911-8d73-d12edfb9373b",
+      "name": "HTTP Request Mac",
+      "credentials": {
+        "mondayComApi": {
+          "id": "tL56OUnJPXJjPxm4",
+          "name": "Monday.com account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://support-sp.apple.com/sp/product?cc={{$json.serialNumber.slice(-4)}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        496,
+        272
+      ],
+      "id": "16a078dc-000c-4c2d-b84d-802795425eca",
+      "name": "HTTP Request"
+    }
+  ],
+  "connections": {
+    "When clicking 'Execute workflow'": {
+      "main": [
+        [
+          {
+            "node": "Get Monday Items Lenovo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Monday Items Lenovo": {
+      "main": [
+        [
+          {
+            "node": "Filter Target Items Lenovo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Target Items Lenovo": {
+      "main": [
+        [
+          {
+            "node": "Get Model Lenovo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Model Lenovo": {
+      "main": [
+        [
+          {
+            "node": "Parse Success Output Lenovo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Success Output Lenovo": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request Lenovo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request Lenovo": {
+      "main": [
+        [
+          {
+            "node": "Check Update Status Lenovo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Update Status Lenovo": {
+      "main": [
+        [
+          {
+            "node": "Final Summary Lenovo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Monday Items Mac": {
+      "main": [
+        [
+          {
+            "node": "Filter Target Items Mac",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Target Items Mac": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Success Output Mac": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request Mac",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Update Status Mac": {
+      "main": [
+        [
+          {
+            "node": "Final Summary Mac",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request Mac": {
+      "main": [
+        [
+          {
+            "node": "Check Update Status Mac",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Parse Success Output Mac",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Jerusalem",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "8272b538-c6fe-4f3f-b265-4800c09ae469",
+  "activeVersionId": null,
+  "triggerCount": 0,
+  "shared": [
+    {
+      "updatedAt": "2025-10-31T09:14:00.850Z",
+      "createdAt": "2025-10-31T09:14:00.850Z",
+      "role": "workflow:owner",
+      "workflowId": "WvXu0pxOgmwwtlqd",
+      "projectId": "pWTWmuHnmIHw48U9"
+    }
+  ],
+  "activeVersion": null,
+  "tags": []
+}
