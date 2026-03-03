@@ -1,0 +1,755 @@
+{
+  "updatedAt": "2026-02-20T12:36:18.703Z",
+  "createdAt": "2026-02-20T12:12:29.446Z",
+  "id": "uNcP5tZVdYldBhg3",
+  "name": "AD Device Monitor",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "device-change",
+        "options": {}
+      },
+      "id": "9ef84208-f470-4cae-bdef-41f220dbc3c7",
+      "name": "Webhook - Device Change",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -720,
+        -48
+      ],
+      "webhookId": "device-change"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "verify-secret",
+              "leftValue": "={{ $json.body.secret }}",
+              "rightValue": "n8w-GmC9x$kQ2vLpR7fT4bYe!Aj6Xs8Z",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "85106e27-391c-43c5-a0ad-a4eb68375544",
+      "name": "Verify Secret",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [
+        -480,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "action-type",
+              "name": "actionType",
+              "value": "={{ $json.body.actionType }}",
+              "type": "string"
+            },
+            {
+              "id": "computer-name",
+              "name": "computerName",
+              "value": "={{ $json.body.computerName }}",
+              "type": "string"
+            },
+            {
+              "id": "os",
+              "name": "operatingSystem",
+              "value": "={{ $json.body.operatingSystem }}",
+              "type": "string"
+            },
+            {
+              "id": "os-version",
+              "name": "osVersion",
+              "value": "={{ $json.body.osVersion }}",
+              "type": "string"
+            },
+            {
+              "id": "description",
+              "name": "description",
+              "value": "={{ $json.body.description }}",
+              "type": "string"
+            },
+            {
+              "id": "performed-by",
+              "name": "performedBy",
+              "value": "={{ $json.body.performedBy }}",
+              "type": "string"
+            },
+            {
+              "id": "performed-by-name",
+              "name": "performedByName",
+              "value": "={{ $json.body.performedByName }}",
+              "type": "string"
+            },
+            {
+              "id": "timestamp",
+              "name": "timestamp",
+              "value": "={{ $json.body.timestamp }}",
+              "type": "string"
+            },
+            {
+              "id": "dc-name",
+              "name": "dcName",
+              "value": "={{ $json.body.dcName }}",
+              "type": "string"
+            },
+            {
+              "id": "event-id",
+              "name": "eventId",
+              "value": "={{ $json.body.eventId }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e0c28c72-842c-4b80-9092-18a6b56f2b91",
+      "name": "Extract Details",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -240,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.actionType }}",
+                    "rightValue": "DEVICE_CREATED",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "258881cd-9e32-424f-962d-e2505bffa9f0"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.actionType }}",
+                    "rightValue": "DEVICE_DISABLED",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "7f0c33fb-5982-48e3-ab99-c00ecb542829"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.actionType }}",
+                    "rightValue": "DEVICE_DELETED",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "a10f2f77-2218-4188-8516-a2223a242876"
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8b3a73c1-34ba-46a7-aae3-718fa78c3143",
+      "name": "Switch: Action Type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        0,
+        -64
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "#new-devices",
+          "mode": "name"
+        },
+        "text": "=🖥️ *New Device Joined Domain*\n\n• *Computer:* {{ $json.computerName }}\n• *OS:* {{ $json.operatingSystem }}{{ $json.osVersion !== 'Unknown' ? ' (' + $json.osVersion + ')' : '' }}\n• *Added By:* {{ $json.performedBy }}{{ $json.performedByName ? ' (' + $json.performedByName + ')' : '' }}\n• *Time:* {{ new Date($json.timestamp).toLocaleDateString('en-GB', {day:'numeric',month:'numeric',year:'numeric'}) + ' ' + new Date($json.timestamp).toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit',hour12:true}) }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "id": "b0b4e81a-b265-442c-9da5-ade1a915293c",
+      "name": "Slack - Device Created",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        240,
+        -224
+      ],
+      "webhookId": "d4040f19-ea25-4324-bd05-10d0ae679b23",
+      "credentials": {
+        "slackApi": {
+          "id": "obEYVo8oQOJ22JqX",
+          "name": "AD Admin Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "#device-disabled",
+          "mode": "name"
+        },
+        "text": "=🔴 *Device Disabled*\n\n• *Computer:* {{ $json.computerName }}\n• *OS:* {{ $json.operatingSystem }}{{ $json.osVersion !== 'Unknown' ? ' (' + $json.osVersion + ')' : '' }}\n• *Disabled By:* {{ $json.performedBy }}{{ $json.performedByName ? ' (' + $json.performedByName + ')' : '' }}\n• *Time:* {{ new Date($json.timestamp).toLocaleDateString('en-GB', {day:'numeric',month:'numeric',year:'numeric'}) + ' ' + new Date($json.timestamp).toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit',hour12:true}) }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "id": "ccd3d1f6-932e-4256-bf54-aa5421c06827",
+      "name": "Slack - Device Disabled",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        240,
+        -48
+      ],
+      "webhookId": "8f547855-e404-414a-96ef-a1895ffde023",
+      "credentials": {
+        "slackApi": {
+          "id": "obEYVo8oQOJ22JqX",
+          "name": "AD Admin Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "#device-deleted",
+          "mode": "name"
+        },
+        "text": "=🗑️ *Device Deleted from AD*\n\n• *Computer:* {{ $json.computerName }}\n• *Deleted By:* {{ $json.performedBy }}{{ $json.performedByName ? ' (' + $json.performedByName + ')' : '' }}\n• *Time:* {{ new Date($json.timestamp).toLocaleDateString('en-GB', {day:'numeric',month:'numeric',year:'numeric'}) + ' ' + new Date($json.timestamp).toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit',hour12:true}) }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "id": "3ed74de2-5892-4481-9c03-869cc76015a9",
+      "name": "Slack - Device Deleted",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        240,
+        144
+      ],
+      "webhookId": "b23a771f-1562-4254-887b-69c7e57ba907",
+      "credentials": {
+        "slackApi": {
+          "id": "obEYVo8oQOJ22JqX",
+          "name": "AD Admin Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook - Device Change": {
+      "main": [
+        [
+          {
+            "node": "Verify Secret",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Secret": {
+      "main": [
+        [
+          {
+            "node": "Extract Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Details": {
+      "main": [
+        [
+          {
+            "node": "Switch: Action Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch: Action Type": {
+      "main": [
+        [
+          {
+            "node": "Slack - Device Created",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Slack - Device Disabled",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Slack - Device Deleted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "785c037a-4da6-4109-bd4c-ae829af4545f",
+  "activeVersionId": "785c037a-4da6-4109-bd4c-ae829af4545f",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-02-20T12:12:29.450Z",
+      "createdAt": "2026-02-20T12:12:29.450Z",
+      "role": "workflow:owner",
+      "workflowId": "uNcP5tZVdYldBhg3",
+      "projectId": "pWTWmuHnmIHw48U9"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-02-20T12:36:22.000Z",
+    "createdAt": "2026-02-20T12:36:18.704Z",
+    "versionId": "785c037a-4da6-4109-bd4c-ae829af4545f",
+    "workflowId": "uNcP5tZVdYldBhg3",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "device-change",
+          "options": {}
+        },
+        "id": "9ef84208-f470-4cae-bdef-41f220dbc3c7",
+        "name": "Webhook - Device Change",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          -720,
+          -48
+        ],
+        "webhookId": "device-change"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict"
+            },
+            "conditions": [
+              {
+                "id": "verify-secret",
+                "leftValue": "={{ $json.body.secret }}",
+                "rightValue": "n8w-GmC9x$kQ2vLpR7fT4bYe!Aj6Xs8Z",
+                "operator": {
+                  "type": "string",
+                  "operation": "equals"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "85106e27-391c-43c5-a0ad-a4eb68375544",
+        "name": "Verify Secret",
+        "type": "n8n-nodes-base.filter",
+        "typeVersion": 2,
+        "position": [
+          -480,
+          -48
+        ]
+      },
+      {
+        "parameters": {
+          "assignments": {
+            "assignments": [
+              {
+                "id": "action-type",
+                "name": "actionType",
+                "value": "={{ $json.body.actionType }}",
+                "type": "string"
+              },
+              {
+                "id": "computer-name",
+                "name": "computerName",
+                "value": "={{ $json.body.computerName }}",
+                "type": "string"
+              },
+              {
+                "id": "os",
+                "name": "operatingSystem",
+                "value": "={{ $json.body.operatingSystem }}",
+                "type": "string"
+              },
+              {
+                "id": "os-version",
+                "name": "osVersion",
+                "value": "={{ $json.body.osVersion }}",
+                "type": "string"
+              },
+              {
+                "id": "description",
+                "name": "description",
+                "value": "={{ $json.body.description }}",
+                "type": "string"
+              },
+              {
+                "id": "performed-by",
+                "name": "performedBy",
+                "value": "={{ $json.body.performedBy }}",
+                "type": "string"
+              },
+              {
+                "id": "performed-by-name",
+                "name": "performedByName",
+                "value": "={{ $json.body.performedByName }}",
+                "type": "string"
+              },
+              {
+                "id": "timestamp",
+                "name": "timestamp",
+                "value": "={{ $json.body.timestamp }}",
+                "type": "string"
+              },
+              {
+                "id": "dc-name",
+                "name": "dcName",
+                "value": "={{ $json.body.dcName }}",
+                "type": "string"
+              },
+              {
+                "id": "event-id",
+                "name": "eventId",
+                "value": "={{ $json.body.eventId }}",
+                "type": "number"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "e0c28c72-842c-4b80-9092-18a6b56f2b91",
+        "name": "Extract Details",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [
+          -240,
+          -48
+        ]
+      },
+      {
+        "parameters": {
+          "rules": {
+            "values": [
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "strict",
+                    "version": 2
+                  },
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.actionType }}",
+                      "rightValue": "DEVICE_CREATED",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      },
+                      "id": "258881cd-9e32-424f-962d-e2505bffa9f0"
+                    }
+                  ],
+                  "combinator": "and"
+                }
+              },
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "strict",
+                    "version": 2
+                  },
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.actionType }}",
+                      "rightValue": "DEVICE_DISABLED",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      },
+                      "id": "7f0c33fb-5982-48e3-ab99-c00ecb542829"
+                    }
+                  ],
+                  "combinator": "and"
+                }
+              },
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "strict",
+                    "version": 2
+                  },
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.actionType }}",
+                      "rightValue": "DEVICE_DELETED",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      },
+                      "id": "a10f2f77-2218-4188-8516-a2223a242876"
+                    }
+                  ],
+                  "combinator": "and"
+                }
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "8b3a73c1-34ba-46a7-aae3-718fa78c3143",
+        "name": "Switch: Action Type",
+        "type": "n8n-nodes-base.switch",
+        "typeVersion": 3.2,
+        "position": [
+          0,
+          -64
+        ]
+      },
+      {
+        "parameters": {
+          "select": "channel",
+          "channelId": {
+            "__rl": true,
+            "value": "#new-devices",
+            "mode": "name"
+          },
+          "text": "=🖥️ *New Device Joined Domain*\n\n• *Computer:* {{ $json.computerName }}\n• *OS:* {{ $json.operatingSystem }}{{ $json.osVersion !== 'Unknown' ? ' (' + $json.osVersion + ')' : '' }}\n• *Added By:* {{ $json.performedBy }}{{ $json.performedByName ? ' (' + $json.performedByName + ')' : '' }}\n• *Time:* {{ new Date($json.timestamp).toLocaleDateString('en-GB', {day:'numeric',month:'numeric',year:'numeric'}) + ' ' + new Date($json.timestamp).toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit',hour12:true}) }}",
+          "otherOptions": {
+            "includeLinkToWorkflow": false
+          }
+        },
+        "id": "b0b4e81a-b265-442c-9da5-ade1a915293c",
+        "name": "Slack - Device Created",
+        "type": "n8n-nodes-base.slack",
+        "typeVersion": 2.2,
+        "position": [
+          240,
+          -224
+        ],
+        "webhookId": "d4040f19-ea25-4324-bd05-10d0ae679b23",
+        "credentials": {
+          "slackApi": {
+            "id": "obEYVo8oQOJ22JqX",
+            "name": "AD Admin Bot"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "select": "channel",
+          "channelId": {
+            "__rl": true,
+            "value": "#device-disabled",
+            "mode": "name"
+          },
+          "text": "=🔴 *Device Disabled*\n\n• *Computer:* {{ $json.computerName }}\n• *OS:* {{ $json.operatingSystem }}{{ $json.osVersion !== 'Unknown' ? ' (' + $json.osVersion + ')' : '' }}\n• *Disabled By:* {{ $json.performedBy }}{{ $json.performedByName ? ' (' + $json.performedByName + ')' : '' }}\n• *Time:* {{ new Date($json.timestamp).toLocaleDateString('en-GB', {day:'numeric',month:'numeric',year:'numeric'}) + ' ' + new Date($json.timestamp).toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit',hour12:true}) }}",
+          "otherOptions": {
+            "includeLinkToWorkflow": false
+          }
+        },
+        "id": "ccd3d1f6-932e-4256-bf54-aa5421c06827",
+        "name": "Slack - Device Disabled",
+        "type": "n8n-nodes-base.slack",
+        "typeVersion": 2.2,
+        "position": [
+          240,
+          -48
+        ],
+        "webhookId": "8f547855-e404-414a-96ef-a1895ffde023",
+        "credentials": {
+          "slackApi": {
+            "id": "obEYVo8oQOJ22JqX",
+            "name": "AD Admin Bot"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "select": "channel",
+          "channelId": {
+            "__rl": true,
+            "value": "#device-deleted",
+            "mode": "name"
+          },
+          "text": "=🗑️ *Device Deleted from AD*\n\n• *Computer:* {{ $json.computerName }}\n• *Deleted By:* {{ $json.performedBy }}{{ $json.performedByName ? ' (' + $json.performedByName + ')' : '' }}\n• *Time:* {{ new Date($json.timestamp).toLocaleDateString('en-GB', {day:'numeric',month:'numeric',year:'numeric'}) + ' ' + new Date($json.timestamp).toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit',hour12:true}) }}",
+          "otherOptions": {
+            "includeLinkToWorkflow": false
+          }
+        },
+        "id": "3ed74de2-5892-4481-9c03-869cc76015a9",
+        "name": "Slack - Device Deleted",
+        "type": "n8n-nodes-base.slack",
+        "typeVersion": 2.2,
+        "position": [
+          240,
+          144
+        ],
+        "webhookId": "b23a771f-1562-4254-887b-69c7e57ba907",
+        "credentials": {
+          "slackApi": {
+            "id": "obEYVo8oQOJ22JqX",
+            "name": "AD Admin Bot"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Webhook - Device Change": {
+        "main": [
+          [
+            {
+              "node": "Verify Secret",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Verify Secret": {
+        "main": [
+          [
+            {
+              "node": "Extract Details",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Extract Details": {
+        "main": [
+          [
+            {
+              "node": "Switch: Action Type",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Switch: Action Type": {
+        "main": [
+          [
+            {
+              "node": "Slack - Device Created",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Slack - Device Disabled",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Slack - Device Deleted",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Alex Vinokur",
+    "name": "Version 785c037a",
+    "description": "",
+    "autosaved": true
+  },
+  "tags": []
+}
