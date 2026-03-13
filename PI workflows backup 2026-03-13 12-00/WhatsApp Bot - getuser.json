@@ -1,0 +1,970 @@
+{
+  "updatedAt": "2026-03-13T09:59:59.573Z",
+  "createdAt": "2026-03-13T09:39:55.700Z",
+  "id": "pceCVB1FXBroAJQm",
+  "name": "WhatsApp Bot - getuser",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "waha",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "16943a55-2446-459a-88bc-deb3df0778b3",
+      "name": "WAHA Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -640,
+        304
+      ],
+      "webhookId": "4be743f3-024f-4049-b5c2-5e43c95b0b9b"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "OK",
+        "options": {}
+      },
+      "id": "80230315-59fd-4210-a346-5ee72d457389",
+      "name": "Respond 200",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        -416,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.body.event }}",
+              "value2": "message"
+            },
+            {
+              "value1": "={{ String($json.body.payload.fromMe) }}",
+              "value2": "false"
+            },
+            {
+              "value1": "={{ String($json.body.payload.body).startsWith('!') }}",
+              "value2": "true"
+            }
+          ]
+        }
+      },
+      "id": "7d59d72a-bb85-4a4e-9b84-733b3ddd874b",
+      "name": "Is Bot Command?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -192,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body.payload.body.trim();\nconst chatId = $json.body.payload.from;\nconst parts = body.split(/\\s+/);\nconst cmd = parts[0].toLowerCase();\nconst arg = parts[1] || '';\n\nconst username = arg.replace(/[^a-zA-Z0-9._-]/g, '');\n\nif (cmd === '!getuser') {\n  if (!username || username.length === 0) {\n    return [{ json: { cmd, username: '', chatId, error: true, message: '❌ Usage: !getuser <username>' } }];\n  }\n  if (username.length > 64) {\n    return [{ json: { cmd, username: '', chatId, error: true, message: '❌ Username too long (max 64 chars).' } }];\n  }\n  return [{ json: { cmd, username, chatId, error: false, message: '' } }];\n}\n\nreturn [{ json: { cmd, username: '', chatId, error: true, message: '❓ Unknown command. Available: !getuser <username>' } }];"
+      },
+      "id": "002e5cd3-6cc0-4a0d-8bae-f22aecf7d3aa",
+      "name": "Parse Command",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        16,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ String($json.error) }}",
+              "operation": "equals",
+              "value2": "true"
+            }
+          ]
+        }
+      },
+      "id": "e53b1852-3f1d-4e64-9bce-7a14f16a2985",
+      "name": "Has Error?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        256,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://waha:3000/api/sendText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Key",
+              "value": "1ENEwO3sB28lWYzMEhmDYNpW7xc2Om0y"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "session",
+              "value": "default"
+            },
+            {
+              "name": "chatId",
+              "value": "={{ $json.chatId }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.message }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e7ad5614-f9f4-43e9-85db-a2967d505ab0",
+      "name": "Send Error Reply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        464,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "command": "=powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"C:\\Scripts\\Get-ADUserInfo.ps1\" -Username \"{{ $json.username }}\"",
+        "cwd": "="
+      },
+      "id": "d7276b5e-09d3-4db1-a5d2-fbde9687a668",
+      "name": "SSH to DC3",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        464,
+        496
+      ],
+      "credentials": {
+        "sshPassword": {
+          "id": "umWU43lA8b3R4GcA",
+          "name": "SSH Password account"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.stderr }}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "id": "d7a6e8e7-d690-49a3-b062-3129a3ebf433",
+      "name": "SSH Error?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        688,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://waha:3000/api/sendText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Key",
+              "value": "1ENEwO3sB28lWYzMEhmDYNpW7xc2Om0y"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "session",
+              "value": "default"
+            },
+            {
+              "name": "chatId",
+              "value": "={{ $('Parse Command').first().json.chatId }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ '⚠️ AD connection error: ' + $json.stderr }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "cf6ceecf-4497-49bc-aee2-e652d0ae39b3",
+      "name": "Send SSH Error",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        912,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $json;\n\nif (item.error || !item.stdout || item.stdout.trim() === '') {\n  return [{ json: { status: 'error', message: item.stderr || 'No output from AD script.', chatId: $('Parse Command').first().json.chatId } }];\n}\n\nlet parsed;\ntry {\n  parsed = JSON.parse(item.stdout);\n} catch(e) {\n  const match = item.stdout.match(/\\{[\\s\\S]*\\}/);\n  if (match) {\n    try { parsed = JSON.parse(match[0]); } catch(e2) {\n      return [{ json: { status: 'error', message: 'Failed to parse AD response.', chatId: $('Parse Command').first().json.chatId } }];\n    }\n  } else {\n    return [{ json: { status: 'error', message: 'Unexpected response from AD.', chatId: $('Parse Command').first().json.chatId } }];\n  }\n}\n\nparsed.chatId = $('Parse Command').first().json.chatId;\nreturn [{ json: parsed }];"
+      },
+      "id": "9f4efbad-fe70-4643-be43-1f5b9ebb2703",
+      "name": "Parse AD Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        912,
+        704
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.status }}",
+              "operation": "equals",
+              "value2": "success"
+            }
+          ]
+        }
+      },
+      "id": "33af7e9d-ce83-4f68-8776-20cd90f97a30",
+      "name": "User Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1136,
+        704
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const u = $json.data;\nconst distGroups = u.groups?.distribution?.length > 0 ? u.groups.distribution.map(g => `• ${g}`).join('\\n') : '• None';\nconst secGroups = u.groups?.security?.length > 0 ? u.groups.security.map(g => `• ${g}`).join('\\n') : '• None';\n\nconst text = `👤 *AD User: ${u.username}*\n━━━━━━━━━━━━━━━━━━\n📛 Name: ${u.fullName}\n📧 Email: ${u.email}\n💼 Title: ${u.title || 'N/A'}\n📞 Phone: ${u.telephoneNumber || 'N/A'}\n👔 Manager: ${u.manager || 'N/A'}\n✅ Enabled: ${u.enabled ? 'Yes' : 'No'}\n🔒 Locked: ${u.locked ? 'Yes' : 'No'}\n🕒 Last Logon: ${u.lastLogon}\n🔑 Pwd Last Set: ${u.passwordLastSet}\n━━━━━━━━━━━━━━━━━━\n🛡️ Security Groups:\n${secGroups}\n📨 Distribution Groups:\n${distGroups}`;\n\nreturn [{ json: { text, chatId: $json.chatId } }];"
+      },
+      "id": "74ba6cc5-6998-4516-a89e-52adeb8ceee1",
+      "name": "Format User Info",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { text: `❌ User not found: ${$('Parse Command').first().json.username}`, chatId: $json.chatId } }];"
+      },
+      "id": "c49c2ae0-95fc-421b-bd1f-311b0aca3c8f",
+      "name": "Format Not Found",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        896
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://waha:3000/api/sendText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Key",
+              "value": "1ENEwO3sB28lWYzMEhmDYNpW7xc2Om0y"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "session",
+              "value": "default"
+            },
+            {
+              "name": "chatId",
+              "value": "={{ $json.chatId }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.text }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "bcb1a247-cd45-498f-9f79-0e56b061d496",
+      "name": "Send WhatsApp Reply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1760,
+        672
+      ]
+    }
+  ],
+  "connections": {
+    "WAHA Webhook": {
+      "main": [
+        [
+          {
+            "node": "Respond 200",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond 200": {
+      "main": [
+        [
+          {
+            "node": "Is Bot Command?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Bot Command?": {
+      "main": [
+        [
+          {
+            "node": "Parse Command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Command": {
+      "main": [
+        [
+          {
+            "node": "Has Error?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Error?": {
+      "main": [
+        [
+          {
+            "node": "Send Error Reply",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "SSH to DC3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH to DC3": {
+      "main": [
+        [
+          {
+            "node": "SSH Error?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH Error?": {
+      "main": [
+        [
+          {
+            "node": "Send SSH Error",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Parse AD Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AD Response": {
+      "main": [
+        [
+          {
+            "node": "User Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "User Found?": {
+      "main": [
+        [
+          {
+            "node": "Format User Info",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format Not Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format User Info": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Not Found": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "timezone": "Asia/Jerusalem",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "234d7fe0-60f0-4014-919b-444f09ddd96f",
+  "activeVersionId": "234d7fe0-60f0-4014-919b-444f09ddd96f",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-13T09:39:55.706Z",
+      "createdAt": "2026-03-13T09:39:55.706Z",
+      "role": "workflow:owner",
+      "workflowId": "pceCVB1FXBroAJQm",
+      "projectId": "pWTWmuHnmIHw48U9"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-03-13T10:00:00.000Z",
+    "createdAt": "2026-03-13T09:59:59.575Z",
+    "versionId": "234d7fe0-60f0-4014-919b-444f09ddd96f",
+    "workflowId": "pceCVB1FXBroAJQm",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "waha",
+          "responseMode": "responseNode",
+          "options": {}
+        },
+        "id": "16943a55-2446-459a-88bc-deb3df0778b3",
+        "name": "WAHA Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 1,
+        "position": [
+          -640,
+          304
+        ],
+        "webhookId": "4be743f3-024f-4049-b5c2-5e43c95b0b9b"
+      },
+      {
+        "parameters": {
+          "respondWith": "text",
+          "responseBody": "OK",
+          "options": {}
+        },
+        "id": "80230315-59fd-4210-a346-5ee72d457389",
+        "name": "Respond 200",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1,
+        "position": [
+          -416,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "string": [
+              {
+                "value1": "={{ $json.body.event }}",
+                "value2": "message"
+              },
+              {
+                "value1": "={{ String($json.body.payload.fromMe) }}",
+                "value2": "false"
+              },
+              {
+                "value1": "={{ String($json.body.payload.body).startsWith('!') }}",
+                "value2": "true"
+              }
+            ]
+          }
+        },
+        "id": "7d59d72a-bb85-4a4e-9b84-733b3ddd874b",
+        "name": "Is Bot Command?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 1,
+        "position": [
+          -192,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const body = $json.body.payload.body.trim();\nconst chatId = $json.body.payload.from;\nconst parts = body.split(/\\s+/);\nconst cmd = parts[0].toLowerCase();\nconst arg = parts[1] || '';\n\nconst username = arg.replace(/[^a-zA-Z0-9._-]/g, '');\n\nif (cmd === '!getuser') {\n  if (!username || username.length === 0) {\n    return [{ json: { cmd, username: '', chatId, error: true, message: '❌ Usage: !getuser <username>' } }];\n  }\n  if (username.length > 64) {\n    return [{ json: { cmd, username: '', chatId, error: true, message: '❌ Username too long (max 64 chars).' } }];\n  }\n  return [{ json: { cmd, username, chatId, error: false, message: '' } }];\n}\n\nreturn [{ json: { cmd, username: '', chatId, error: true, message: '❓ Unknown command. Available: !getuser <username>' } }];"
+        },
+        "id": "002e5cd3-6cc0-4a0d-8bae-f22aecf7d3aa",
+        "name": "Parse Command",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          16,
+          288
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "string": [
+              {
+                "value1": "={{ String($json.error) }}",
+                "operation": "equals",
+                "value2": "true"
+              }
+            ]
+          }
+        },
+        "id": "e53b1852-3f1d-4e64-9bce-7a14f16a2985",
+        "name": "Has Error?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 1,
+        "position": [
+          256,
+          288
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://waha:3000/api/sendText",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "X-Api-Key",
+                "value": "1ENEwO3sB28lWYzMEhmDYNpW7xc2Om0y"
+              }
+            ]
+          },
+          "sendBody": true,
+          "bodyParameters": {
+            "parameters": [
+              {
+                "name": "session",
+                "value": "default"
+              },
+              {
+                "name": "chatId",
+                "value": "={{ $json.chatId }}"
+              },
+              {
+                "name": "text",
+                "value": "={{ $json.message }}"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "e7ad5614-f9f4-43e9-85db-a2967d505ab0",
+        "name": "Send Error Reply",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          464,
+          96
+        ]
+      },
+      {
+        "parameters": {
+          "command": "=powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"C:\\Scripts\\Get-ADUserInfo.ps1\" -Username \"{{ $json.username }}\"",
+          "cwd": "="
+        },
+        "id": "d7276b5e-09d3-4db1-a5d2-fbde9687a668",
+        "name": "SSH to DC3",
+        "type": "n8n-nodes-base.ssh",
+        "typeVersion": 1,
+        "position": [
+          464,
+          496
+        ],
+        "credentials": {
+          "sshPassword": {
+            "id": "umWU43lA8b3R4GcA",
+            "name": "SSH Password account"
+          }
+        },
+        "continueOnFail": true
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "string": [
+              {
+                "value1": "={{ $json.stderr }}",
+                "operation": "isNotEmpty"
+              }
+            ]
+          }
+        },
+        "id": "d7a6e8e7-d690-49a3-b062-3129a3ebf433",
+        "name": "SSH Error?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 1,
+        "position": [
+          688,
+          496
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://waha:3000/api/sendText",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "X-Api-Key",
+                "value": "1ENEwO3sB28lWYzMEhmDYNpW7xc2Om0y"
+              }
+            ]
+          },
+          "sendBody": true,
+          "bodyParameters": {
+            "parameters": [
+              {
+                "name": "session",
+                "value": "default"
+              },
+              {
+                "name": "chatId",
+                "value": "={{ $('Parse Command').first().json.chatId }}"
+              },
+              {
+                "name": "text",
+                "value": "={{ '⚠️ AD connection error: ' + $json.stderr }}"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "cf6ceecf-4497-49bc-aee2-e652d0ae39b3",
+        "name": "Send SSH Error",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          912,
+          496
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const item = $json;\n\nif (item.error || !item.stdout || item.stdout.trim() === '') {\n  return [{ json: { status: 'error', message: item.stderr || 'No output from AD script.', chatId: $('Parse Command').first().json.chatId } }];\n}\n\nlet parsed;\ntry {\n  parsed = JSON.parse(item.stdout);\n} catch(e) {\n  const match = item.stdout.match(/\\{[\\s\\S]*\\}/);\n  if (match) {\n    try { parsed = JSON.parse(match[0]); } catch(e2) {\n      return [{ json: { status: 'error', message: 'Failed to parse AD response.', chatId: $('Parse Command').first().json.chatId } }];\n    }\n  } else {\n    return [{ json: { status: 'error', message: 'Unexpected response from AD.', chatId: $('Parse Command').first().json.chatId } }];\n  }\n}\n\nparsed.chatId = $('Parse Command').first().json.chatId;\nreturn [{ json: parsed }];"
+        },
+        "id": "9f4efbad-fe70-4643-be43-1f5b9ebb2703",
+        "name": "Parse AD Response",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          912,
+          704
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "string": [
+              {
+                "value1": "={{ $json.status }}",
+                "operation": "equals",
+                "value2": "success"
+              }
+            ]
+          }
+        },
+        "id": "33af7e9d-ce83-4f68-8776-20cd90f97a30",
+        "name": "User Found?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 1,
+        "position": [
+          1136,
+          704
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const u = $json.data;\nconst distGroups = u.groups?.distribution?.length > 0 ? u.groups.distribution.map(g => `• ${g}`).join('\\n') : '• None';\nconst secGroups = u.groups?.security?.length > 0 ? u.groups.security.map(g => `• ${g}`).join('\\n') : '• None';\n\nconst text = `👤 *AD User: ${u.username}*\n━━━━━━━━━━━━━━━━━━\n📛 Name: ${u.fullName}\n📧 Email: ${u.email}\n💼 Title: ${u.title || 'N/A'}\n📞 Phone: ${u.telephoneNumber || 'N/A'}\n👔 Manager: ${u.manager || 'N/A'}\n✅ Enabled: ${u.enabled ? 'Yes' : 'No'}\n🔒 Locked: ${u.locked ? 'Yes' : 'No'}\n🕒 Last Logon: ${u.lastLogon}\n🔑 Pwd Last Set: ${u.passwordLastSet}\n━━━━━━━━━━━━━━━━━━\n🛡️ Security Groups:\n${secGroups}\n📨 Distribution Groups:\n${distGroups}`;\n\nreturn [{ json: { text, chatId: $json.chatId } }];"
+        },
+        "id": "74ba6cc5-6998-4516-a89e-52adeb8ceee1",
+        "name": "Format User Info",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1344,
+          496
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "return [{ json: { text: `❌ User not found: ${$('Parse Command').first().json.username}`, chatId: $json.chatId } }];"
+        },
+        "id": "c49c2ae0-95fc-421b-bd1f-311b0aca3c8f",
+        "name": "Format Not Found",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1344,
+          896
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://waha:3000/api/sendText",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "X-Api-Key",
+                "value": "1ENEwO3sB28lWYzMEhmDYNpW7xc2Om0y"
+              }
+            ]
+          },
+          "sendBody": true,
+          "bodyParameters": {
+            "parameters": [
+              {
+                "name": "session",
+                "value": "default"
+              },
+              {
+                "name": "chatId",
+                "value": "={{ $json.chatId }}"
+              },
+              {
+                "name": "text",
+                "value": "={{ $json.text }}"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "bcb1a247-cd45-498f-9f79-0e56b061d496",
+        "name": "Send WhatsApp Reply",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          1760,
+          672
+        ]
+      }
+    ],
+    "connections": {
+      "WAHA Webhook": {
+        "main": [
+          [
+            {
+              "node": "Respond 200",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Respond 200": {
+        "main": [
+          [
+            {
+              "node": "Is Bot Command?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Is Bot Command?": {
+        "main": [
+          [
+            {
+              "node": "Parse Command",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Parse Command": {
+        "main": [
+          [
+            {
+              "node": "Has Error?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Has Error?": {
+        "main": [
+          [
+            {
+              "node": "Send Error Reply",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "SSH to DC3",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "SSH to DC3": {
+        "main": [
+          [
+            {
+              "node": "SSH Error?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "SSH Error?": {
+        "main": [
+          [
+            {
+              "node": "Send SSH Error",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Parse AD Response",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Parse AD Response": {
+        "main": [
+          [
+            {
+              "node": "User Found?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "User Found?": {
+        "main": [
+          [
+            {
+              "node": "Format User Info",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Format Not Found",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Format User Info": {
+        "main": [
+          [
+            {
+              "node": "Send WhatsApp Reply",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Format Not Found": {
+        "main": [
+          [
+            {
+              "node": "Send WhatsApp Reply",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Alex Vinokur",
+    "name": "Version 234d7fe0",
+    "description": "",
+    "autosaved": true
+  },
+  "tags": []
+}
