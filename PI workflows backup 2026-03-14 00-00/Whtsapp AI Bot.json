@@ -1,0 +1,586 @@
+{
+  "updatedAt": "2026-03-13T18:25:36.820Z",
+  "createdAt": "2026-03-13T10:46:06.839Z",
+  "id": "TuCodb0y457nG7iM",
+  "name": "Whtsapp AI Bot",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "waha-incoming-bot",
+        "options": {}
+      },
+      "id": "99ef85f5-216b-4bf1-a135-4571f2774c88",
+      "name": "Webhook - Receive WhatsApp Message",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        448,
+        -1264
+      ],
+      "webhookId": "waha-incoming-bot"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "check-chat-id",
+              "leftValue": "={{ $json.body.payload.from }}",
+              "rightValue": "120363426439026095@g.us",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "check-not-from-api",
+              "leftValue": "={{ $json.body.payload.source }}",
+              "rightValue": "api",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f173fcea-d055-4d8d-b183-687c35557764",
+      "name": "Filter: AI Bot group only",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [
+        720,
+        -1264
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "extract-from",
+              "name": "chatId",
+              "value": "={{ $json.body.payload.from }}",
+              "type": "string"
+            },
+            {
+              "id": "extract-question",
+              "name": "question",
+              "value": "={{ $json.body.payload.body.trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "session-key",
+              "name": "sessionKey",
+              "value": "={{ 'history_' + $json.body.payload.from.replace(/[^a-z0-9]/gi, '_') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "408fbd56-9128-4e0e-b534-3c6083b9b767",
+      "name": "Extract Message",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        976,
+        -1264
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const key = $json.sessionKey;\nconst stored = $getWorkflowStaticData('global');\nconst history = stored[key] ? JSON.parse(stored[key]) : [];\n\nreturn [{\n  json: {\n    chatId: $json.chatId,\n    question: $json.question,\n    sessionKey: $json.sessionKey,\n    history: history\n  }\n}];"
+      },
+      "id": "e6fd0ff8-f6b2-4aa0-a312-99b43746726e",
+      "name": "Load History",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1232,
+        -1264
+      ]
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "google/gemma-3-27b",
+          "mode": "list",
+          "cachedResultName": "GOOGLE/GEMMA-3-27B"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "You are Alex’s AI assistant. Answer questions clearly and accurately. Provide concise, useful information. Structure responses when it helps readability. Avoid unnecessary filler or overly casual language. Respond in the same language as the user’s message (for example, Hebrew questions → Hebrew answers, English questions → English answers).",
+              "role": "system"
+            },
+            {
+              "content": "={{ $json.question }}"
+            }
+          ]
+        },
+        "options": {
+          "maxTokens": 1024,
+          "temperature": 0.7
+        }
+      },
+      "id": "118f7f2f-94cd-4310-9e78-be81e768bf2b",
+      "name": "Ask LM Studio",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        1488,
+        -1264
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "WJsCuec8UzGRGVIc",
+          "name": "Macbook ProM1 Pro"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const prev = $('Load History').first().json;\nconst answer = ($json.message?.content || $json.text || '').trim();\nconst key = prev.sessionKey;\n\nconst stored = $getWorkflowStaticData('global');\nlet history = stored[key] ? JSON.parse(stored[key]) : [];\n\nhistory.push({ role: 'user', content: prev.question });\nhistory.push({ role: 'assistant', content: answer });\n\nif (history.length > 20) history = history.slice(-20);\n\nstored[key] = JSON.stringify(history);\n\nreturn [{\n  json: {\n    chatId: prev.chatId,\n    answer: answer\n  }\n}];"
+      },
+      "id": "32471ecf-7401-46d8-8651-2e00221a1f47",
+      "name": "Save History + Extract Answer",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1840,
+        -1264
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://waha:3000/api/sendText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Key",
+              "value": "1ENEwO3sB28lWYzMEhmDYNpW7xc2Om0y"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "session",
+              "value": "default"
+            },
+            {
+              "name": "chatId",
+              "value": "={{ $json.chatId }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.answer }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ab2363ab-7aa3-49e7-8189-2afa5f0f0968",
+      "name": "Send Reply via WAHA",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        2160,
+        -1264
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook - Receive WhatsApp Message": {
+      "main": [
+        [
+          {
+            "node": "Filter: AI Bot group only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter: AI Bot group only": {
+      "main": [
+        [
+          {
+            "node": "Extract Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Message": {
+      "main": [
+        [
+          {
+            "node": "Load History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load History": {
+      "main": [
+        [
+          {
+            "node": "Ask LM Studio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask LM Studio": {
+      "main": [
+        [
+          {
+            "node": "Save History + Extract Answer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save History + Extract Answer": {
+      "main": [
+        [
+          {
+            "node": "Send Reply via WAHA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "timezone": "Asia/Jerusalem",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": {
+    "global": {
+      "history_972545580431_c_us": "[{\"role\":\"user\",\"content\":\"what is 2+2?\"},{\"role\":\"assistant\",\"content\":\"4\"},{\"role\":\"user\",\"content\":\"what is the capital of France?\"},{\"role\":\"assistant\",\"content\":\"Paris.\"},{\"role\":\"user\",\"content\":\"what is the capital of Israel?\"},{\"role\":\"assistant\",\"content\":\"Jerusalem.\"},{\"role\":\"user\",\"content\":\"what is the capital of Belarus?\"},{\"role\":\"assistant\",\"content\":\"Minsk.\"},{\"role\":\"user\",\"content\":\"tell me about Trump\"},{\"role\":\"assistant\",\"content\":\"Donald Trump is a businessman and former U.S. President (2017-2021). Key points:\\n\\n*   **Business:** Real estate developer, known for Trump Tower and casinos.\\n*   **Politics:** Republican Party. Ran for president in 2016, winning against Hillary Clinton. Lost to Joe Biden in 2020.\\n*   **Policies:** Focused on tax cuts, deregulation, and stricter immigration policies.\\n*   **Controversies:** Faced investigations and impeachment proceedings during his presidency.\\n\\n\\n\\nIs there a specific aspect you'd like to know more about?\"},{\"role\":\"user\",\"content\":\"כמה שנים ישראל קיימת?\"},{\"role\":\"assistant\",\"content\":\"ישראל הוקמה בשנת 1948. לכן, היא קיימת כבר 76 שנים.\"},{\"role\":\"user\",\"content\":\"כמה  מלחמות ארצות הברית עברה ?\"},{\"role\":\"assistant\",\"content\":\"The United States has been involved in numerous conflicts. Here's a concise list of major wars:\\n\\n*   Revolutionary War (1775-1783)\\n*   War of 1812 (1812-1815)\\n*   Mexican-American War (1846-1848)\\n*   Civil War (1861-1865)\\n*   Spanish-American War (1898)\\n*   World War I (1917-1918)\\n*   World War II (1941-1945)\\n*   Korean War (1950-1953)\\n*   Vietnam War (1955-1975)\\n*   Persian Gulf War (1990-1991)\\n*   War in Afghanistan (2001-2021)\\n*   Iraq War (2003-2011)\"},{\"role\":\"user\",\"content\":\"מי היא מכבי חיפה ?\"},{\"role\":\"assistant\",\"content\":\"מכבי חיפה הוא מועדון כדורגל ישראלי מהצפון.\"},{\"role\":\"user\",\"content\":\"למה כשאדם רואה טוב אומרים שהוא רואה 6  6\"},{\"role\":\"assistant\",\"content\":\"It's a reference to the Snellen eye chart. \\\"6/6\\\" vision means you can see at 20 feet what a person with normal vision should be able to see at 20 feet.\"},{\"role\":\"user\",\"content\":\"תענה בעברית מי יותר טוב מסי או רונדלו?\"},{\"role\":\"assistant\",\"content\":\"מסי.\"}]",
+      "history_120363407766258921_g_us": "[{\"role\":\"user\",\"content\":\"Patching schedule confirmed.\\n\\n*   **Windows Servers:** Sunday 2:00-6:00 AM\\n*   **macOS Devices:** Saturday 8:00AM-12:00PM\"},{\"role\":\"assistant\",\"content\":\"Patching schedule confirmed:\\n\\n*   **Windows Servers:** Sunday 2:00-6:00 AM\\n*   **macOS Devices:** Saturday 8:00AM-12:00PM\"},{\"role\":\"user\",\"content\":\"Patching schedule confirmed:\\n\\n*   **Windows Servers:** Sunday 2:00-6:00 AM\\n*   **macOS Devices:** Saturday 8:00AM-12:00PM\"},{\"role\":\"assistant\",\"content\":\"Patching schedule confirmed:\\n\\n*   **Windows Servers:** Sunday 2:00-6:00 AM\\n*   **macOS Devices:** Saturday 8:00AM-12:00PM\"},{\"role\":\"user\",\"content\":\"Patching schedule confirmed:\\n\\n*   **Windows Servers:** Sunday 2:00-6:00 AM\\n*   **macOS Devices:** Saturday 8:00AM-12:00PM\"},{\"role\":\"assistant\",\"content\":\"Patching schedule confirmed.\\n\\n*   **Windows Servers:** Sunday 2:00-6:00 AM\\n*   **macOS Devices:** Saturday 8:00AM-12:00PM\"},{\"role\":\"user\",\"content\":\"Patching schedule confirmed.\\n\\n*   **Windows Servers:** Sunday 2:00-6:00 AM\\n*   **macOS Devices:** Saturday 8:00AM-12:00PM\"},{\"role\":\"assistant\",\"content\":\"Patching schedule confirmed:\\n\\n*   **Windows Servers:** Sunday 2:00-6:00 AM\\n*   **macOS Devices:** Saturday 8:00AM-12:00PM\"},{\"role\":\"user\",\"content\":\"Patching schedule confirmed:\\n\\n*   **Windows Servers:** Sunday 2:00-6:00 AM\\n*   **macOS Devices:** Saturday 8:00AM-12:00PM\"},{\"role\":\"assistant\",\"content\":\"Patching schedule confirmed.\\n\\n*   **Windows Servers:** Sunday 2:00-6:00 AM\\n*   **macOS Devices:** Saturday 8:00AM-12:00PM\"},{\"role\":\"user\",\"content\":\"Patching schedule confirmed.\\n\\n*   **Windows Servers:** Sunday 2:00-6:00 AM\\n*   **macOS Devices:** Saturday 8:00AM-12:00PM\"},{\"role\":\"assistant\",\"content\":\"Patching schedule confirmed:\\n\\n*   **Windows Servers:** Sunday 2:00-6:00 AM\\n*   **macOS Devices:** Saturday 8:00AM-12:00PM\"},{\"role\":\"user\",\"content\":\"Patching schedule confirmed:\\n\\n*   **Windows Servers:** Sunday 2:00-6:00 AM\\n*   **macOS Devices:** Saturday 8:00AM-12:00PM\"},{\"role\":\"assistant\",\"content\":\"Patching schedule confirmed.\\n\\n*   **Windows Servers:** Sunday 2:00-6:00 AM\\n*   **macOS Devices:** Saturday 8:00AM-12:00PM\"},{\"role\":\"user\",\"content\":\"who is better messi or ronaldo?\"},{\"role\":\"assistant\",\"content\":\"That's a debate with no definitive answer, Alex. \\n\\n**Messi:** Generally considered more naturally gifted, exceptional dribbling & playmaking.\\n**Ronaldo:** Incredible athleticism, prolific goalscorer, strong aerial ability.\\n\\nIt comes down to preference. Both are all-time greats.\"},{\"role\":\"user\",\"content\":\"what is dns?\"},{\"role\":\"assistant\",\"content\":\"DNS (Domain Name System) translates human-readable domain names (like google.com) into IP addresses (like 172.217.160.142) computers use to locate websites and other online resources.\\n\\nEssentially, it's the internet's phonebook.\"},{\"role\":\"user\",\"content\":\"מי יותר טוב רונאלדו או מסי?\"},{\"role\":\"assistant\",\"content\":\"This is a subjective question! Both Ronaldo and Messi are incredible players. \\n\\n**Generally:**\\n\\n*   **Messi** is often praised for natural talent, dribbling, and playmaking.\\n*   **Ronaldo** is often praised for athleticism, finishing, and versatility.\\n\\nThere's no definitive \\\"better\\\" – it depends on preference!\"}]",
+      "history_120363426439026095_g_us": "[{\"role\":\"user\",\"content\":\"hi how are you?\"},{\"role\":\"assistant\",\"content\":\"Hey! I'm doing pretty good, actually. Just hanging out in the digital world, ready to help whenever someone needs it. 😄 How about *you*? Anything interesting happening today, or just a regular kind of day? \\n\\nSeriously though, happy to hear from you. Let me know if there's anything on your mind – big or small! I can chat, brainstorm ideas, try to answer questions... whatever you're up for. ✨\"},{\"role\":\"user\",\"content\":\"tell me about usa\"},{\"role\":\"assistant\",\"content\":\"Okay, so the USA! That's a *big* question – it's kinda hard to sum up such a diverse place, but I can definitely give you the highlights. \\n\\nBasically, it's a country made up of 50 states (plus Washington D.C., which isn’t a state but is super important) in North America. It's got a pretty fascinating history... Originally inhabited by lots of different Native American tribes, then colonized mostly by Europeans starting in the 1600s. It fought for its independence from Britain in the late 1700s and has been evolving ever since.\\n\\nWhat makes it unique? Well, for one thing, it's a huge melting pot of cultures. People from *all* over the world come here, which means you get incredible food, music, art... just a ton of different perspectives. \\n\\nEconomically it's a powerhouse – one of the biggest economies in the world, known for tech, finance, entertainment (Hollywood!), agriculture... you name it. Politically things can be pretty complex (understatement of the year, honestly!), with a federal government and then each state having its own rules too.\\n\\nGeographically it’s wildly different from place to place. You've got scorching deserts in the Southwest, bustling cities on the coasts like New York and LA, sprawling farmlands in the Midwest, beautiful mountains in places like Colorado... Seriously, you could spend a lifetime exploring and not see it all.\\n\\nIs there anything *specific* about the USA you're curious about? Like, are you wondering about the food, the music scene, a particular state, the history, or something else?  I can totally dive deeper into whatever interests you most! ✨\"},{\"role\":\"user\",\"content\":\"tell me about new yourk\"},{\"role\":\"assistant\",\"content\":\"Ooh, New York! Okay, where do I even *begin*? It's honestly kind of overwhelming in the best way possible. Like, it’s not just a city, it's a whole collection of little cities *within* a city. \\n\\nBasically, you’ve got five main boroughs: Manhattan (that's the iconic one with Times Square and skyscrapers), Brooklyn (super trendy, artsy vibe, amazing food), Queens (the most diverse borough, incredible restaurants too!), The Bronx (home to Yankee Stadium and the New York Zoo), and Staten Island (a bit more laid-back, you can take a free ferry with awesome views of the Statue of Liberty).\\n\\nManhattan is what most people picture – Broadway shows, Central Park, museums like the Met and MoMA. But honestly? Some of my favorite stuff is *outside* Manhattan. Brooklyn has these amazing parks like Prospect Park, and neighborhoods like Williamsburg that are just buzzing with energy. Queens is a food paradise – you can literally eat your way around the world there.\\n\\nIt's *expensive*, no getting around that. But you can totally do it on a budget! So much is free – walking the Brooklyn Bridge, hanging out in parks, visiting free museum days. The subway is your best friend for getting around (it can be confusing at first, but you’ll get the hang of it). \\n\\nPeople are always rushing around, which can be intense, but they're also pretty helpful if you need it. And the energy...it’s just *different*. 24/7 kind of vibe.\\n\\nWhat are you thinking about when you ask? Are you planning a trip, just curious, or something else? Knowing that would help me narrow things down and tell you more specific stuff! Like, are you into art? Music? Food? History? Let me know and I can geek out about it. 😊\"},{\"role\":\"user\",\"content\":\"tell me about Iran\"},{\"role\":\"assistant\",\"content\":\"## Iran: An Overview\\n\\nHere's a concise overview of Iran, covering key aspects.\\n\\n**1. Geography & Climate:**\\n\\n*   **Location:** Western Asia, bordering the Caspian Sea, Persian Gulf, and Arabian Sea.\\n*   **Area:** 1,648,195 sq km (roughly the size of Alaska).\\n*   **Terrain:** Diverse - mountains, deserts, plateaus, coastal plains.\\n*   **Climate:**  Mostly arid or semi-arid; hot summers, cold winters. Regional variations are significant (e.g., humid Caspian coast vs. dry interior).\\n\\n**2. People & Culture:**\\n\\n*   **Population:** ~89 million (2024 est.).\\n*   **Language:** Persian (Farsi) is the official language.  Minority languages include Azerbaijani, Kurdish, and Arabic.\\n*   **Religion:** Predominantly Shia Islam (90-95%).  Minorities include Sunni Muslims, Christians, Jews, and Zoroastrians.\\n*   **Culture:** Rich history with significant contributions to art, literature (poetry – Rumi, Hafez), architecture, and cuisine. Strong family values are common.\\n\\n**3. Politics & Government:**\\n\\n*   **Political System:** Islamic Republic – a theocratic system combining elements of a republic with religious authority.\\n*   **Supreme Leader:** Ayatollah Ali Khamenei - highest political and religious authority.\\n*   **President:** Ebrahim Raisi (current).  Responsible for day-to-day government operations.\\n*   **Parliament:** Majlis – elected legislative body.\\n\\n**4. Economy:**\\n\\n*   **Key Industries:** Oil & gas (dominant), mining, manufacturing (steel, textiles, automobiles), agriculture.\\n*   **Currency:** Iranian Rial (IRR).\\n*   **Challenges:** Heavily impacted by international sanctions, leading to economic instability and inflation.\\n\\n**5. History (Briefly):**\\n\\n*   Ancient Persia: One of the world's oldest civilizations with empires like the Achaemenid, Parthian, and Sasanian.\\n*   Islamic Conquest (7th century): Gradual conversion to Islam.\\n*   Modern Iran: Established as a nation-state in the 15th century with various dynasties.\\n*   1979 Revolution: Overthrow of the Pahlavi dynasty and establishment of the Islamic Republic.\\n\\n\\n\\n**Resources for further information:**\\n\\n*   **CIA World Factbook - Iran:** [https://www.cia.gov/the-world-factbook/countries/iran/](https://www.cia.gov/the-world-factbook/countries/iran/)\\n*   **Britannica - Iran:** [https://www.britannica.com/place/Iran](https://www.britannica.com/place/Iran)\\n*   **U.S. Department of State - Iran:** [https://www.state.gov/countries-areas/iran/](https://www.state.gov/countries-areas/iran/)\\n\\n\\n\\nDo you want me to elaborate on any specific aspect (e.g., economy, history, political system)?\"},{\"role\":\"user\",\"content\":\"מה קורה?\"},{\"role\":\"assistant\",\"content\":\"\\\"מה קורה?\\\" translates to \\\"What's up?\\\" or \\\"How are things?\\\". \\n\\nA common response would be:\\n\\n*   **בסדר גמור, תודה.** (Beseder gamor, toda.) - \\\"Everything is fine, thank you.\\\"\\n*   **טוב, תודה.** (Tov, toda.) - \\\"Good, thank you.\\\"\\n*   **לא רע.** (Lo ra'e.) - \\\"Not bad.\\\"\\n\\nYou can also ask back: **מה איתך?** (Ma itach?) - \\\"And with you?\\\" or **מה קורה איתך?** (Ma kore itach?) - \\\"What's up with you?\\\".\"},{\"role\":\"user\",\"content\":\"מה התאריך?\"},{\"role\":\"assistant\",\"content\":\"היום הוא יום שלישי, ה-7 במאי 2024.\"},{\"role\":\"user\",\"content\":\"מי נשיא ארצות הברית?\"},{\"role\":\"assistant\",\"content\":\"ג'ו ביידן הוא נשיא ארצות הברית הנוכחי. \\n\\n(Joe Biden is the current President of the United States.)\"},{\"role\":\"user\",\"content\":\"מי נשיא רוסיה?\"},{\"role\":\"assistant\",\"content\":\"נשיא רוסיה הוא ולדימיר פוטין.\"},{\"role\":\"user\",\"content\":\"who president of Israel?\"},{\"role\":\"assistant\",\"content\":\"The current President of Israel is Isaac Herzog. \\n\\nHere's a brief overview:\\n\\n*   **Name:** Isaac Herzog\\n*   **Took Office:** July 1, 2021\\n*   **Term Length:** 7 years (single term)\"},{\"role\":\"user\",\"content\":\"איך אומרים יד באנגלית?\"},{\"role\":\"assistant\",\"content\":\"יד באנגלית נקראת **hand**.\"}]"
+    }
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "a936669c-1e05-491b-a17b-8998f2695d00",
+  "activeVersionId": "a936669c-1e05-491b-a17b-8998f2695d00",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-13T10:46:06.843Z",
+      "createdAt": "2026-03-13T10:46:06.843Z",
+      "role": "workflow:owner",
+      "workflowId": "TuCodb0y457nG7iM",
+      "projectId": "pWTWmuHnmIHw48U9"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-03-13T18:25:37.000Z",
+    "createdAt": "2026-03-13T18:25:36.822Z",
+    "versionId": "a936669c-1e05-491b-a17b-8998f2695d00",
+    "workflowId": "TuCodb0y457nG7iM",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "waha-incoming-bot",
+          "options": {}
+        },
+        "id": "99ef85f5-216b-4bf1-a135-4571f2774c88",
+        "name": "Webhook - Receive WhatsApp Message",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          448,
+          -1264
+        ],
+        "webhookId": "waha-incoming-bot"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": false,
+              "typeValidation": "strict",
+              "version": 1
+            },
+            "conditions": [
+              {
+                "id": "check-chat-id",
+                "leftValue": "={{ $json.body.payload.from }}",
+                "rightValue": "120363426439026095@g.us",
+                "operator": {
+                  "type": "string",
+                  "operation": "equals"
+                }
+              },
+              {
+                "id": "check-not-from-api",
+                "leftValue": "={{ $json.body.payload.source }}",
+                "rightValue": "api",
+                "operator": {
+                  "type": "string",
+                  "operation": "notEquals"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "f173fcea-d055-4d8d-b183-687c35557764",
+        "name": "Filter: AI Bot group only",
+        "type": "n8n-nodes-base.filter",
+        "typeVersion": 2,
+        "position": [
+          720,
+          -1264
+        ]
+      },
+      {
+        "parameters": {
+          "assignments": {
+            "assignments": [
+              {
+                "id": "extract-from",
+                "name": "chatId",
+                "value": "={{ $json.body.payload.from }}",
+                "type": "string"
+              },
+              {
+                "id": "extract-question",
+                "name": "question",
+                "value": "={{ $json.body.payload.body.trim() }}",
+                "type": "string"
+              },
+              {
+                "id": "session-key",
+                "name": "sessionKey",
+                "value": "={{ 'history_' + $json.body.payload.from.replace(/[^a-z0-9]/gi, '_') }}",
+                "type": "string"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "408fbd56-9128-4e0e-b534-3c6083b9b767",
+        "name": "Extract Message",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [
+          976,
+          -1264
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const key = $json.sessionKey;\nconst stored = $getWorkflowStaticData('global');\nconst history = stored[key] ? JSON.parse(stored[key]) : [];\n\nreturn [{\n  json: {\n    chatId: $json.chatId,\n    question: $json.question,\n    sessionKey: $json.sessionKey,\n    history: history\n  }\n}];"
+        },
+        "id": "e6fd0ff8-f6b2-4aa0-a312-99b43746726e",
+        "name": "Load History",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1232,
+          -1264
+        ]
+      },
+      {
+        "parameters": {
+          "modelId": {
+            "__rl": true,
+            "value": "google/gemma-3-27b",
+            "mode": "list",
+            "cachedResultName": "GOOGLE/GEMMA-3-27B"
+          },
+          "messages": {
+            "values": [
+              {
+                "content": "You are Alex’s AI assistant. Answer questions clearly and accurately. Provide concise, useful information. Structure responses when it helps readability. Avoid unnecessary filler or overly casual language. Respond in the same language as the user’s message (for example, Hebrew questions → Hebrew answers, English questions → English answers).",
+                "role": "system"
+              },
+              {
+                "content": "={{ $json.question }}"
+              }
+            ]
+          },
+          "options": {
+            "maxTokens": 1024,
+            "temperature": 0.7
+          }
+        },
+        "id": "118f7f2f-94cd-4310-9e78-be81e768bf2b",
+        "name": "Ask LM Studio",
+        "type": "@n8n/n8n-nodes-langchain.openAi",
+        "typeVersion": 1.8,
+        "position": [
+          1488,
+          -1264
+        ],
+        "credentials": {
+          "openAiApi": {
+            "id": "WJsCuec8UzGRGVIc",
+            "name": "Macbook ProM1 Pro"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "const prev = $('Load History').first().json;\nconst answer = ($json.message?.content || $json.text || '').trim();\nconst key = prev.sessionKey;\n\nconst stored = $getWorkflowStaticData('global');\nlet history = stored[key] ? JSON.parse(stored[key]) : [];\n\nhistory.push({ role: 'user', content: prev.question });\nhistory.push({ role: 'assistant', content: answer });\n\nif (history.length > 20) history = history.slice(-20);\n\nstored[key] = JSON.stringify(history);\n\nreturn [{\n  json: {\n    chatId: prev.chatId,\n    answer: answer\n  }\n}];"
+        },
+        "id": "32471ecf-7401-46d8-8651-2e00221a1f47",
+        "name": "Save History + Extract Answer",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1840,
+          -1264
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://waha:3000/api/sendText",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "X-Api-Key",
+                "value": "1ENEwO3sB28lWYzMEhmDYNpW7xc2Om0y"
+              }
+            ]
+          },
+          "sendBody": true,
+          "bodyParameters": {
+            "parameters": [
+              {
+                "name": "session",
+                "value": "default"
+              },
+              {
+                "name": "chatId",
+                "value": "={{ $json.chatId }}"
+              },
+              {
+                "name": "text",
+                "value": "={{ $json.answer }}"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "ab2363ab-7aa3-49e7-8189-2afa5f0f0968",
+        "name": "Send Reply via WAHA",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          2160,
+          -1264
+        ]
+      }
+    ],
+    "connections": {
+      "Webhook - Receive WhatsApp Message": {
+        "main": [
+          [
+            {
+              "node": "Filter: AI Bot group only",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Filter: AI Bot group only": {
+        "main": [
+          [
+            {
+              "node": "Extract Message",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Extract Message": {
+        "main": [
+          [
+            {
+              "node": "Load History",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Load History": {
+        "main": [
+          [
+            {
+              "node": "Ask LM Studio",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Ask LM Studio": {
+        "main": [
+          [
+            {
+              "node": "Save History + Extract Answer",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Save History + Extract Answer": {
+        "main": [
+          [
+            {
+              "node": "Send Reply via WAHA",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Alex Vinokur",
+    "name": "Version a936669c",
+    "description": "",
+    "autosaved": true
+  },
+  "tags": []
+}
