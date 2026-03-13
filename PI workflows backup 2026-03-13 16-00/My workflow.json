@@ -1,0 +1,2347 @@
+{
+  "updatedAt": "2026-03-13T13:52:38.236Z",
+  "createdAt": "2026-03-13T12:51:06.459Z",
+  "id": "zmvJvWN8mdK2ONJY",
+  "name": "My workflow",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "waha-incoming",
+        "options": {}
+      },
+      "id": "0cc22f92-6fef-4830-a3b4-972ee0b43605",
+      "name": "Webhook - Receive WhatsApp Message",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -832,
+        656
+      ],
+      "webhookId": "waha-incoming"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "check-group",
+              "leftValue": "={{ $json.body.payload.from }}",
+              "rightValue": "120363407766258921@g.us",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "check-prefix",
+              "leftValue": "={{ $json.body.payload.body }}",
+              "rightValue": "/",
+              "operator": {
+                "type": "string",
+                "operation": "startsWith"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "91c9a456-db68-497f-a3eb-02a864cf4aa0",
+      "name": "Filter: group + slash command",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [
+        -576,
+        656
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "chatid",
+              "name": "chatId",
+              "value": "={{ $json.body.payload.from }}",
+              "type": "string"
+            },
+            {
+              "id": "cmd",
+              "name": "command",
+              "value": "={{ $json.body.payload.body.trim().split(' ')[0].toLowerCase() }}",
+              "type": "string"
+            },
+            {
+              "id": "args",
+              "name": "args",
+              "value": "={{ $json.body.payload.body.trim().split(' ').slice(1).join(' ') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "50d07c63-9073-434c-a2a0-2dedb2ef1585",
+      "name": "Extract Command",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -320,
+        656
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.command }}",
+                    "rightValue": "/menu",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "r1"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.command }}",
+                    "rightValue": "/disk",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "r2"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.command }}",
+                    "rightValue": "/containers",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "r3"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.command }}",
+                    "rightValue": "/cpu",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "r4"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.command }}",
+                    "rightValue": "/memory",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "r5"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.command }}",
+                    "rightValue": "/uptime",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "r6"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.command }}",
+                    "rightValue": "/top",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "r7"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.command }}",
+                    "rightValue": "/ip",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "r8"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.command }}",
+                    "rightValue": "/ports",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "r9"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.command }}",
+                    "rightValue": "/vpn",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "r10"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.command }}",
+                    "rightValue": "/logs",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "r11"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.command }}",
+                    "rightValue": "/restart",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "r12"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.command }}",
+                    "rightValue": "/stop",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "r13"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.command }}",
+                    "rightValue": "/start",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "r14"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.command }}",
+                    "rightValue": "/stopped",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "r15"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.command }}",
+                    "rightValue": "/logins",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "r16"
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2476bc68-894b-45b5-aae3-5e082e26e425",
+      "name": "Switch: Command Router",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -64,
+        656
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "menu-chatid",
+              "name": "chatId",
+              "value": "={{ $json.chatId }}",
+              "type": "string"
+            },
+            {
+              "id": "menu-text",
+              "name": "text",
+              "value": "🤖 *Bot Menu*\n\n*SYSTEM*\n/cpu - CPU temp + usage\n/memory - RAM usage\n/disk - Disk space\n/uptime - Pi uptime\n/top - Top 5 processes\n\n*NETWORK*\n/ip - Local + public IP\n/ports - Open ports\n/vpn - WireGuard status\n\n*DOCKER*\n/containers - All containers\n/stopped - Stopped containers\n/start <name> - Start container\n/stop <name> - Stop container\n/restart <name> - Restart container\n/logs <name> - Last 20 log lines\n\n*SECURITY*\n/logins - Recent SSH logins",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "0e04ee20-2781-45a5-b0bd-1fa396bb0a0b",
+      "name": "Build Menu Message",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        192,
+        -144
+      ]
+    },
+    {
+      "parameters": {
+        "command": "df -h | grep -v tmpfs | grep -v udev"
+      },
+      "id": "4120f5d9-dfe1-4436-8ea9-4f731ccceda8",
+      "name": "Disk Space (SSH)",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        192,
+        656
+      ],
+      "credentials": {
+        "sshPassword": {
+          "id": "Bz4RWdZkj3xQKNYO",
+          "name": "PI 5 SSH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "docker ps --format 'table {{.Names}}\\t{{.Status}}'"
+      },
+      "id": "00ff9218-35b6-400d-9827-caa04e5e19ac",
+      "name": "Containers (SSH)",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        192,
+        864
+      ],
+      "credentials": {
+        "sshPassword": {
+          "id": "Bz4RWdZkj3xQKNYO",
+          "name": "PI 5 SSH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "echo \"Temp: $(vcgencmd measure_temp 2>/dev/null || cat /sys/class/thermal/thermal_zone0/temp | awk '{printf \"%.1f C\", $1/1000}')\" && echo \"CPU: $(top -bn1 | grep 'Cpu(s)' | awk '{print $2+$4\"%\"}')\""
+      },
+      "id": "e7f55400-9980-479a-8bec-6492cfcba64c",
+      "name": "CPU (SSH)",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        192,
+        1056
+      ],
+      "credentials": {
+        "sshPassword": {
+          "id": "Bz4RWdZkj3xQKNYO",
+          "name": "PI 5 SSH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "free -h | awk 'NR==2{printf \"Used: %s / %s (%.1f%%)\\n\", $3, $2, $3/$2*100}'"
+      },
+      "id": "cf101d1d-c59d-476c-a65b-13c41a78067f",
+      "name": "Memory (SSH)",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        192,
+        1264
+      ],
+      "credentials": {
+        "sshPassword": {
+          "id": "Bz4RWdZkj3xQKNYO",
+          "name": "PI 5 SSH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "uptime -p && echo \"Since: $(uptime -s)\""
+      },
+      "id": "07ac355c-9dc9-4440-a1a0-f7d2a2d6fa8b",
+      "name": "Uptime (SSH)",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        192,
+        1456
+      ],
+      "credentials": {
+        "sshPassword": {
+          "id": "Bz4RWdZkj3xQKNYO",
+          "name": "PI 5 SSH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "ps aux --sort=-%cpu | head -6 | awk 'NR>1{printf \"%s - CPU:%s%% MEM:%s%%\\n\", $11, $3, $4}'"
+      },
+      "id": "c1034f01-3dbb-413b-b097-dd3f411d8f34",
+      "name": "Top Processes (SSH)",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        192,
+        1664
+      ],
+      "credentials": {
+        "sshPassword": {
+          "id": "Bz4RWdZkj3xQKNYO",
+          "name": "PI 5 SSH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "echo \"Local: $(hostname -I | awk '{print $1}')\" && echo \"Public: $(curl -s ifconfig.me)\""
+      },
+      "id": "0c18e1ad-4f2a-487b-a02e-4c1b6ea8ecc6",
+      "name": "IP (SSH)",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        192,
+        1856
+      ],
+      "credentials": {
+        "sshPassword": {
+          "id": "Bz4RWdZkj3xQKNYO",
+          "name": "PI 5 SSH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "ss -tlnp | grep LISTEN | awk '{print $4, $6}' | sort"
+      },
+      "id": "98c0e715-3756-42fa-923f-a89c9454da23",
+      "name": "Ports (SSH)",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        192,
+        2064
+      ],
+      "credentials": {
+        "sshPassword": {
+          "id": "Bz4RWdZkj3xQKNYO",
+          "name": "PI 5 SSH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "result=$(docker exec wg-easy wg show 2>/dev/null | awk '/^peer/{if(ep!=\"\")printf \"%s|%s|%s\\n\",ip,ep,hs; ep=\"\";hs=\"\";ip=\"\"} /endpoint/{ep=$2} /latest handshake/{hs=$3\" \"$4\" \"$5} /allowed ips/{ip=$3} END{if(ep!=\"\")printf \"%s|%s|%s\\n\",ip,ep,hs}'); if [ -z \"$result\" ]; then echo 'No connected peers'; else db=$(docker exec wg-easy cat /etc/wireguard/wg0.json 2>/dev/null); echo \"$result\" | while IFS='|' read ip ep hs; do cleanip=$(echo $ip | cut -d'/' -f1); name=$(echo \"$db\" | python3 -c \"import sys,json; d=json.load(sys.stdin); print(next((v['name'] for v in d['clients'].values() if v['address']=='$cleanip'),'$cleanip'))\" 2>/dev/null || echo $cleanip); printf \"%s\\n  IP: %s\\n  Endpoint: %s\\n  Last seen: %s\\n\\n\" \"$name\" \"$ip\" \"$ep\" \"$hs\"; done; fi"
+      },
+      "id": "7f135bf3-d7b7-4c3d-aed5-bd5b322ed00a",
+      "name": "VPN (SSH)",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        192,
+        2256
+      ],
+      "credentials": {
+        "sshPassword": {
+          "id": "Bz4RWdZkj3xQKNYO",
+          "name": "PI 5 SSH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "={{ (() => { const a = $('Extract Command').first().json.args; return (a && a.trim()) ? 'docker logs --tail 20 ' + a.trim() + ' 2>&1' : 'echo \"⚠️ Usage: /logs <container_name>\"'; })() }}"
+      },
+      "id": "868f9980-324c-4357-bff7-e8adc449fb7b",
+      "name": "Logs (SSH)",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        192,
+        2464
+      ],
+      "credentials": {
+        "sshPassword": {
+          "id": "Bz4RWdZkj3xQKNYO",
+          "name": "PI 5 SSH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "={{ (() => { const a = $('Extract Command').first().json.args; return (a && a.trim()) ? 'docker restart ' + a.trim() + ' 2>&1' : 'echo \"⚠️ Usage: /restart <container_name>\"'; })() }}"
+      },
+      "id": "d892e1ff-861d-419b-9c13-9680f89a25c9",
+      "name": "Restart (SSH)",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        192,
+        2656
+      ],
+      "credentials": {
+        "sshPassword": {
+          "id": "Bz4RWdZkj3xQKNYO",
+          "name": "PI 5 SSH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "={{ (() => { const a = $('Extract Command').first().json.args; return (a && a.trim()) ? 'docker stop ' + a.trim() + ' 2>&1' : 'echo \"⚠️ Usage: /stop <container_name>\"'; })() }}"
+      },
+      "id": "542c93fa-a7dc-49b4-99e2-6af418455ae3",
+      "name": "Stop (SSH)",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        192,
+        2848
+      ],
+      "credentials": {
+        "sshPassword": {
+          "id": "Bz4RWdZkj3xQKNYO",
+          "name": "PI 5 SSH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "={{ (() => { const a = $('Extract Command').first().json.args; return (a && a.trim()) ? 'docker start ' + a.trim() + ' 2>&1' : 'echo \"⚠️ Usage: /start <container_name>\"'; })() }}"
+      },
+      "id": "91f96823-0b3b-4bc4-b51b-c59eaaa05733",
+      "name": "Start (SSH)",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        192,
+        3040
+      ],
+      "credentials": {
+        "sshPassword": {
+          "id": "Bz4RWdZkj3xQKNYO",
+          "name": "PI 5 SSH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "docker ps -a --filter status=exited --filter status=dead --format \"table {{.Names}}\\t{{.Status}}\""
+      },
+      "id": "d6448b91-6fc0-4511-8df7-d7e554060dfc",
+      "name": "Stopped Containers (SSH)",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        192,
+        3232
+      ],
+      "credentials": {
+        "sshPassword": {
+          "id": "Bz4RWdZkj3xQKNYO",
+          "name": "PI 5 SSH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "last -n 10 2>/dev/null | grep -v '^$' | grep -v 'wtmp begins' | grep -v 'reboot' || echo '-- No entries --'"
+      },
+      "id": "81911fc3-362f-48b5-a3cc-4b739f510b1e",
+      "name": "Logins (SSH)",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        192,
+        3424
+      ],
+      "credentials": {
+        "sshPassword": {
+          "id": "Bz4RWdZkj3xQKNYO",
+          "name": "PI 5 SSH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const cmd = $('Extract Command').first().json.command;\nconst chatId = $('Extract Command').first().json.chatId;\nconst output = ($json.stdout || $json.text || '').trim() || 'No output';\nconst labels = {\n  '/disk': '💾 Disk Space',\n  '/containers': '🐳 Containers',\n  '/cpu': '🌡️ CPU',\n  '/memory': '🧠 Memory',\n  '/uptime': '⏱️ Uptime',\n  '/top': '📊 Top Processes',\n  '/ip': '🌐 IP Addresses',\n  '/ports': '🔌 Open Ports',\n  '/vpn': '🔒 WireGuard VPN',\n  '/logs': '📋 Container Logs',\n  '/restart': '🔄 Restart',\n  '/stop': '🛑 Stop',\n  '/start': '▶️ Start',\n  '/stopped': '🛑 Stopped Containers',\n  '/logins': '🔑 Recent Logins'\n};\nconst label = labels[cmd] || cmd;\nreturn [{ json: { chatId, text: label + '\\n```\\n' + output + '\\n```' } }];"
+      },
+      "id": "7cc87590-8c2b-4d4e-8b61-5bd9ef12c149",
+      "name": "Format SSH Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        704,
+        1856
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://waha:3000/api/sendText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Key",
+              "value": "1ENEwO3sB28lWYzMEhmDYNpW7xc2Om0y"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "session",
+              "value": "default"
+            },
+            {
+              "name": "chatId",
+              "value": "={{ $json.chatId }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.text }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b7a3fc07-9e09-4b30-afd4-9072ae67ac7e",
+      "name": "Send Reply via WAHA",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        960,
+        656
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook - Receive WhatsApp Message": {
+      "main": [
+        [
+          {
+            "node": "Filter: group + slash command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter: group + slash command": {
+      "main": [
+        [
+          {
+            "node": "Extract Command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Command": {
+      "main": [
+        [
+          {
+            "node": "Switch: Command Router",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch: Command Router": {
+      "main": [
+        [
+          {
+            "node": "Build Menu Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Disk Space (SSH)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Containers (SSH)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "CPU (SSH)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Memory (SSH)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Uptime (SSH)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Top Processes (SSH)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "IP (SSH)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ports (SSH)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "VPN (SSH)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Logs (SSH)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Restart (SSH)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stop (SSH)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Start (SSH)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stopped Containers (SSH)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Logins (SSH)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Menu Message": {
+      "main": [
+        [
+          {
+            "node": "Send Reply via WAHA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Disk Space (SSH)": {
+      "main": [
+        [
+          {
+            "node": "Format SSH Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Containers (SSH)": {
+      "main": [
+        [
+          {
+            "node": "Format SSH Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CPU (SSH)": {
+      "main": [
+        [
+          {
+            "node": "Format SSH Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Memory (SSH)": {
+      "main": [
+        [
+          {
+            "node": "Format SSH Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Uptime (SSH)": {
+      "main": [
+        [
+          {
+            "node": "Format SSH Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Top Processes (SSH)": {
+      "main": [
+        [
+          {
+            "node": "Format SSH Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IP (SSH)": {
+      "main": [
+        [
+          {
+            "node": "Format SSH Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ports (SSH)": {
+      "main": [
+        [
+          {
+            "node": "Format SSH Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "VPN (SSH)": {
+      "main": [
+        [
+          {
+            "node": "Format SSH Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Logs (SSH)": {
+      "main": [
+        [
+          {
+            "node": "Format SSH Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restart (SSH)": {
+      "main": [
+        [
+          {
+            "node": "Format SSH Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stop (SSH)": {
+      "main": [
+        [
+          {
+            "node": "Format SSH Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start (SSH)": {
+      "main": [
+        [
+          {
+            "node": "Format SSH Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stopped Containers (SSH)": {
+      "main": [
+        [
+          {
+            "node": "Format SSH Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Logins (SSH)": {
+      "main": [
+        [
+          {
+            "node": "Format SSH Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format SSH Output": {
+      "main": [
+        [
+          {
+            "node": "Send Reply via WAHA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "1fdd1620-5321-4c70-981a-fc35e2cdeb01",
+  "activeVersionId": "1fdd1620-5321-4c70-981a-fc35e2cdeb01",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-13T12:51:06.463Z",
+      "createdAt": "2026-03-13T12:51:06.463Z",
+      "role": "workflow:owner",
+      "workflowId": "zmvJvWN8mdK2ONJY",
+      "projectId": "pWTWmuHnmIHw48U9"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-03-13T13:52:39.000Z",
+    "createdAt": "2026-03-13T13:52:38.238Z",
+    "versionId": "1fdd1620-5321-4c70-981a-fc35e2cdeb01",
+    "workflowId": "zmvJvWN8mdK2ONJY",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "waha-incoming",
+          "options": {}
+        },
+        "id": "0cc22f92-6fef-4830-a3b4-972ee0b43605",
+        "name": "Webhook - Receive WhatsApp Message",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          -832,
+          656
+        ],
+        "webhookId": "waha-incoming"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": false,
+              "typeValidation": "strict",
+              "version": 1
+            },
+            "conditions": [
+              {
+                "id": "check-group",
+                "leftValue": "={{ $json.body.payload.from }}",
+                "rightValue": "120363407766258921@g.us",
+                "operator": {
+                  "type": "string",
+                  "operation": "equals"
+                }
+              },
+              {
+                "id": "check-prefix",
+                "leftValue": "={{ $json.body.payload.body }}",
+                "rightValue": "/",
+                "operator": {
+                  "type": "string",
+                  "operation": "startsWith"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "91c9a456-db68-497f-a3eb-02a864cf4aa0",
+        "name": "Filter: group + slash command",
+        "type": "n8n-nodes-base.filter",
+        "typeVersion": 2,
+        "position": [
+          -576,
+          656
+        ]
+      },
+      {
+        "parameters": {
+          "assignments": {
+            "assignments": [
+              {
+                "id": "chatid",
+                "name": "chatId",
+                "value": "={{ $json.body.payload.from }}",
+                "type": "string"
+              },
+              {
+                "id": "cmd",
+                "name": "command",
+                "value": "={{ $json.body.payload.body.trim().split(' ')[0].toLowerCase() }}",
+                "type": "string"
+              },
+              {
+                "id": "args",
+                "name": "args",
+                "value": "={{ $json.body.payload.body.trim().split(' ').slice(1).join(' ') }}",
+                "type": "string"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "50d07c63-9073-434c-a2a0-2dedb2ef1585",
+        "name": "Extract Command",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [
+          -320,
+          656
+        ]
+      },
+      {
+        "parameters": {
+          "rules": {
+            "values": [
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": false,
+                    "typeValidation": "strict",
+                    "version": 2
+                  },
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.command }}",
+                      "rightValue": "/menu",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      },
+                      "id": "r1"
+                    }
+                  ],
+                  "combinator": "and"
+                }
+              },
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": false,
+                    "typeValidation": "strict",
+                    "version": 2
+                  },
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.command }}",
+                      "rightValue": "/disk",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      },
+                      "id": "r2"
+                    }
+                  ],
+                  "combinator": "and"
+                }
+              },
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": false,
+                    "typeValidation": "strict",
+                    "version": 2
+                  },
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.command }}",
+                      "rightValue": "/containers",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      },
+                      "id": "r3"
+                    }
+                  ],
+                  "combinator": "and"
+                }
+              },
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": false,
+                    "typeValidation": "strict",
+                    "version": 2
+                  },
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.command }}",
+                      "rightValue": "/cpu",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      },
+                      "id": "r4"
+                    }
+                  ],
+                  "combinator": "and"
+                }
+              },
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": false,
+                    "typeValidation": "strict",
+                    "version": 2
+                  },
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.command }}",
+                      "rightValue": "/memory",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      },
+                      "id": "r5"
+                    }
+                  ],
+                  "combinator": "and"
+                }
+              },
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": false,
+                    "typeValidation": "strict",
+                    "version": 2
+                  },
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.command }}",
+                      "rightValue": "/uptime",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      },
+                      "id": "r6"
+                    }
+                  ],
+                  "combinator": "and"
+                }
+              },
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": false,
+                    "typeValidation": "strict",
+                    "version": 2
+                  },
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.command }}",
+                      "rightValue": "/top",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      },
+                      "id": "r7"
+                    }
+                  ],
+                  "combinator": "and"
+                }
+              },
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": false,
+                    "typeValidation": "strict",
+                    "version": 2
+                  },
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.command }}",
+                      "rightValue": "/ip",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      },
+                      "id": "r8"
+                    }
+                  ],
+                  "combinator": "and"
+                }
+              },
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": false,
+                    "typeValidation": "strict",
+                    "version": 2
+                  },
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.command }}",
+                      "rightValue": "/ports",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      },
+                      "id": "r9"
+                    }
+                  ],
+                  "combinator": "and"
+                }
+              },
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": false,
+                    "typeValidation": "strict",
+                    "version": 2
+                  },
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.command }}",
+                      "rightValue": "/vpn",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      },
+                      "id": "r10"
+                    }
+                  ],
+                  "combinator": "and"
+                }
+              },
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": false,
+                    "typeValidation": "strict",
+                    "version": 2
+                  },
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.command }}",
+                      "rightValue": "/logs",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      },
+                      "id": "r11"
+                    }
+                  ],
+                  "combinator": "and"
+                }
+              },
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": false,
+                    "typeValidation": "strict",
+                    "version": 2
+                  },
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.command }}",
+                      "rightValue": "/restart",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      },
+                      "id": "r12"
+                    }
+                  ],
+                  "combinator": "and"
+                }
+              },
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": false,
+                    "typeValidation": "strict",
+                    "version": 2
+                  },
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.command }}",
+                      "rightValue": "/stop",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      },
+                      "id": "r13"
+                    }
+                  ],
+                  "combinator": "and"
+                }
+              },
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": false,
+                    "typeValidation": "strict",
+                    "version": 2
+                  },
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.command }}",
+                      "rightValue": "/start",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      },
+                      "id": "r14"
+                    }
+                  ],
+                  "combinator": "and"
+                }
+              },
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": false,
+                    "typeValidation": "strict",
+                    "version": 2
+                  },
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.command }}",
+                      "rightValue": "/stopped",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      },
+                      "id": "r15"
+                    }
+                  ],
+                  "combinator": "and"
+                }
+              },
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": false,
+                    "typeValidation": "strict",
+                    "version": 2
+                  },
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.command }}",
+                      "rightValue": "/logins",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      },
+                      "id": "r16"
+                    }
+                  ],
+                  "combinator": "and"
+                }
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "2476bc68-894b-45b5-aae3-5e082e26e425",
+        "name": "Switch: Command Router",
+        "type": "n8n-nodes-base.switch",
+        "typeVersion": 3.2,
+        "position": [
+          -64,
+          656
+        ]
+      },
+      {
+        "parameters": {
+          "assignments": {
+            "assignments": [
+              {
+                "id": "menu-chatid",
+                "name": "chatId",
+                "value": "={{ $json.chatId }}",
+                "type": "string"
+              },
+              {
+                "id": "menu-text",
+                "name": "text",
+                "value": "🤖 *Bot Menu*\n\n*SYSTEM*\n/cpu - CPU temp + usage\n/memory - RAM usage\n/disk - Disk space\n/uptime - Pi uptime\n/top - Top 5 processes\n\n*NETWORK*\n/ip - Local + public IP\n/ports - Open ports\n/vpn - WireGuard status\n\n*DOCKER*\n/containers - All containers\n/stopped - Stopped containers\n/start <name> - Start container\n/stop <name> - Stop container\n/restart <name> - Restart container\n/logs <name> - Last 20 log lines\n\n*SECURITY*\n/logins - Recent SSH logins",
+                "type": "string"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "0e04ee20-2781-45a5-b0bd-1fa396bb0a0b",
+        "name": "Build Menu Message",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [
+          192,
+          -144
+        ]
+      },
+      {
+        "parameters": {
+          "command": "df -h | grep -v tmpfs | grep -v udev"
+        },
+        "id": "4120f5d9-dfe1-4436-8ea9-4f731ccceda8",
+        "name": "Disk Space (SSH)",
+        "type": "n8n-nodes-base.ssh",
+        "typeVersion": 1,
+        "position": [
+          192,
+          656
+        ],
+        "credentials": {
+          "sshPassword": {
+            "id": "Bz4RWdZkj3xQKNYO",
+            "name": "PI 5 SSH"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "command": "docker ps --format 'table {{.Names}}\\t{{.Status}}'"
+        },
+        "id": "00ff9218-35b6-400d-9827-caa04e5e19ac",
+        "name": "Containers (SSH)",
+        "type": "n8n-nodes-base.ssh",
+        "typeVersion": 1,
+        "position": [
+          192,
+          864
+        ],
+        "credentials": {
+          "sshPassword": {
+            "id": "Bz4RWdZkj3xQKNYO",
+            "name": "PI 5 SSH"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "command": "echo \"Temp: $(vcgencmd measure_temp 2>/dev/null || cat /sys/class/thermal/thermal_zone0/temp | awk '{printf \"%.1f C\", $1/1000}')\" && echo \"CPU: $(top -bn1 | grep 'Cpu(s)' | awk '{print $2+$4\"%\"}')\""
+        },
+        "id": "e7f55400-9980-479a-8bec-6492cfcba64c",
+        "name": "CPU (SSH)",
+        "type": "n8n-nodes-base.ssh",
+        "typeVersion": 1,
+        "position": [
+          192,
+          1056
+        ],
+        "credentials": {
+          "sshPassword": {
+            "id": "Bz4RWdZkj3xQKNYO",
+            "name": "PI 5 SSH"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "command": "free -h | awk 'NR==2{printf \"Used: %s / %s (%.1f%%)\\n\", $3, $2, $3/$2*100}'"
+        },
+        "id": "cf101d1d-c59d-476c-a65b-13c41a78067f",
+        "name": "Memory (SSH)",
+        "type": "n8n-nodes-base.ssh",
+        "typeVersion": 1,
+        "position": [
+          192,
+          1264
+        ],
+        "credentials": {
+          "sshPassword": {
+            "id": "Bz4RWdZkj3xQKNYO",
+            "name": "PI 5 SSH"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "command": "uptime -p && echo \"Since: $(uptime -s)\""
+        },
+        "id": "07ac355c-9dc9-4440-a1a0-f7d2a2d6fa8b",
+        "name": "Uptime (SSH)",
+        "type": "n8n-nodes-base.ssh",
+        "typeVersion": 1,
+        "position": [
+          192,
+          1456
+        ],
+        "credentials": {
+          "sshPassword": {
+            "id": "Bz4RWdZkj3xQKNYO",
+            "name": "PI 5 SSH"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "command": "ps aux --sort=-%cpu | head -6 | awk 'NR>1{printf \"%s - CPU:%s%% MEM:%s%%\\n\", $11, $3, $4}'"
+        },
+        "id": "c1034f01-3dbb-413b-b097-dd3f411d8f34",
+        "name": "Top Processes (SSH)",
+        "type": "n8n-nodes-base.ssh",
+        "typeVersion": 1,
+        "position": [
+          192,
+          1664
+        ],
+        "credentials": {
+          "sshPassword": {
+            "id": "Bz4RWdZkj3xQKNYO",
+            "name": "PI 5 SSH"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "command": "echo \"Local: $(hostname -I | awk '{print $1}')\" && echo \"Public: $(curl -s ifconfig.me)\""
+        },
+        "id": "0c18e1ad-4f2a-487b-a02e-4c1b6ea8ecc6",
+        "name": "IP (SSH)",
+        "type": "n8n-nodes-base.ssh",
+        "typeVersion": 1,
+        "position": [
+          192,
+          1856
+        ],
+        "credentials": {
+          "sshPassword": {
+            "id": "Bz4RWdZkj3xQKNYO",
+            "name": "PI 5 SSH"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "command": "ss -tlnp | grep LISTEN | awk '{print $4, $6}' | sort"
+        },
+        "id": "98c0e715-3756-42fa-923f-a89c9454da23",
+        "name": "Ports (SSH)",
+        "type": "n8n-nodes-base.ssh",
+        "typeVersion": 1,
+        "position": [
+          192,
+          2064
+        ],
+        "credentials": {
+          "sshPassword": {
+            "id": "Bz4RWdZkj3xQKNYO",
+            "name": "PI 5 SSH"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "command": "result=$(docker exec wg-easy wg show 2>/dev/null | awk '/^peer/{if(ep!=\"\")printf \"%s|%s|%s\\n\",ip,ep,hs; ep=\"\";hs=\"\";ip=\"\"} /endpoint/{ep=$2} /latest handshake/{hs=$3\" \"$4\" \"$5} /allowed ips/{ip=$3} END{if(ep!=\"\")printf \"%s|%s|%s\\n\",ip,ep,hs}'); if [ -z \"$result\" ]; then echo 'No connected peers'; else db=$(docker exec wg-easy cat /etc/wireguard/wg0.json 2>/dev/null); echo \"$result\" | while IFS='|' read ip ep hs; do cleanip=$(echo $ip | cut -d'/' -f1); name=$(echo \"$db\" | python3 -c \"import sys,json; d=json.load(sys.stdin); print(next((v['name'] for v in d['clients'].values() if v['address']=='$cleanip'),'$cleanip'))\" 2>/dev/null || echo $cleanip); printf \"%s\\n  IP: %s\\n  Endpoint: %s\\n  Last seen: %s\\n\\n\" \"$name\" \"$ip\" \"$ep\" \"$hs\"; done; fi"
+        },
+        "id": "7f135bf3-d7b7-4c3d-aed5-bd5b322ed00a",
+        "name": "VPN (SSH)",
+        "type": "n8n-nodes-base.ssh",
+        "typeVersion": 1,
+        "position": [
+          192,
+          2256
+        ],
+        "credentials": {
+          "sshPassword": {
+            "id": "Bz4RWdZkj3xQKNYO",
+            "name": "PI 5 SSH"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "command": "={{ (() => { const a = $('Extract Command').first().json.args; return (a && a.trim()) ? 'docker logs --tail 20 ' + a.trim() + ' 2>&1' : 'echo \"⚠️ Usage: /logs <container_name>\"'; })() }}"
+        },
+        "id": "868f9980-324c-4357-bff7-e8adc449fb7b",
+        "name": "Logs (SSH)",
+        "type": "n8n-nodes-base.ssh",
+        "typeVersion": 1,
+        "position": [
+          192,
+          2464
+        ],
+        "credentials": {
+          "sshPassword": {
+            "id": "Bz4RWdZkj3xQKNYO",
+            "name": "PI 5 SSH"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "command": "={{ (() => { const a = $('Extract Command').first().json.args; return (a && a.trim()) ? 'docker restart ' + a.trim() + ' 2>&1' : 'echo \"⚠️ Usage: /restart <container_name>\"'; })() }}"
+        },
+        "id": "d892e1ff-861d-419b-9c13-9680f89a25c9",
+        "name": "Restart (SSH)",
+        "type": "n8n-nodes-base.ssh",
+        "typeVersion": 1,
+        "position": [
+          192,
+          2656
+        ],
+        "credentials": {
+          "sshPassword": {
+            "id": "Bz4RWdZkj3xQKNYO",
+            "name": "PI 5 SSH"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "command": "={{ (() => { const a = $('Extract Command').first().json.args; return (a && a.trim()) ? 'docker stop ' + a.trim() + ' 2>&1' : 'echo \"⚠️ Usage: /stop <container_name>\"'; })() }}"
+        },
+        "id": "542c93fa-a7dc-49b4-99e2-6af418455ae3",
+        "name": "Stop (SSH)",
+        "type": "n8n-nodes-base.ssh",
+        "typeVersion": 1,
+        "position": [
+          192,
+          2848
+        ],
+        "credentials": {
+          "sshPassword": {
+            "id": "Bz4RWdZkj3xQKNYO",
+            "name": "PI 5 SSH"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "command": "={{ (() => { const a = $('Extract Command').first().json.args; return (a && a.trim()) ? 'docker start ' + a.trim() + ' 2>&1' : 'echo \"⚠️ Usage: /start <container_name>\"'; })() }}"
+        },
+        "id": "91f96823-0b3b-4bc4-b51b-c59eaaa05733",
+        "name": "Start (SSH)",
+        "type": "n8n-nodes-base.ssh",
+        "typeVersion": 1,
+        "position": [
+          192,
+          3040
+        ],
+        "credentials": {
+          "sshPassword": {
+            "id": "Bz4RWdZkj3xQKNYO",
+            "name": "PI 5 SSH"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "command": "docker ps -a --filter status=exited --filter status=dead --format \"table {{.Names}}\\t{{.Status}}\""
+        },
+        "id": "d6448b91-6fc0-4511-8df7-d7e554060dfc",
+        "name": "Stopped Containers (SSH)",
+        "type": "n8n-nodes-base.ssh",
+        "typeVersion": 1,
+        "position": [
+          192,
+          3232
+        ],
+        "credentials": {
+          "sshPassword": {
+            "id": "Bz4RWdZkj3xQKNYO",
+            "name": "PI 5 SSH"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "command": "last -n 10 2>/dev/null | grep -v '^$' | grep -v 'wtmp begins' | grep -v 'reboot' || echo '-- No entries --'"
+        },
+        "id": "81911fc3-362f-48b5-a3cc-4b739f510b1e",
+        "name": "Logins (SSH)",
+        "type": "n8n-nodes-base.ssh",
+        "typeVersion": 1,
+        "position": [
+          192,
+          3424
+        ],
+        "credentials": {
+          "sshPassword": {
+            "id": "Bz4RWdZkj3xQKNYO",
+            "name": "PI 5 SSH"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "const cmd = $('Extract Command').first().json.command;\nconst chatId = $('Extract Command').first().json.chatId;\nconst output = ($json.stdout || $json.text || '').trim() || 'No output';\nconst labels = {\n  '/disk': '💾 Disk Space',\n  '/containers': '🐳 Containers',\n  '/cpu': '🌡️ CPU',\n  '/memory': '🧠 Memory',\n  '/uptime': '⏱️ Uptime',\n  '/top': '📊 Top Processes',\n  '/ip': '🌐 IP Addresses',\n  '/ports': '🔌 Open Ports',\n  '/vpn': '🔒 WireGuard VPN',\n  '/logs': '📋 Container Logs',\n  '/restart': '🔄 Restart',\n  '/stop': '🛑 Stop',\n  '/start': '▶️ Start',\n  '/stopped': '🛑 Stopped Containers',\n  '/logins': '🔑 Recent Logins'\n};\nconst label = labels[cmd] || cmd;\nreturn [{ json: { chatId, text: label + '\\n```\\n' + output + '\\n```' } }];"
+        },
+        "id": "7cc87590-8c2b-4d4e-8b61-5bd9ef12c149",
+        "name": "Format SSH Output",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          704,
+          1856
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://waha:3000/api/sendText",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "X-Api-Key",
+                "value": "1ENEwO3sB28lWYzMEhmDYNpW7xc2Om0y"
+              }
+            ]
+          },
+          "sendBody": true,
+          "bodyParameters": {
+            "parameters": [
+              {
+                "name": "session",
+                "value": "default"
+              },
+              {
+                "name": "chatId",
+                "value": "={{ $json.chatId }}"
+              },
+              {
+                "name": "text",
+                "value": "={{ $json.text }}"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "b7a3fc07-9e09-4b30-afd4-9072ae67ac7e",
+        "name": "Send Reply via WAHA",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          960,
+          656
+        ]
+      }
+    ],
+    "connections": {
+      "Webhook - Receive WhatsApp Message": {
+        "main": [
+          [
+            {
+              "node": "Filter: group + slash command",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Filter: group + slash command": {
+        "main": [
+          [
+            {
+              "node": "Extract Command",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Extract Command": {
+        "main": [
+          [
+            {
+              "node": "Switch: Command Router",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Switch: Command Router": {
+        "main": [
+          [
+            {
+              "node": "Build Menu Message",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Disk Space (SSH)",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Containers (SSH)",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "CPU (SSH)",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Memory (SSH)",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Uptime (SSH)",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Top Processes (SSH)",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "IP (SSH)",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Ports (SSH)",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "VPN (SSH)",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Logs (SSH)",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Restart (SSH)",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Stop (SSH)",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Start (SSH)",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Stopped Containers (SSH)",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Logins (SSH)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build Menu Message": {
+        "main": [
+          [
+            {
+              "node": "Send Reply via WAHA",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Disk Space (SSH)": {
+        "main": [
+          [
+            {
+              "node": "Format SSH Output",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Containers (SSH)": {
+        "main": [
+          [
+            {
+              "node": "Format SSH Output",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "CPU (SSH)": {
+        "main": [
+          [
+            {
+              "node": "Format SSH Output",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Memory (SSH)": {
+        "main": [
+          [
+            {
+              "node": "Format SSH Output",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Uptime (SSH)": {
+        "main": [
+          [
+            {
+              "node": "Format SSH Output",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Top Processes (SSH)": {
+        "main": [
+          [
+            {
+              "node": "Format SSH Output",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "IP (SSH)": {
+        "main": [
+          [
+            {
+              "node": "Format SSH Output",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Ports (SSH)": {
+        "main": [
+          [
+            {
+              "node": "Format SSH Output",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "VPN (SSH)": {
+        "main": [
+          [
+            {
+              "node": "Format SSH Output",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Logs (SSH)": {
+        "main": [
+          [
+            {
+              "node": "Format SSH Output",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Restart (SSH)": {
+        "main": [
+          [
+            {
+              "node": "Format SSH Output",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Stop (SSH)": {
+        "main": [
+          [
+            {
+              "node": "Format SSH Output",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Start (SSH)": {
+        "main": [
+          [
+            {
+              "node": "Format SSH Output",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Stopped Containers (SSH)": {
+        "main": [
+          [
+            {
+              "node": "Format SSH Output",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Logins (SSH)": {
+        "main": [
+          [
+            {
+              "node": "Format SSH Output",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Format SSH Output": {
+        "main": [
+          [
+            {
+              "node": "Send Reply via WAHA",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Alex Vinokur",
+    "name": "Version 1fdd1620",
+    "description": "",
+    "autosaved": false
+  },
+  "tags": []
+}
