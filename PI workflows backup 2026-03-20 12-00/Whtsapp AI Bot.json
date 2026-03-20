@@ -1,0 +1,884 @@
+{
+  "updatedAt": "2026-03-18T22:01:55.063Z",
+  "createdAt": "2026-03-13T10:46:06.839Z",
+  "id": "TuCodb0y457nG7iM",
+  "name": "Whtsapp AI Bot",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.modelProvider }}",
+                    "rightValue": "lmstudio",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "LM Studio"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.modelProvider }}",
+                    "rightValue": "openai",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "OpenAI"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "none"
+        }
+      },
+      "id": "db7ad6d3-3728-40d8-a419-56f69fe6254f",
+      "name": "Switch Model",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        240,
+        -1808
+      ]
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "lmstudio-community/gemma-3-12b-it-qat",
+          "mode": "list",
+          "cachedResultName": "LMSTUDIO-COMMUNITY/GEMMA-3-12B-IT-QAT"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "={{ $json.messages[0].content }}",
+              "role": "system"
+            },
+            {
+              "content": "={{ $json.messages[$json.messages.length - 1].content }}"
+            }
+          ]
+        },
+        "options": {
+          "maxTokens": 1024,
+          "temperature": 0.7
+        }
+      },
+      "id": "f9118975-52c6-4f4a-96e3-ee7096a027d4",
+      "name": "Ask OpenAI",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        496,
+        -1936
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "Qixf0scvpigYEtTm",
+          "name": "Macbook mini m4"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "waha-incoming-bot",
+        "options": {}
+      },
+      "id": "6959bd9e-9544-4ab8-9bbf-5bd6491e3b75",
+      "name": "Webhook - Receive WhatsApp Message",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1056,
+        -1808
+      ],
+      "webhookId": "waha-incoming-bot"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "check-chat-id",
+              "leftValue": "={{ $json.body.payload.from }}",
+              "rightValue": "120363426439026095@g.us",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "check-not-from-api",
+              "leftValue": "={{ $json.body.payload.source }}",
+              "rightValue": "api",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "de3a9768-b08d-4efb-8a29-b0a628142e23",
+      "name": "Filter: AI Bot group only",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [
+        -784,
+        -1808
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "extract-from",
+              "name": "chatId",
+              "value": "={{ $json.body.payload.from }}",
+              "type": "string"
+            },
+            {
+              "id": "extract-question",
+              "name": "question",
+              "value": "={{ $json.body.payload.body.trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "session-key",
+              "name": "sessionKey",
+              "value": "={{ 'history_' + $json.body.payload.from.replace(/[^a-z0-9]/gi, '_') }}",
+              "type": "string"
+            },
+            {
+              "id": "model-provider",
+              "name": "modelProvider",
+              "value": "lmstudio",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3102c4e8-34b7-4856-b1eb-36da16dc0e04",
+      "name": "Extract Message",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -528,
+        -1808
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const key = $json.sessionKey;\nconst stored = $getWorkflowStaticData('global');\nconst history = stored[key] ? JSON.parse(stored[key]) : [];\n\nreturn [{\n  json: {\n    chatId: $json.chatId,\n    question: $json.question,\n    sessionKey: $json.sessionKey,\n    modelProvider: $json.modelProvider,\n    history: history\n  }\n}];"
+      },
+      "id": "607e7572-f329-4f65-b7bd-474b106c4daf",
+      "name": "Load History",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -272,
+        -1808
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const { chatId, question, sessionKey, modelProvider, history } = $json;\n\nconst isHebrew = /[\\u05d0-\\u05ea]/.test(question);\nconst langInstruction = isHebrew\n  ? 'IMPORTANT: The user is writing in Hebrew. You MUST respond entirely in Hebrew. Do not use English at all.'\n  : \"Respond in the same language as the user's message.\";\n\nconst messages = [\n  {\n    role: 'system',\n    content: `You are Alex's AI assistant. Answer questions clearly and accurately. Provide concise, useful information. Structure responses when it helps readability. Avoid unnecessary filler or overly casual language. ${langInstruction}`\n  },\n  ...history,\n  {\n    role: 'user',\n    content: question\n  }\n];\n\nreturn [{\n  json: {\n    chatId,\n    question,\n    sessionKey,\n    modelProvider,\n    messages\n  }\n}];"
+      },
+      "id": "59cf25fd-c3b1-4c05-90d1-09df4385fd98",
+      "name": "Build Messages",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -16,
+        -1808
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://192.168.1.72:1234/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'lmstudio-community/gemma-3-12b-it-qat', messages: $json.messages, max_tokens: 1024, temperature: 0.7 }) }}",
+        "options": {}
+      },
+      "id": "da44c3b2-1985-42c8-aab9-9708d463c1a7",
+      "name": "Ask LM Studio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        496,
+        -1680
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const prev = $('Build Messages').first().json;\n\n// Handle response from either LM Studio (HTTP) or OpenAI node\nlet answer = '';\nif ($json.choices) {\n  // LM Studio HTTP response\n  answer = ($json.choices?.[0]?.message?.content || '').trim();\n} else {\n  // OpenAI node response\n  answer = ($json.message?.content || $json.text || '').trim();\n}\n\nconst key = prev.sessionKey;\nconst stored = $getWorkflowStaticData('global');\nlet history = stored[key] ? JSON.parse(stored[key]) : [];\n\nhistory.push({ role: 'user', content: prev.question });\nhistory.push({ role: 'assistant', content: answer });\n\nif (history.length > 20) history = history.slice(-20);\n\nstored[key] = JSON.stringify(history);\n\nreturn [{\n  json: {\n    chatId: prev.chatId,\n    answer: answer\n  }\n}];"
+      },
+      "id": "8e1cd8bd-dea0-4ebe-8f68-882b45c56077",
+      "name": "Save History + Extract Answer",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        752,
+        -1808
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://waha:3000/api/sendText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Key",
+              "value": "1ENEwO3sB28lWYzMEhmDYNpW7xc2Om0y"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "session",
+              "value": "default"
+            },
+            {
+              "name": "chatId",
+              "value": "={{ $json.chatId }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.answer }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6a617efd-0984-4303-8fca-8d76a6481ce8",
+      "name": "Send Reply via WAHA",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1008,
+        -1808
+      ]
+    }
+  ],
+  "connections": {
+    "Switch Model": {
+      "main": [
+        [
+          {
+            "node": "Ask LM Studio",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ask OpenAI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask OpenAI": {
+      "main": [
+        [
+          {
+            "node": "Save History + Extract Answer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook - Receive WhatsApp Message": {
+      "main": [
+        [
+          {
+            "node": "Filter: AI Bot group only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter: AI Bot group only": {
+      "main": [
+        [
+          {
+            "node": "Extract Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Message": {
+      "main": [
+        [
+          {
+            "node": "Load History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load History": {
+      "main": [
+        [
+          {
+            "node": "Build Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Messages": {
+      "main": [
+        [
+          {
+            "node": "Switch Model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask LM Studio": {
+      "main": [
+        [
+          {
+            "node": "Save History + Extract Answer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save History + Extract Answer": {
+      "main": [
+        [
+          {
+            "node": "Send Reply via WAHA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "timezone": "Asia/Jerusalem",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": {
+    "global": {
+      "history_972545580431_c_us": "[{\"role\":\"user\",\"content\":\"what is 2+2?\"},{\"role\":\"assistant\",\"content\":\"4\"},{\"role\":\"user\",\"content\":\"what is the capital of France?\"},{\"role\":\"assistant\",\"content\":\"Paris.\"},{\"role\":\"user\",\"content\":\"what is the capital of Israel?\"},{\"role\":\"assistant\",\"content\":\"Jerusalem.\"},{\"role\":\"user\",\"content\":\"what is the capital of Belarus?\"},{\"role\":\"assistant\",\"content\":\"Minsk.\"},{\"role\":\"user\",\"content\":\"tell me about Trump\"},{\"role\":\"assistant\",\"content\":\"Donald Trump is a businessman and former U.S. President (2017-2021). Key points:\\n\\n*   **Business:** Real estate developer, known for Trump Tower and casinos.\\n*   **Politics:** Republican Party. Ran for president in 2016, winning against Hillary Clinton. Lost to Joe Biden in 2020.\\n*   **Policies:** Focused on tax cuts, deregulation, and stricter immigration policies.\\n*   **Controversies:** Faced investigations and impeachment proceedings during his presidency.\\n\\n\\n\\nIs there a specific aspect you'd like to know more about?\"},{\"role\":\"user\",\"content\":\"כמה שנים ישראל קיימת?\"},{\"role\":\"assistant\",\"content\":\"ישראל הוקמה בשנת 1948. לכן, היא קיימת כבר 76 שנים.\"},{\"role\":\"user\",\"content\":\"כמה  מלחמות ארצות הברית עברה ?\"},{\"role\":\"assistant\",\"content\":\"The United States has been involved in numerous conflicts. Here's a concise list of major wars:\\n\\n*   Revolutionary War (1775-1783)\\n*   War of 1812 (1812-1815)\\n*   Mexican-American War (1846-1848)\\n*   Civil War (1861-1865)\\n*   Spanish-American War (1898)\\n*   World War I (1917-1918)\\n*   World War II (1941-1945)\\n*   Korean War (1950-1953)\\n*   Vietnam War (1955-1975)\\n*   Persian Gulf War (1990-1991)\\n*   War in Afghanistan (2001-2021)\\n*   Iraq War (2003-2011)\"},{\"role\":\"user\",\"content\":\"מי היא מכבי חיפה ?\"},{\"role\":\"assistant\",\"content\":\"מכבי חיפה הוא מועדון כדורגל ישראלי מהצפון.\"},{\"role\":\"user\",\"content\":\"למה כשאדם רואה טוב אומרים שהוא רואה 6  6\"},{\"role\":\"assistant\",\"content\":\"It's a reference to the Snellen eye chart. \\\"6/6\\\" vision means you can see at 20 feet what a person with normal vision should be able to see at 20 feet.\"},{\"role\":\"user\",\"content\":\"תענה בעברית מי יותר טוב מסי או רונדלו?\"},{\"role\":\"assistant\",\"content\":\"מסי.\"}]",
+      "history_120363407766258921_g_us": "[{\"role\":\"user\",\"content\":\"Patching schedule confirmed.\\n\\n*   **Windows Servers:** Sunday 2:00-6:00 AM\\n*   **macOS Devices:** Saturday 8:00AM-12:00PM\"},{\"role\":\"assistant\",\"content\":\"Patching schedule confirmed:\\n\\n*   **Windows Servers:** Sunday 2:00-6:00 AM\\n*   **macOS Devices:** Saturday 8:00AM-12:00PM\"},{\"role\":\"user\",\"content\":\"Patching schedule confirmed:\\n\\n*   **Windows Servers:** Sunday 2:00-6:00 AM\\n*   **macOS Devices:** Saturday 8:00AM-12:00PM\"},{\"role\":\"assistant\",\"content\":\"Patching schedule confirmed:\\n\\n*   **Windows Servers:** Sunday 2:00-6:00 AM\\n*   **macOS Devices:** Saturday 8:00AM-12:00PM\"},{\"role\":\"user\",\"content\":\"Patching schedule confirmed:\\n\\n*   **Windows Servers:** Sunday 2:00-6:00 AM\\n*   **macOS Devices:** Saturday 8:00AM-12:00PM\"},{\"role\":\"assistant\",\"content\":\"Patching schedule confirmed.\\n\\n*   **Windows Servers:** Sunday 2:00-6:00 AM\\n*   **macOS Devices:** Saturday 8:00AM-12:00PM\"},{\"role\":\"user\",\"content\":\"Patching schedule confirmed.\\n\\n*   **Windows Servers:** Sunday 2:00-6:00 AM\\n*   **macOS Devices:** Saturday 8:00AM-12:00PM\"},{\"role\":\"assistant\",\"content\":\"Patching schedule confirmed:\\n\\n*   **Windows Servers:** Sunday 2:00-6:00 AM\\n*   **macOS Devices:** Saturday 8:00AM-12:00PM\"},{\"role\":\"user\",\"content\":\"Patching schedule confirmed:\\n\\n*   **Windows Servers:** Sunday 2:00-6:00 AM\\n*   **macOS Devices:** Saturday 8:00AM-12:00PM\"},{\"role\":\"assistant\",\"content\":\"Patching schedule confirmed.\\n\\n*   **Windows Servers:** Sunday 2:00-6:00 AM\\n*   **macOS Devices:** Saturday 8:00AM-12:00PM\"},{\"role\":\"user\",\"content\":\"Patching schedule confirmed.\\n\\n*   **Windows Servers:** Sunday 2:00-6:00 AM\\n*   **macOS Devices:** Saturday 8:00AM-12:00PM\"},{\"role\":\"assistant\",\"content\":\"Patching schedule confirmed:\\n\\n*   **Windows Servers:** Sunday 2:00-6:00 AM\\n*   **macOS Devices:** Saturday 8:00AM-12:00PM\"},{\"role\":\"user\",\"content\":\"Patching schedule confirmed:\\n\\n*   **Windows Servers:** Sunday 2:00-6:00 AM\\n*   **macOS Devices:** Saturday 8:00AM-12:00PM\"},{\"role\":\"assistant\",\"content\":\"Patching schedule confirmed.\\n\\n*   **Windows Servers:** Sunday 2:00-6:00 AM\\n*   **macOS Devices:** Saturday 8:00AM-12:00PM\"},{\"role\":\"user\",\"content\":\"who is better messi or ronaldo?\"},{\"role\":\"assistant\",\"content\":\"That's a debate with no definitive answer, Alex. \\n\\n**Messi:** Generally considered more naturally gifted, exceptional dribbling & playmaking.\\n**Ronaldo:** Incredible athleticism, prolific goalscorer, strong aerial ability.\\n\\nIt comes down to preference. Both are all-time greats.\"},{\"role\":\"user\",\"content\":\"what is dns?\"},{\"role\":\"assistant\",\"content\":\"DNS (Domain Name System) translates human-readable domain names (like google.com) into IP addresses (like 172.217.160.142) computers use to locate websites and other online resources.\\n\\nEssentially, it's the internet's phonebook.\"},{\"role\":\"user\",\"content\":\"מי יותר טוב רונאלדו או מסי?\"},{\"role\":\"assistant\",\"content\":\"This is a subjective question! Both Ronaldo and Messi are incredible players. \\n\\n**Generally:**\\n\\n*   **Messi** is often praised for natural talent, dribbling, and playmaking.\\n*   **Ronaldo** is often praised for athleticism, finishing, and versatility.\\n\\nThere's no definitive \\\"better\\\" – it depends on preference!\"}]",
+      "history_120363426439026095_g_us": "[{\"role\":\"user\",\"content\":\"תענה לי בעבית\"},{\"role\":\"assistant\",\"content\":\"הנשיא/ה של ארצות הברית הוא ג'ו ביידן.\"},{\"role\":\"user\",\"content\":\"ומי היה לפניו?\"},{\"role\":\"assistant\",\"content\":\"לפניו היה דונלד טראמפ.\"},{\"role\":\"user\",\"content\":\"תספר לי עליו\"},{\"role\":\"assistant\",\"content\":\"Here's some information about Donald Trump:\\n\\n*   **Full Name:** Donald John Trump\\n*   **Born:** June 14, 1946 (age 78) in Queens, New York City\\n*   **Political Party:** Republican\\n*   **Presidential Term:** 2017-2021 (45th President of the United States)\\n\\n**Key Facts & Background:**\\n\\n*   **Business Career:** Before entering politics, Trump was a businessman and real estate developer. He owned numerous hotels, casinos, golf courses, and other properties. He is known for his brand name which appears on many buildings and products.\\n*   **Reality TV Star:** He gained significant public recognition as the host of \\\"The Apprentice\\\" on NBC.\\n*   **Presidential Campaign & Election (2016):** Trump ran a surprising and unconventional campaign in 2016, defeating Hillary Clinton to win the presidency.\\n*   **Policies & Actions During Presidency:** Key policies included tax cuts, deregulation, immigration restrictions (including attempts to build a wall on the US-Mexico border), and renegotiating trade agreements.\\n*   **Impeachments:** Trump was impeached twice by the House of Representatives – once in 2019 for abuse of power and obstruction of Congress, and again in 2021 for inciting an insurrection. He was acquitted by the Senate both times.\\n* **Post-Presidency:** After leaving office, he has remained a prominent figure in Republican politics and faces legal challenges related to his business dealings and actions after the 2020 election.\\n\\n\\n\\nDo you want to know more about a specific aspect of Donald Trump’s life or presidency?\"},{\"role\":\"user\",\"content\":\"תספר לי על ליברפול FC\"},{\"role\":\"assistant\",\"content\":\"בבקשה, הנה מידע מפורט יותר על ליברפול FC:\\n\\n*   **שם מלא:** Liverpool Football Club\\n*   **כינוי:** The Reds (האדומים)\\n*   **תאריך הקמה:** 3 במרץ 1892\\n*   **מגרש ביתי:** אנפילד, ליברפול, אנגליה\\n*   **ליגה:** הפרמייר ליג (אנגליה)\\n\\n**הישגים עיקריים:**\\n\\n*   **תארים אירופיים:**\\n    *   6 זכיות בליגת האלופות/גביע אירופה\\n    *   3 זכיות בגביע אופ\\\"א/ליגה אירופית\\n    *   4 זכיות בסופר קאפ האירופי\\n*   **תארים לאומיים:**\\n    *   19 זכיות באליפות הליגה האנגלית (השישית ביותר בתולדות)\\n    *   8 זכיות בגביע ה-FA\\n    *   9 זכיות בליגת האלופות האנגלית/גביע הליגה\\n    *   4 זכיות במגן הקהילה\\n\\n**סמלים וזהות:**\\n\\n*   **צבעי המועדון:** אדום ומלכותי (Royal Blue) - הצבעים הללו נלקחו מצבעי מחברת הספנות \\\"האונייה האדומה\\\" שבה עבדו חלק ממייסדי הקבוצה.\\n*   **סמל המועדון:** סמל העיר ליברפול, עם ציפור הדרור (Liver Bird) ומינרלים מקומיים.\\n* **שירים ידועים:** \\\"You'll Never Walk Alone\\\" - שיר ההמנון של הקבוצה, מושר על ידי האוהדים בביתוס אנפילד.\\n\\n**כוכבים לשעבר ולהווה:**\\n\\n*   סטפן ג'רארד (קפטן היסטורי)\\n*   מוחמד סלאח\\n*   וירג'יל ואן דייק\\n*   יאן מולבי\\n*   רוברט פרמר\\n\\n\\n\\nהאם תרצה לדעת מידע נוסף על שחקנים, מאמנים, או היסטוריה ספציפית של הקבוצה?\"},{\"role\":\"user\",\"content\":\"מה מזג האוויר?\"},{\"role\":\"assistant\",\"content\":\"כדי לתת לך תחזית מדויקת, אני צריך לדעת איפה אתה נמצא. אנא ציין את העיר או המיקום שלך.\"},{\"role\":\"user\",\"content\":\"מה השעה בניו יורק?\"},{\"role\":\"assistant\",\"content\":\"השעה בניו יורק היא כרגע 16:58 (4:58 אחר הצהריים).\"},{\"role\":\"user\",\"content\":\"מי נשיא ישראל?\"},{\"role\":\"assistant\",\"content\":\"נשיא מדינת ישראל הוא יצחק הרצוג.\"},{\"role\":\"user\",\"content\":\"ומי היה לפניו?\"},{\"role\":\"assistant\",\"content\":\"לפניו כיהן ראובן ריבלין בתפקיד הנשיא.\"},{\"role\":\"user\",\"content\":\"מה המזג האוויר עכשיו באשקלון ישראל?\"},{\"role\":\"assistant\",\"content\":\"כרגע (17:04), מזג האוויר באשקלון הוא מעונן חלקית. הטמפרטורה היא 26°C (79°F). הלחות גבוהה, כ-78%. הרוח מזרחית במהירות של 8 קמ\\\"ש.\\n\\nהתחזית לשעות הקרובות: צפויה המשך עננות חלקית ללא גשם.\"},{\"role\":\"user\",\"content\":\"מי הקבוצה הכי גדולה בליגה הספרדית?\"},{\"role\":\"assistant\",\"content\":\"קשה לקבוע באופן חד משמעי איזו קבוצה היא \\\"הגדולה ביותר\\\" מכיוון שההגדרה יכולה להיות מבוססת על היסטוריה, כמות אוהדים, תארים וכו'. עם זאת, בדרך כלל נחשבת **ריאל מדריד (Real Madrid)** לקבוצה הגדולה ביותר בליגה הספרדית (לה ליגה).\\n\\n**מדוע ריאל מדריד נחשבת לקבוצה הגדולה ביותר?**\\n\\n*   **מספר תארים:** היא מחזיקה במספר הרב ביותר של זכיות באליפות ספרד (36) ובליגת האלופות (14).\\n*   **היסטוריה עשירה:** הקבוצה הוקמה ב-1902 ויש לה היסטוריה מפוארת ומלאת תארים.\\n*   **אוהדים רבים:** יש לה בסיס אוהדים עצום ברחבי העולם.\\n*   **כוכבים בעבר ובהווה:** לאורך השנים שיחקו בקבוצה שחקנים אגדיים כמו אלפרדו די סטפנו, פרנץ פושקאש, זידאן ועוד.\\n\\nלמרות זאת, גם **ברצלונה (Barcelona)** היא קבוצה ענקית וחשובה עם היסטוריה מפוארת ותארים רבים, והתחרות בין שתי הקבוצות הזו היא חלק מהקסם של הכדורגל הספרדי.\"}]"
+    }
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "8a983c58-44ba-4add-9b37-1d90ef0527ce",
+  "activeVersionId": "8a983c58-44ba-4add-9b37-1d90ef0527ce",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-13T10:46:06.843Z",
+      "createdAt": "2026-03-13T10:46:06.843Z",
+      "role": "workflow:owner",
+      "workflowId": "TuCodb0y457nG7iM",
+      "projectId": "pWTWmuHnmIHw48U9"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-03-18T22:01:56.000Z",
+    "createdAt": "2026-03-18T22:01:55.064Z",
+    "versionId": "8a983c58-44ba-4add-9b37-1d90ef0527ce",
+    "workflowId": "TuCodb0y457nG7iM",
+    "nodes": [
+      {
+        "parameters": {
+          "rules": {
+            "values": [
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": false,
+                    "typeValidation": "strict",
+                    "version": 1
+                  },
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.modelProvider }}",
+                      "rightValue": "lmstudio",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      }
+                    }
+                  ],
+                  "combinator": "and"
+                },
+                "renameOutput": true,
+                "outputKey": "LM Studio"
+              },
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": false,
+                    "typeValidation": "strict",
+                    "version": 1
+                  },
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.modelProvider }}",
+                      "rightValue": "openai",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      }
+                    }
+                  ],
+                  "combinator": "and"
+                },
+                "renameOutput": true,
+                "outputKey": "OpenAI"
+              }
+            ]
+          },
+          "options": {
+            "fallbackOutput": "none"
+          }
+        },
+        "id": "db7ad6d3-3728-40d8-a419-56f69fe6254f",
+        "name": "Switch Model",
+        "type": "n8n-nodes-base.switch",
+        "typeVersion": 3,
+        "position": [
+          240,
+          -1808
+        ]
+      },
+      {
+        "parameters": {
+          "modelId": {
+            "__rl": true,
+            "value": "lmstudio-community/gemma-3-12b-it-qat",
+            "mode": "list",
+            "cachedResultName": "LMSTUDIO-COMMUNITY/GEMMA-3-12B-IT-QAT"
+          },
+          "messages": {
+            "values": [
+              {
+                "content": "={{ $json.messages[0].content }}",
+                "role": "system"
+              },
+              {
+                "content": "={{ $json.messages[$json.messages.length - 1].content }}"
+              }
+            ]
+          },
+          "options": {
+            "maxTokens": 1024,
+            "temperature": 0.7
+          }
+        },
+        "id": "f9118975-52c6-4f4a-96e3-ee7096a027d4",
+        "name": "Ask OpenAI",
+        "type": "@n8n/n8n-nodes-langchain.openAi",
+        "typeVersion": 1.8,
+        "position": [
+          496,
+          -1936
+        ],
+        "credentials": {
+          "openAiApi": {
+            "id": "Qixf0scvpigYEtTm",
+            "name": "Macbook mini m4"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "waha-incoming-bot",
+          "options": {}
+        },
+        "id": "6959bd9e-9544-4ab8-9bbf-5bd6491e3b75",
+        "name": "Webhook - Receive WhatsApp Message",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          -1056,
+          -1808
+        ],
+        "webhookId": "waha-incoming-bot"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": false,
+              "typeValidation": "strict",
+              "version": 1
+            },
+            "conditions": [
+              {
+                "id": "check-chat-id",
+                "leftValue": "={{ $json.body.payload.from }}",
+                "rightValue": "120363426439026095@g.us",
+                "operator": {
+                  "type": "string",
+                  "operation": "equals"
+                }
+              },
+              {
+                "id": "check-not-from-api",
+                "leftValue": "={{ $json.body.payload.source }}",
+                "rightValue": "api",
+                "operator": {
+                  "type": "string",
+                  "operation": "notEquals"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "de3a9768-b08d-4efb-8a29-b0a628142e23",
+        "name": "Filter: AI Bot group only",
+        "type": "n8n-nodes-base.filter",
+        "typeVersion": 2,
+        "position": [
+          -784,
+          -1808
+        ]
+      },
+      {
+        "parameters": {
+          "assignments": {
+            "assignments": [
+              {
+                "id": "extract-from",
+                "name": "chatId",
+                "value": "={{ $json.body.payload.from }}",
+                "type": "string"
+              },
+              {
+                "id": "extract-question",
+                "name": "question",
+                "value": "={{ $json.body.payload.body.trim() }}",
+                "type": "string"
+              },
+              {
+                "id": "session-key",
+                "name": "sessionKey",
+                "value": "={{ 'history_' + $json.body.payload.from.replace(/[^a-z0-9]/gi, '_') }}",
+                "type": "string"
+              },
+              {
+                "id": "model-provider",
+                "name": "modelProvider",
+                "value": "lmstudio",
+                "type": "string"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "3102c4e8-34b7-4856-b1eb-36da16dc0e04",
+        "name": "Extract Message",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [
+          -528,
+          -1808
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const key = $json.sessionKey;\nconst stored = $getWorkflowStaticData('global');\nconst history = stored[key] ? JSON.parse(stored[key]) : [];\n\nreturn [{\n  json: {\n    chatId: $json.chatId,\n    question: $json.question,\n    sessionKey: $json.sessionKey,\n    modelProvider: $json.modelProvider,\n    history: history\n  }\n}];"
+        },
+        "id": "607e7572-f329-4f65-b7bd-474b106c4daf",
+        "name": "Load History",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -272,
+          -1808
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const { chatId, question, sessionKey, modelProvider, history } = $json;\n\nconst isHebrew = /[\\u05d0-\\u05ea]/.test(question);\nconst langInstruction = isHebrew\n  ? 'IMPORTANT: The user is writing in Hebrew. You MUST respond entirely in Hebrew. Do not use English at all.'\n  : \"Respond in the same language as the user's message.\";\n\nconst messages = [\n  {\n    role: 'system',\n    content: `You are Alex's AI assistant. Answer questions clearly and accurately. Provide concise, useful information. Structure responses when it helps readability. Avoid unnecessary filler or overly casual language. ${langInstruction}`\n  },\n  ...history,\n  {\n    role: 'user',\n    content: question\n  }\n];\n\nreturn [{\n  json: {\n    chatId,\n    question,\n    sessionKey,\n    modelProvider,\n    messages\n  }\n}];"
+        },
+        "id": "59cf25fd-c3b1-4c05-90d1-09df4385fd98",
+        "name": "Build Messages",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -16,
+          -1808
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://192.168.1.72:1234/v1/chat/completions",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({ model: 'lmstudio-community/gemma-3-12b-it-qat', messages: $json.messages, max_tokens: 1024, temperature: 0.7 }) }}",
+          "options": {}
+        },
+        "id": "da44c3b2-1985-42c8-aab9-9708d463c1a7",
+        "name": "Ask LM Studio",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          496,
+          -1680
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const prev = $('Build Messages').first().json;\n\n// Handle response from either LM Studio (HTTP) or OpenAI node\nlet answer = '';\nif ($json.choices) {\n  // LM Studio HTTP response\n  answer = ($json.choices?.[0]?.message?.content || '').trim();\n} else {\n  // OpenAI node response\n  answer = ($json.message?.content || $json.text || '').trim();\n}\n\nconst key = prev.sessionKey;\nconst stored = $getWorkflowStaticData('global');\nlet history = stored[key] ? JSON.parse(stored[key]) : [];\n\nhistory.push({ role: 'user', content: prev.question });\nhistory.push({ role: 'assistant', content: answer });\n\nif (history.length > 20) history = history.slice(-20);\n\nstored[key] = JSON.stringify(history);\n\nreturn [{\n  json: {\n    chatId: prev.chatId,\n    answer: answer\n  }\n}];"
+        },
+        "id": "8e1cd8bd-dea0-4ebe-8f68-882b45c56077",
+        "name": "Save History + Extract Answer",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          752,
+          -1808
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://waha:3000/api/sendText",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "X-Api-Key",
+                "value": "1ENEwO3sB28lWYzMEhmDYNpW7xc2Om0y"
+              }
+            ]
+          },
+          "sendBody": true,
+          "bodyParameters": {
+            "parameters": [
+              {
+                "name": "session",
+                "value": "default"
+              },
+              {
+                "name": "chatId",
+                "value": "={{ $json.chatId }}"
+              },
+              {
+                "name": "text",
+                "value": "={{ $json.answer }}"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "6a617efd-0984-4303-8fca-8d76a6481ce8",
+        "name": "Send Reply via WAHA",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          1008,
+          -1808
+        ]
+      }
+    ],
+    "connections": {
+      "Switch Model": {
+        "main": [
+          [
+            {
+              "node": "Ask LM Studio",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Ask OpenAI",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Ask OpenAI": {
+        "main": [
+          [
+            {
+              "node": "Save History + Extract Answer",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Webhook - Receive WhatsApp Message": {
+        "main": [
+          [
+            {
+              "node": "Filter: AI Bot group only",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Filter: AI Bot group only": {
+        "main": [
+          [
+            {
+              "node": "Extract Message",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Extract Message": {
+        "main": [
+          [
+            {
+              "node": "Load History",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Load History": {
+        "main": [
+          [
+            {
+              "node": "Build Messages",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build Messages": {
+        "main": [
+          [
+            {
+              "node": "Switch Model",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Ask LM Studio": {
+        "main": [
+          [
+            {
+              "node": "Save History + Extract Answer",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Save History + Extract Answer": {
+        "main": [
+          [
+            {
+              "node": "Send Reply via WAHA",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Alex Vinokur",
+    "name": "Version 8a983c58",
+    "description": "",
+    "autosaved": false
+  },
+  "tags": []
+}
