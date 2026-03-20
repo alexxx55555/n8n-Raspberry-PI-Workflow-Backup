@@ -1,0 +1,1485 @@
+{
+  "updatedAt": "2026-02-28T11:05:37.921Z",
+  "createdAt": "2025-09-02T14:13:13.473Z",
+  "id": "vb6sSMl5XrlcvUae",
+  "name": "Users AD/JC Onboarding",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Deduplication: track processed messageIds in workflow static data\nconst staticData = $getWorkflowStaticData('global');\nif (!staticData.processedIds) staticData.processedIds = {};\n\nconst msgId = $json.messageId || $json.id || '';\nif (!msgId) {\n  throw new Error('No messageId found — cannot deduplicate.');\n}\n\n// Clean up entries older than 24 hours\nconst now = Date.now();\nconst ONE_DAY = 24 * 60 * 60 * 1000;\nfor (const [key, ts] of Object.entries(staticData.processedIds)) {\n  if (now - ts > ONE_DAY) delete staticData.processedIds[key];\n}\n\nif (staticData.processedIds[msgId]) {\n  // Already processed — stop execution for this item\n  return [];\n}\n\nstaticData.processedIds[msgId] = now;\nreturn { json: $json };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        992,
+        128
+      ],
+      "id": "a7ef4a82-48d3-437c-a335-f4576ef7ceda",
+      "name": "Deduplicate"
+    },
+    {
+      "parameters": {
+        "chatId": "426570413",
+        "text": "=🚨 *ONBOARDING FAILURE — JC PATH*\n\n❌ *Error:* {{$json.error?.message || $json.message || $json.stderr || $json.errorMessage || JSON.stringify($json).substring(0, 500)}}\n\n📧 *Original request from:* {{$('Email Parser JC').item.json.originalEmail?.from || 'Unknown'}}\n👤 *Name:* {{$('Email Parser JC').item.json.body?.firstname || '?'}} {{$('Email Parser JC').item.json.body?.lastname || '?'}}\n\n⏰ {{new Date().toISOString()}}\n\nPlease investigate and process manually if needed.",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2400,
+        448
+      ],
+      "id": "7f1e043a-56ae-4333-8610-b75ee85a26e4",
+      "name": "Error Alert JC",
+      "webhookId": "c7e912bc-d583-4904-8cc6-b1b6edd9cbb1",
+      "credentials": {
+        "telegramApi": {
+          "id": "QH2SVpRQkhmpSDsN",
+          "name": "Users Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "426570413",
+        "text": "=🚨 *ONBOARDING FAILURE — AD PATH*\n\n❌ *Error:* {{$json.error?.message || $json.message || $json.stderr || $json.errorMessage || JSON.stringify($json).substring(0, 500)}}\n\n📧 *Original request from:* {{$('Email Parser AD').item.json.originalEmail?.from || 'Unknown'}}\n👤 *Name:* {{$('Email Parser AD').item.json.body?.firstname || '?'}} {{$('Email Parser AD').item.json.body?.lastname || '?'}}\n\n⏰ {{new Date().toISOString()}}\n\nPlease investigate and process manually if needed.",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2320,
+        1056
+      ],
+      "id": "8ccf2cfa-18ca-41a7-9d96-d495d8cc0a11",
+      "name": "Error Alert AD",
+      "webhookId": "813f62f4-4082-4190-a6e6-3904d3063856",
+      "credentials": {
+        "telegramApi": {
+          "id": "QH2SVpRQkhmpSDsN",
+          "name": "Users Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {},
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        816,
+        128
+      ],
+      "id": "cc1ac205-2457-413b-b04d-e67fda7df1aa",
+      "name": "Gmail Trigger",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "C5742Grqr9Rpnxid",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "7dd6a3f5-aa13-4fdc-88f8-a9798fbf925d",
+                    "leftValue": "={{$json.subject || $json.headers?.subject?.replace(/^Subject:\\s*/i,'').trim() || ''}}",
+                    "rightValue": "JC",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "3367d402-3127-4cf0-b3de-69d8cdc8cf90",
+                    "leftValue": "={{$json.subject || $json.headers?.subject?.replace(/^Subject:\\s*/i,'').trim() || ''}}",
+                    "rightValue": "AD",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1152,
+        128
+      ],
+      "id": "a38a0337-54ba-48b7-9494-0460a3d5b512",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// ===== AD EMAIL PARSER WITH SANITIZATION =====\n\nfunction sanitize(val) {\n  if (!val || typeof val !== 'string') return '';\n  return val.replace(/[;'\"\\`$|&><\\\\{}()]/g, '').trim();\n}\n\nfunction htmlToText(html) {\n  if (!html) return '';\n  html = html\n    .replace(/<br\\s*\\/?>/gi, '\\n')\n    .replace(/<\\/(p|div|li|tr|h\\d)>/gi, '\\n')\n    .replace(/&nbsp;/gi, ' ');\n  const text = html.replace(/<[^>]+>/g, ' ');\n  return text.replace(/\\r?\\n/g, '\\n').replace(/[ \\t]+\\n/g, '\\n').replace(/[ \\t]{2,}/g, ' ').trim();\n}\n\nlet emailBody =\n  ($json.text && String($json.text)) ||\n  htmlToText($json.html) ||\n  htmlToText($json.textAsHtml) ||\n  ($json.snippet && String($json.snippet)) ||\n  '';\n\nif (!emailBody && $json.payload && $json.payload.body && $json.payload.body.data) {\n  try {\n    const buff = Buffer.from($json.payload.body.data, 'base64');\n    emailBody = buff.toString('utf8');\n  } catch (_) {}\n}\n\nconst flat = (emailBody || '').replace(/\\r/g, '').replace(/[ \\t]+/g, ' ').trim();\n\nconst LABELS = [\n  'First Name','Last Name','Employee Number','Job Title',\n  'Department','Manager SAM','Manager','Office Phone','Phone',\n  'Office Location','Location'\n];\n\nfunction esc(s){ return s.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&'); }\n\nfunction captureAfter(label, src) {\n  const labelEsc = esc(label);\n  const next = LABELS.filter(l => l !== label).map(esc);\n  const lookahead = next.length ? `(?=\\\\s*(?:${next.join('|')})\\\\s*:|$)` : '$';\n  const re = new RegExp(`${labelEsc}\\\\s*:\\\\s*([\\\\s\\\\S]*?)\\\\s*${lookahead}`, 'i');\n  const m = src.match(re);\n  return m ? m[1].trim() : '';\n}\n\nconst userData = {\n  firstname:      sanitize(captureAfter('First Name', flat)),\n  lastname:       sanitize(captureAfter('Last Name', flat)),\n  employeenumber: sanitize(captureAfter('Employee Number', flat)),\n  jobtitle:       sanitize(captureAfter('Job Title', flat)),\n  department:     sanitize(captureAfter('Department', flat)),\n  managersam:     sanitize(captureAfter('Manager SAM', flat) || captureAfter('Manager', flat)),\n  officephone:    sanitize(captureAfter('Office Phone', flat) || captureAfter('Phone', flat)),\n  officelocation: sanitize(captureAfter('Office Location', flat) || captureAfter('Location', flat)),\n};\n\nconst required = ['firstname','lastname','employeenumber','jobtitle','department','managersam'];\nconst missing = required.filter(f => !userData[f] || userData[f].trim() === '');\nif (missing.length) {\n  throw new Error(`[AD] Missing required fields: ${missing.join(', ')}. Parsed body was empty or labels didn't match.`);\n}\n\nconst subj = $json.subject || ($json.headers?.subject?.replace(/^Subject:\\s*/i,'').trim()) || '';\nconst fromText = ($json.from?.text) || ($json.headers?.from?.replace(/^From:\\s*/i,'').trim()) || '';\nconst msgId = $json.messageId || ($json.headers?.['message-id']?.replace(/^Message-Id:\\s*/i,'').trim()) || '';\n\nreturn {\n  body: userData,\n  originalEmail: { subject: subj, from: fromText, messageId: msgId },\n  sanitized: true,\n  path: 'AD'\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1552,
+        800
+      ],
+      "id": "a9910222-0e86-4f4e-9a1a-3b2df1d5a6b5",
+      "name": "Email Parser AD"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Gmail Trigger').item.json.from?.value?.map(v => v.address).join(', ') }}",
+        "subject": "=Re: {{$('Gmail Trigger').item.json.subject}} - Processing Started",
+        "message": "=<h2 style=\"color:blue;\">📧 User Creation Request Received</h2>\n\n<p>Thank you for your user creation request. We have received your email and are processing the following information:</p>\n\n<ul>\n<li><b>First Name:</b> {{$json[\"body\"][\"firstname\"]}}</li>\n<li><b>Last Name:</b> {{$json[\"body\"][\"lastname\"]}}</li>\n<li><b>Employee Number:</b> {{$json[\"body\"][\"employeenumber\"]}}</li>\n<li><b>Job Title:</b> {{$json[\"body\"][\"jobtitle\"]}}</li>\n<li><b>Department:</b> {{$json[\"body\"][\"department\"]}}</li>\n<li><b>Manager SAM:</b> {{$json[\"body\"][\"managersam\"]}}</li>\n<li><b>Office Phone:</b> {{$json[\"body\"][\"officephone\"] || 'Not provided'}}</li>\n<li><b>Office Location:</b> {{$json[\"body\"][\"officelocation\"] || 'Not provided'}}</li>\n</ul>\n\n<p style=\"color:green;\"><b>Status:</b> Processing...</p>\n<p>You will receive another notification once the user account has been created successfully.</p>\n\n<hr>\n<small>This is an automated message from Alex IT Systems.</small>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1664,
+        352
+      ],
+      "id": "b70c8b4a-65c5-40ca-9c39-ec98f69df5b0",
+      "name": "Send Acknowledgment AD",
+      "webhookId": "799b1b4d-00fd-4a0c-890c-9991db9a7c75",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "C5742Grqr9Rpnxid",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// ===== JC EMAIL PARSER WITH SANITIZATION =====\n\nfunction sanitize(val) {\n  if (!val || typeof val !== 'string') return '';\n  return val.replace(/[;'\"\\`$|&><\\\\{}()]/g, '').trim();\n}\n\nfunction htmlToText(html) {\n  if (!html) return '';\n  html = html\n    .replace(/<br\\s*\\/?>/gi, '\\n')\n    .replace(/<\\/(p|div|li|tr|h\\d)>/gi, '\\n')\n    .replace(/&nbsp;/gi, ' ');\n  const text = html.replace(/<[^>]+>/g, ' ');\n  return text.replace(/\\r?\\n/g, '\\n').replace(/[ \\t]+\\n/g, '\\n').replace(/[ \\t]{2,}/g, ' ').trim();\n}\n\nlet emailBody =\n  ($json.text && String($json.text)) ||\n  htmlToText($json.html) ||\n  htmlToText($json.textAsHtml) ||\n  ($json.snippet && String($json.snippet)) ||\n  '';\n\nif (!emailBody && $json.payload && $json.payload.body && $json.payload.body.data) {\n  try {\n    const buff = Buffer.from($json.payload.body.data, 'base64');\n    emailBody = buff.toString('utf8');\n  } catch (_) {}\n}\n\nconst flat = (emailBody || '').replace(/\\r/g, '').replace(/[ \\t]+/g, ' ').trim();\n\nconst LABELS = [\n  'First Name','Last Name','Employee Number','Job Title',\n  'Department','Manager SAM','Manager','Office Phone','Phone',\n  'Office Location','Location','Source Username'\n];\n\nfunction esc(s){ return s.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&'); }\n\nfunction captureAfter(label, src) {\n  const labelEsc = esc(label);\n  const next = LABELS.filter(l => l !== label).map(esc);\n  const lookahead = next.length ? `(?=\\\\s*(?:${next.join('|')})\\\\s*:|$)` : '$';\n  const re = new RegExp(`${labelEsc}\\\\s*:\\\\s*([\\\\s\\\\S]*?)\\\\s*${lookahead}`, 'i');\n  const m = src.match(re);\n  return m ? m[1].trim() : '';\n}\n\nconst userData = {\n  firstname:      sanitize(captureAfter('First Name', flat)),\n  lastname:       sanitize(captureAfter('Last Name', flat)),\n  employeenumber: sanitize(captureAfter('Employee Number', flat)),\n  jobtitle:       sanitize(captureAfter('Job Title', flat)),\n  department:     sanitize(captureAfter('Department', flat)),\n  managersam:     sanitize(captureAfter('Manager SAM', flat) || captureAfter('Manager', flat)),\n  officephone:    sanitize(captureAfter('Office Phone', flat) || captureAfter('Phone', flat)),\n  officelocation: sanitize(captureAfter('Office Location', flat) || captureAfter('Location', flat)),\n  sourceusername: sanitize(captureAfter('Source Username', flat)),\n};\n\nconst required = ['firstname','lastname','employeenumber','jobtitle','department','managersam'];\nconst missing = required.filter(f => !userData[f] || userData[f].trim() === '');\nif (missing.length) {\n  throw new Error(`[JC] Missing required fields: ${missing.join(', ')}. Parsed body was empty or labels didn't match.`);\n}\n\nconst subj = $json.subject || ($json.headers?.subject?.replace(/^Subject:\\s*/i,'').trim()) || '';\nconst fromText = ($json.from?.text) || ($json.headers?.from?.replace(/^From:\\s*/i,'').trim()) || '';\nconst msgId = $json.messageId || ($json.headers?.['message-id']?.replace(/^Message-Id:\\s*/i,'').trim()) || '';\n\nreturn {\n  body: userData,\n  originalEmail: { subject: subj, from: fromText, messageId: msgId },\n  sanitized: true,\n  path: 'JC'\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        112
+      ],
+      "id": "46b61ee4-242d-4cdc-a6fa-608a7967e0f5",
+      "name": "Email Parser JC"
+    },
+    {
+      "parameters": {
+        "command": "=powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"C:\\Scripts\\Create-ADUser-From-n8n.ps1\" -FirstName \"{{$json[\"body\"][\"firstname\"]}}\" -LastName \"{{$json[\"body\"][\"lastname\"]}}\" -EmployeeNumber {{$json[\"body\"][\"employeenumber\"]}} -JobTitle \"{{$json[\"body\"][\"jobtitle\"]}}\" -Department \"{{$json[\"body\"][\"department\"]}}\" -ManagerSam \"{{$json[\"body\"][\"managersam\"]}}\" -OfficePhone \"{{$json[\"body\"][\"officephone\"]}}\" -OfficeLocation \"{{$json[\"body\"][\"officelocation\"]}}\"",
+        "cwd": "="
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        2032,
+        800
+      ],
+      "id": "2ad0f91a-0a92-4f00-902d-0cb6b40e1b16",
+      "name": "Create New AD User",
+      "credentials": {
+        "sshPassword": {
+          "id": "umWU43lA8b3R4GcA",
+          "name": "SSH Password account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "if (!$json[\"stdout\"] || $json[\"stdout\"].trim() === \"\") {\n  throw new Error(\"[AD] No JSON output received from PowerShell script. Stdout was empty.\");\n}\nlet out;\ntry {\n  out = JSON.parse($json[\"stdout\"]);\n} catch (e) {\n  throw new Error(\"[AD] Failed to parse JSON from PowerShell script: \" + e.message + \"\\n\\nOutput was:\\n\" + $json[\"stdout\"]);\n}\nif (out.error) {\n  throw new Error(\"[AD] PowerShell script error: \" + out.error);\n}\nreturn out;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2400,
+        784
+      ],
+      "id": "6be49db5-a313-4638-be7f-895a8f95532b",
+      "name": "PowerShell Output Parser AD",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C099QKJSCTD",
+          "mode": "list",
+          "cachedResultName": "new-user-created"
+        },
+        "text": "=🤖 *New AD User Created Successfully!*\n\n👤 *First Name:* {{$json[\"FirstName\"]}}\n👥 *Last Name:* {{$json[\"LastName\"]}}\n🪪 *Display Name:* {{$json[\"DisplayName\"]}}\n🆔 *Username:* `{{$json[\"Username\"]}}`\n🔢 *Employee ID:* `{{$json[\"EmployeeNumber\"]}}`\n💼 *Job Title:* {{$json[\"JobTitle\"]}}\n🏢 *Department:* {{$json[\"Department\"]}}\n👔 *Manager:* {{$json[\"Manager\"]}}\n📍 *Office Location:* {{$json[\"OfficeLocation\"]}}\n📞 *Phone:* {{$json[\"OfficePhone\"]}}\n📧 *Email:* {{$json[\"Email\"]}}\n🔑 *Password:* `{{$json[\"Password\"]}}`\n✉️ *DL Groups:* {{ $json[\"DLGroupsCopied\"]?.length > 0 ? $json[\"DLGroupsCopied\"].join(', ') : '_None_' }}\n🛡️ *Security Groups:* {{ $json[\"SecurityGroupsCopied\"]?.length > 0 ? $json[\"SecurityGroupsCopied\"].join(', ') : '_None_' }}\n\n{{ $json[\"ConflictMessage\"] ? '⚠️ *Note:*\\n' + $json[\"ConflictMessage\"].split('\\n').join('\\n') : '✅ No conflicts detected.' }}",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        2752,
+        1008
+      ],
+      "id": "ff0f7afc-1671-480f-86ff-505c8896831d",
+      "name": "Send a message AD",
+      "webhookId": "619d4034-0d7d-43f0-9691-ea960aef7115",
+      "credentials": {
+        "slackApi": {
+          "id": "obEYVo8oQOJ22JqX",
+          "name": "AD Admin Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "vinokura@alex-it.net",
+        "subject": "New AD User Created",
+        "message": "=<h1 style=\"color:blue;\">🤖 New AD User Created:</h1>\n<p style=\"color:black; font-size:1.1em;\"><b>First Name:</b> {{$json[\"FirstName\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>Last Name:</b> {{$json[\"LastName\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>Display Name:</b> {{$json[\"DisplayName\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>Username:</b> {{$json[\"Username\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>Employee Number:</b> {{$json[\"EmployeeNumber\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>Department:</b> {{$json[\"Department\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>Job Title:</b> {{$json[\"JobTitle\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>Manager:</b> {{$json[\"Manager\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>Office Location:</b> {{$json[\"OfficeLocation\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>Office Phone:</b> {{$json[\"OfficePhone\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>E-mail:</b> {{$json[\"Email\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>DL Groups Copied:</b> {{$json[\"DLGroupsCopied\"]?.join(', ') || 'None'}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>Security Groups Copied:</b> {{$json[\"SecurityGroupsCopied\"]?.join(', ') || 'None'}}</p>\n<p style=\"color:red; font-size:1.3em;\"><b>Initial Password:</b> <code>{{$json[\"Password\"]}}</code></p>\n<p style=\"color:red; font-size:1.1em;\"><b>Make sure to save the initial password in a safe location!</b></p>\n<p style=\"color:green; font-size:1.3em;\"><b>Alex IT</b></p>\n<hr>\n<small>This is an automated message. Do not reply.</small>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        2736,
+        576
+      ],
+      "id": "39f39052-5503-490e-9b77-48f692a6bfed",
+      "name": "Send Message AD",
+      "webhookId": "961eced4-af4c-4015-a632-1c5dcecb5a5f",
+      "executeOnce": false,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "C5742Grqr9Rpnxid",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Gmail Trigger').item.json.from?.value?.map(v => v.address).join(', ') }}",
+        "subject": "=Re: {{$('Gmail Trigger').item.json.subject}} - Processing Started",
+        "message": "=<h2 style=\"color:blue;\">📧 User Creation Request Received</h2>\n\n<p>Thank you for your user creation request. We have received your email and are processing the following information:</p>\n\n<ul>\n<li><b>First Name:</b> {{$json[\"body\"][\"firstname\"]}}</li>\n<li><b>Last Name:</b> {{$json[\"body\"][\"lastname\"]}}</li>\n<li><b>Employee Number:</b> {{$json[\"body\"][\"employeenumber\"]}}</li>\n<li><b>Job Title:</b> {{$json[\"body\"][\"jobtitle\"]}}</li>\n<li><b>Department:</b> {{$json[\"body\"][\"department\"]}}</li>\n<li><b>Manager SAM:</b> {{$json[\"body\"][\"managersam\"]}}</li>\n<li><b>Office Phone:</b> {{$json[\"body\"][\"officephone\"] || 'Not provided'}}</li>\n<li><b>Office Location:</b> {{$json[\"body\"][\"officelocation\"] || 'Not provided'}}</li>\n</ul>\n\n<p style=\"color:green;\"><b>Status:</b> Processing...</p>\n<p>You will receive another notification once the user account has been created successfully.</p>\n\n<hr>\n<small>This is an automated message from Alex IT Systems.</small>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1680,
+        -256
+      ],
+      "id": "b15b3821-7f63-4604-9515-efa35518e27e",
+      "name": "Send Acknowledgment JC",
+      "webhookId": "799b1b4d-00fd-4a0c-890c-9991db9a7c75",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "C5742Grqr9Rpnxid",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "=powershell.exe -NoProfile -Command \"& { C:\\Scripts\\Create-JCUser-From-n8n.ps1 -FirstName '{{$json[\"body\"][\"firstname\"]}}' -LastName '{{$json[\"body\"][\"lastname\"]}}' -EmployeeNumber '{{$json[\"body\"][\"employeenumber\"]}}' -JobTitle '{{$json[\"body\"][\"jobtitle\"]}}' -Department '{{$json[\"body\"][\"department\"]}}' -ManagerSam '{{$json[\"body\"][\"managersam\"]}}' -OfficePhone '{{$json[\"body\"][\"officephone\"]}}' -OfficeLocation '{{$json[\"body\"][\"officelocation\"]}}' -SourceUsername '{{$json[\"body\"][\"sourceusername\"]}}' }\"",
+        "cwd": "="
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        2016,
+        112
+      ],
+      "id": "24fab732-aaca-4376-a5a9-c0bdfec35bd1",
+      "name": "Create New JC User",
+      "credentials": {
+        "sshPassword": {
+          "id": "umWU43lA8b3R4GcA",
+          "name": "SSH Password account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "if (!$json[\"stdout\"] || $json[\"stdout\"].trim() === \"\") {\n  throw new Error(\"[JC] No JSON output received from PowerShell script. Stdout was empty.\");\n}\nlet out;\ntry {\n  out = JSON.parse($json[\"stdout\"]);\n} catch (e) {\n  throw new Error(\"[JC] Failed to parse JSON from PowerShell script: \" + e.message + \"\\n\\nOutput was:\\n\" + $json[\"stdout\"]);\n}\nif (out.error) {\n  throw new Error(\"[JC] PowerShell script error: \" + out.error);\n}\nreturn out;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2288,
+        96
+      ],
+      "id": "d9be7da2-ed34-43f7-84c7-ff4f59a6116a",
+      "name": "PowerShell Output Parser JC",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "sendTo": "vinokura@alex-it.net",
+        "subject": "New JC User Created",
+        "message": "=<h1 style=\"color:blue;\">🤖 New JC User Created:</h1>\n\n<p style=\"color:black; font-size:1.1em;\"><b>First Name:</b> {{$json[\"FirstName\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>Last Name:</b> {{$json[\"LastName\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>Display Name:</b> {{$json[\"FirstName\"]}} {{$json[\"LastName\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>Employee Number:</b> {{$json[\"EmployeeNumber\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>Department:</b> {{$json[\"Department\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>Job Title:</b> {{$json[\"JobTitle\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>Username:</b> {{$json[\"Username\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>Manager:</b> {{$json[\"Manager\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>Office Location:</b> {{$json[\"OfficeLocation\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>Office Phone:</b> {{$json[\"OfficePhone\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>E-mail:</b> {{$json[\"Email\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>DL Groups Copied:</b> {{$json[\"DLGroupsCopied\"]?.join(', ') || 'None'}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>Security Groups Copied:</b> {{$json[\"SecurityGroupsCopied\"]?.join(', ') || 'None'}}</p>\n<p style=\"color:red; font-size:1.3em;\"><b>Initial Password:</b> <code>{{$json[\"Password\"]}}</code></p>\n<p style=\"color:red; font-size:1.1em;\"><b>Make sure to save the initial password in a safe location!</b></p>\n<p style=\"color:green; font-size:1.3em;\"><b>Alex IT</b></p>\n<hr>\n<small>This is an automated message. Do not reply.</small>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        2720,
+        -160
+      ],
+      "id": "20faa24c-c0c3-4845-94d2-dd7b345ef97f",
+      "name": "Send Message JC",
+      "webhookId": "961eced4-af4c-4015-a632-1c5dcecb5a5f",
+      "executeOnce": false,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "C5742Grqr9Rpnxid",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "426570413",
+        "text": "=🤖 *New JC User Created Successfully!*\n\n*First Name:* {{$json[\"FirstName\"]}}\n*Last Name:* {{$json[\"LastName\"]}}\n*Display Name:* {{$json[\"FirstName\"]}} {{$json[\"LastName\"]}}\n*Employee Number:* {{$json[\"EmployeeNumber\"]}}\n*Job Title:* {{$json[\"JobTitle\"]}}\n*Department:* {{$json[\"Department\"]}}\n*Manager:* {{$json[\"Manager\"]}}\n*Office Location:* {{$json[\"OfficeLocation\"]}}\n*Phone:* {{$json[\"OfficePhone\"]}}\n*Email:* {{$json[\"Email\"]}}\n*Username:* {{$json[\"Username\"]}}\n*Password:* `{{$json[\"Password\"]}}`\n{{$json[\"ConflictMessage\"]}}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2720,
+        80
+      ],
+      "id": "ea5b9a3d-7969-4bae-a50c-e4f65b22a241",
+      "name": "Send a text message JC",
+      "webhookId": "ae9b49c5-f740-4d7f-b4af-c7ce2935e45f",
+      "executeOnce": false,
+      "credentials": {
+        "telegramApi": {
+          "id": "QH2SVpRQkhmpSDsN",
+          "name": "Users Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C099QKJSCTD",
+          "mode": "list",
+          "cachedResultName": "new-user-created"
+        },
+        "text": "=🤖 *New JC User Created Successfully!*\n\n👤 *First Name:* {{$json[\"FirstName\"]}}\n👥 *Last Name:* {{$json[\"LastName\"]}}\n🪪 *Display Name:* {{$json[\"FirstName\"]}} {{$json[\"LastName\"]}}\n🔢 *Employee ID:* `{{$json[\"EmployeeNumber\"]}}`\n💼 *Job Title:* {{$json[\"JobTitle\"]}}\n🏢 *Department:* {{$json[\"Department\"]}}\n👔 *Manager:* {{$json[\"Manager\"]}}\n📍 *Office Location:* {{$json[\"OfficeLocation\"]}}\n📞 *Phone:* {{$json[\"OfficePhone\"]}}\n📧 *Email:* {{$json[\"Email\"]}}\n🆔 *Username:* `{{$json[\"Username\"]}}`\n🔑 *Password:* `{{$json[\"Password\"]}}`\n\n{{$json[\"ConflictMessage\"] ? '⚠️ *Note:* ' + $json[\"ConflictMessage\"] : '✅ No conflicts detected.'}}",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        2720,
+        320
+      ],
+      "id": "ca120eab-5c60-4288-8a7c-978c439fd15b",
+      "name": "Send a message JC",
+      "webhookId": "619d4034-0d7d-43f0-9691-ea960aef7115",
+      "credentials": {
+        "slackApi": {
+          "id": "obEYVo8oQOJ22JqX",
+          "name": "AD Admin Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "426570413",
+        "text": "=🤖 <b>New AD User Created Successfully!</b>\n\n<b>First Name:</b> {{$json[\"FirstName\"]}}\n<b>Last Name:</b> {{$json[\"LastName\"]}}\n<b>Display Name:</b> {{$json[\"DisplayName\"]}}\n<b>Employee Number:</b> {{$json[\"EmployeeNumber\"]}}\n<b>Job Title:</b> {{$json[\"JobTitle\"]}}\n<b>Department:</b> {{$json[\"Department\"]}}\n<b>Manager:</b> {{$json[\"Manager\"]}}\n<b>Office Location:</b> {{$json[\"OfficeLocation\"]}}\n<b>Phone:</b> {{$json[\"OfficePhone\"]}}\n<b>Email:</b> {{$json[\"Email\"]}}\n<b>Username:</b> <code>{{$json[\"Username\"]}}</code>\n<b>Password:</b> <code>{{$json[\"Password\"].replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}}</code>\n<b>DL Groups Copied:</b> {{$json[\"DLGroupsCopied\"]?.join(', ') || 'None'}}\n<b>Security Groups Copied:</b> {{$json[\"SecurityGroupsCopied\"]?.join(', ') || 'None'}}\n{{ $json[\"ConflictMessage\"] ? '⚠️ <b>Note:</b>\\n' + $json[\"ConflictMessage\"].replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') : '✅ No conflicts detected.' }}",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2736,
+        768
+      ],
+      "id": "ecaeb4f5-7d99-4bc1-9bbe-77793b733d88",
+      "name": "Send a text message AD",
+      "webhookId": "ae9b49c5-f740-4d7f-b4af-c7ce2935e45f",
+      "executeOnce": false,
+      "credentials": {
+        "telegramApi": {
+          "id": "QH2SVpRQkhmpSDsN",
+          "name": "Users Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Deduplicate": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "Deduplicate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Email Parser JC",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Email Parser AD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Parser AD": {
+      "main": [
+        [
+          {
+            "node": "Send Acknowledgment AD",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Create New AD User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Parser JC": {
+      "main": [
+        [
+          {
+            "node": "Create New JC User",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send Acknowledgment JC",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create New AD User": {
+      "main": [
+        [
+          {
+            "node": "PowerShell Output Parser AD",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error Alert AD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PowerShell Output Parser AD": {
+      "main": [
+        [
+          {
+            "node": "Send a message AD",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send Message AD",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send a text message AD",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error Alert AD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create New JC User": {
+      "main": [
+        [
+          {
+            "node": "PowerShell Output Parser JC",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error Alert JC",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PowerShell Output Parser JC": {
+      "main": [
+        [
+          {
+            "node": "Send a message JC",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send Message JC",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send a text message JC",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error Alert JC",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": {
+    "node:Gmail Trigger": {
+      "Gmail Trigger": {
+        "lastTimeChecked": 1774041286,
+        "possibleDuplicates": [
+          "19d0d19c975cf86f",
+          "19d0cf4f1287e1bb",
+          "19d0cb8c48e4b418",
+          "19d0c8f7ad352014",
+          "19d0c84b3c92858e",
+          "19d0c6982ecb4692",
+          "19d0c4c051c19b19",
+          "19d0c41deeec3c1c",
+          "19d0beab6cbee2ba",
+          "19d0be1c3121d246",
+          "19d0bd8f0e1854a7",
+          "19d0b674ee498a56",
+          "19d0af947be85ce9",
+          "19d0a8db3f88a4a5",
+          "19d0a8a4d255f2a2",
+          "19d0a81219ad7d7a",
+          "19d0a1c75f359c9a",
+          "19d09d9cb6bf4dcc",
+          "19d07bcd18b07660",
+          "19d071be4a1fefb5",
+          "19d06fced1429d7b",
+          "19d06d902845e003",
+          "19d06adcab0bd5d1",
+          "19d06a62ef89dfe5",
+          "19d06971d8a1d920",
+          "19d0687141a663ce",
+          "19d067d64c0656df",
+          "19d067431eed8124",
+          "19d067300e28f67d",
+          "19d06403bf000ace",
+          "19d05ff40d25d9f3",
+          "19d05fe70e91e0d9",
+          "19d05fdb75141dc1",
+          "19d05fd26e84342a",
+          "19d05fd07d28130f",
+          "19d05fca294e3a13",
+          "19d05fc3eaf10756",
+          "19d05fb688c39beb",
+          "19d05d6a4a564133",
+          "19d05d647e7dc0b9",
+          "19d05d2206564cec",
+          "19d057c11c4e29b0",
+          "19d057492c6d6a6d",
+          "19d0563faf298009",
+          "19d053bfadddcd39",
+          "19d052e0a0dacf8c",
+          "19d0519a13621ffa",
+          "19d051286b221581",
+          "19d04f8699540023",
+          "19d0252e93d45ab2",
+          "19d024fc261f9506",
+          "19d01e27ad982d0b",
+          "19d01dfad2a8d332",
+          "19d01dc78f61de0a",
+          "19d01a72536c4c35",
+          "19d0187da7e85a2f",
+          "19d011a7f71714ef",
+          "19d00c60fcb888d0",
+          "19d00ab9664cc872",
+          "19d008a8ab83668e",
+          "19d008727e848546",
+          "19d0083181a97a6e",
+          "19d003f95ccde3a8",
+          "19d003d644064a91",
+          "19cfff1522852ac5",
+          "19cffd0c9fc792cd",
+          "19cfe0fb33039575",
+          "19cfd9550095b0ee",
+          "19cfd419f4e30d07",
+          "19cfd06c071e0d8e",
+          "19cfce8f8c4f2a61",
+          "19cfcceea5f99b82",
+          "19cfcc84a5a43de5",
+          "19cfc7db451334b4",
+          "19cfc612585dd560",
+          "19cfc468bb2f26cc",
+          "19cfbf5499d827a4",
+          "19cfbe4440c7b0a6",
+          "19cfb9d2530b383a",
+          "19cfb85604652a42",
+          "19cfb646f06248c1",
+          "19cfb3ea5776a869",
+          "19cfb38d159acdb9",
+          "19cfb2c7516afb1c",
+          "19cfb173cea42b38",
+          "19cfb0dba99286af",
+          "19cfafe2419d923d",
+          "19cfaa9681725736",
+          "19cf80ae33b36291",
+          "19cf79540ccf6876",
+          "19cf7817fe836dcc",
+          "19cf73b19e1fe9a6",
+          "19cf731fef610d5b",
+          "19cf73046f0363ff",
+          "19cf72ff7a59d414",
+          "19cf72fa94b9ceed",
+          "19cf72ef437092f3",
+          "19cf72e62f6e267d",
+          "19cf72531031af32",
+          "19cf705f1613b74a"
+        ]
+      }
+    },
+    "node:Gmail Trigger1": {
+      "Gmail Trigger1": {
+        "lastTimeChecked": 1771680097,
+        "possibleDuplicates": [
+          "19c805ce5b77d08c",
+          "19c80559e4605ab9"
+        ]
+      }
+    },
+    "global": {
+      "processedIds": {
+        "<E1w3gYB-00000009Nj6-3gQ9@smtp-10-tuk1.steampowered.com>": 1774041341508,
+        "<0102019d0cb8c2c0-8d0346aa-6ea4-42bd-b301-1492fbec3e12-000000@eu-west-1.amazonses.com>": 1774041341509,
+        "<0102019d0c8f7a0f-9d444e3a-8970-4883-94f7-a7ca354a87b6-000000@eu-west-1.amazonses.com>": 1774041341510,
+        "<09e0lg_pkg_merge_sash_$2b26d47fb2df440f9c98e08995ecc44b@notice.aliexpress.com>": 1774041341511,
+        "<DaHA0jLSSLSmB2mWs71K6w@geopod-ismtpd-15>": 1774041341511,
+        "<367c3fc6-361f-bbd9-a8ec-d02405da763f@serper.dev>": 1774041341512,
+        "<499425812.5292763.1774027136060@lva1-app184376.prod.linkedin.com>": 1774041341516,
+        "<P4KV8cIiSmeDXzdAXPPhLw@notifications.google.com>": 1774041341517,
+        "<115804e847eca0813f25d9a49.b6bfc6b34e.20260320153251.4d937bbb46.f1ac6b94@mail99.atl11.rsgsv.net>": 1774041341518,
+        "<1135353613.4980398.1774020061739@lva1-app114797.prod.linkedin.com>": 1774041341522,
+        "<842642374.3841382.1774012786148@lva1-app39269.prod.linkedin.com>": 1774041341523,
+        "<2058659561.3839659.1774005587536@lva1-app88954.prod.linkedin.com>": 1774041341525,
+        "<20260320092231.b47fd00b782546eb@cio56699.info.n8n.io>": 1774041341526,
+        "<2075077062.3503229.1773998327499@lva1-app84274.prod.linkedin.com>": 1774041341527,
+        "<3wh4z7DsRsy6awleDO-jWg@geopod-ismtpd-71>": 1774041341528,
+        "<1469878940.3058852.1773991127218@lva1-app101524.prod.linkedin.com>": 1774041341529,
+        "<e0ealg_pkg_merge_sash_$469a28d3e5064ffd9a8e7937c6a2c78e@notice.aliexpress.com>": 1774041341530,
+        "<82.8B.12677.B495CB96@ccg13mail05>": 1774041341531,
+        "<869283523.13763193.1773940758001@lor1-app128736.prod.linkedin.com>": 1774041341534,
+        "<0102019d06fce9ee-d00994e9-1bb3-4802-83d8-20eb0af380a4-000000@eu-west-1.amazonses.com>": 1774041341536,
+        "<56607430.342385398.1773936377945@email.apple.com>": 1774041341537,
+        "<55565385.27972203.1773933542200@lor1-app123075.prod.linkedin.com>": 1774041341538,
+        "<952272190.9601879.1773933043218@ltx1-app49839.prod.linkedin.com>": 1774041341539,
+        "<96520288.9931618.1773932055295@ltx1-app38451.prod.linkedin.com>": 1774041341549,
+        "<OW4pX9WhE0ikdFIMalFpvw@notifications.google.com>": 1774041341550,
+        "<X33VUA7lkDWOoz_54U24gA@notifications.google.com>": 1774041341551,
+        "<gEiVY4rfB8fT9bbfY8bNtQ@notifications.google.com>": 1774041341551,
+        "<deliver.e39.b0b54.19d06133e19@mme02.eu.unicadeliver.net>": 1774041341552,
+        "<510875851.11235455.1773926362152@lor1-app91600.prod.linkedin.com>": 1774041341552,
+        "<calendar-93acbe52-3e01-4d35-9669-1c76f59a838c@google.com>": 1774041341553,
+        "<calendar-a6eacfc8-07a4-4546-bafd-82426256c3f5@google.com>": 1774041341553,
+        "<calendar-e62df327-81d9-4ed0-967d-af180581e018@google.com>": 1774041341554,
+        "<calendar-bd357d26-cc7d-4992-8f77-844c157d4d6b@google.com>": 1774041341554,
+        "<calendar-51e1de5c-83f0-48ba-b6b7-201295e7b4d5@google.com>": 1774041341554,
+        "<calendar-51eb41c1-e28b-4d16-af71-8e36d4ff623b@google.com>": 1774041341555,
+        "<calendar-d4879bd5-98f4-466e-8ad0-b08f786de3e6@google.com>": 1774041341555,
+        "<calendar-6717767d-d156-4c13-8e17-577c64630afa@google.com>": 1774041341556,
+        "<deliver.e37.30323.19d05bb561c@mme01.eu.unicadeliver.net>": 1774041341556,
+        "<EP7hG8PvSbaDowKejZvFIw@geopod-ismtpd-21>": 1774041341557,
+        "<635978385.26195315.1773919147245@lor1-app139148.prod.linkedin.com>": 1774041341557,
+        "<4470d25252174917a96797c35e368bad@aliexpress.com>": 1774041341558,
+        "<y9tvyp9WSM2_HES7d3u1rQ@geopod-ismtpd-36>": 1774041341558,
+        "<1168047534.30935983.1773911927500@lor1-app146004.prod.linkedin.com>": 1774041341559,
+        "<eG_WsqDtRpmFYtoheB7h7Q@geopod-ismtpd-15>": 1774041341559,
+        "<calendar-fd5e3c7a-5f3c-4842-806e-09c9a64f53d6@google.com>": 1774041341560,
+        "<calendar-67f0ec5e-761c-4c04-8535-c81f21ffb674@google.com>": 1774041341560,
+        "<calendar-ddcbb835-6b20-44e0-808e-d58becb03c0e@google.com>": 1774041341560,
+        "<818341321.15571061.1773904860257@lor1-app107646.prod.linkedin.com>": 1774041341561,
+        "<0.0.F.835.1DCB70999B5216E.0@mta-2d5b2de9.ip4.emsmtp.com>": 1774041341561,
+        "<calendar-b9416142-e543-46da-b699-d539bd80a43b@google.com>": 1774041341562,
+        "<579197046.327881591.1773853112241@email.apple.com>": 1774041341562,
+        "<UzabcSVfD4owsE4iqKjXlA@notifications.google.com>": 1774041341563,
+        "<0102019d01dc76b2-4098f45c-e73d-4697-8141-fe38fcaeb5fc-000000@eu-west-1.amazonses.com>": 1774041341563,
+        "<calendar-99690ff8-2a9c-483a-b82d-223e7cd9861b@google.com>": 1774041341564,
+        "<104054463.22158298.1773847168949@lor1-app139418.prod.linkedin.com>": 1774041341564,
+        "<1970884749.24138732.1773839950189@lor1-app150012.prod.linkedin.com>": 1774041341565,
+        "<bj8Od7mjQoSJfhIgQiV_BQ@geopod-ismtpd-49>": 1774041341565,
+        "<1008109864.5208829.1773832736843@lor1-app99511.prod.linkedin.com>": 1774041341566,
+        "<131534641.811443.1773830572042@lva1-app30779.prod.linkedin.com>": 1774041341566,
+        "<calendar-a1fbf487-2dec-4bea-b4f8-d4fc831c8e7a@google.com>": 1774041341567,
+        "<hWBrGAYlQNaTaE0KQrc6yA@geopod-ismtpd-37>": 1774041341567,
+        "<169350405.23219388.1773825656852@lor1-app140871.prod.linkedin.com>": 1774041341568,
+        "<cb63lg_pkg_merge_sash_$91fc8b6efb2644a091bd477bd089a39f@notice.aliexpress.com>": 1774041341568,
+        "<4cdd9ee9-8c8e-425e-8699-ffa1dbb4b8e6@atl1s07mta2750.xt.local>": 1774041341568,
+        "<1266654378.22797204.1773818374685@lor1-app161585.prod.linkedin.com>": 1774041341569,
+        "<16.7E.13790.72FD9B96@ccg14mail04>": 1774041341569,
+        "<995482533.202193689.1773767352826@sjmktmail-batch1m.marketo.org>": 1774041341570,
+        "<202603171924.62HJOJwE029279@mail.iec.co.il>": 1774041341570,
+        "<202603171819.62HIJrei004485@mail.iec.co.il>": 1774041341571,
+        "<1268846766.3041010.1773769651952@lva1-app80394.prod.linkedin.com>": 1774041341571,
+        "<1875140762.20244001.1773767943310@lva1-app63480.prod.linkedin.com>": 1774041341572,
+        "<NEXT-TOPIC-APP81fbed2da7c54389b808ec9314932529@next-topic-app>": 1774041341572,
+        "<69b9783e.050a0220.2f99c1.80aeSMTPIN_ADDED_MISSING@mx.google.com>": 1774041341573,
+        "<2145644672.21143171.1773760745541@lva1-app104088.prod.linkedin.com>": 1774041341573,
+        "<calendar-496ffce7-c655-46b7-a5fd-ed7262c2cc17@google.com>": 1774041341574,
+        "<1590322270.1694988.1773753651034@lva1-app80394.prod.linkedin.com>": 1774041341574,
+        "<a84a338d-b811-455c-bd51-c5c8a69c4118@atl1s07mta2387.xt.local>": 1774041341575,
+        "<465069380.17857719.1773747902291@lva1-app17173.prod.linkedin.com>": 1774041341576,
+        "<1543237202.17306610.1773746331152@lva1-app44401.prod.linkedin.com>": 1774041341576,
+        "<1310640541.6527422.1773744185558@lva1-app103770.prod.linkedin.com>": 1774041341577,
+        "<J70TesVnTC-wmR0KLar0iw@geopod-ismtpd-4>": 1774041341577,
+        "<1144734955.101537.1773741332843@esbprod33.clal-ins>": 1774041341578,
+        "<vXmJJoYRTaKIvjnhmrQCwA@geopod-ismtpd-69>": 1774041341578,
+        "<253434713.19169453.1773739127849@lva1-app96166.prod.linkedin.com>": 1774041341579,
+        "<53c3lg_pkg_merge_sash_$7fabcb7f11cc4a7e9abc01cad86df6d9@notice.aliexpress.com>": 1774041341579,
+        "<69b9160d.050a0220.226d7c.a9a5SMTPIN_ADDED_BROKEN@mx.google.com>": 1774041341580,
+        "<82373431.15456157.1773731929188@lva1-app52147.prod.linkedin.com>": 1774041341580,
+        "<6b8flg_pkg_merge_sash_$f4039e1816c94fc9905d665fa31853f5@notice.aliexpress.com>": 1774041341581,
+        "<calendar-e945cac7-3a27-4fda-afb4-9b87acb637ec@google.com>": 1774041341581,
+        "<qSqs0RAhtuSUR2r2VMew7A@notifications.google.com>": 1774041341582,
+        "<1911068038.11664946.1773674366257@lor1-app144769.prod.linkedin.com>": 1774041341583,
+        "<E1w29ZW-00000000CCt-3fl2@smtp-04-tuk1.steampowered.com>": 1774041341583,
+        "<E1w29Xh-000000007J0-3sbd@smtp-04-tuk1.steampowered.com>": 1774041341584,
+        "<E1w29XO-0000000HS9Q-0TnJ@smtp-02-tuk1.steampowered.com>": 1774041341584,
+        "<E1w29X4-00000000Y4E-0VPb@smtp-03-tuk1.steampowered.com>": 1774041341585,
+        "<E1w29WK-00000000Fh6-1fu2@smtp-02-tuk1.steampowered.com>": 1774041341585,
+        "<E1w29Vi-00000006tN2-1ls7@smtp-01-tuk1.steampowered.com>": 1774041341586,
+        "<E1w29M0-0000000GxpV-0nRB@smtp-02-tuk1.steampowered.com>": 1774041341586,
+        "<20260316142126.d278a0d1e7fc4d85@cio70202.gitguardian.com>": 1774041341587
+      }
+    }
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "745ca5e0-ee81-483c-a255-81c07e212d10",
+  "activeVersionId": "745ca5e0-ee81-483c-a255-81c07e212d10",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2025-10-31T09:14:00.807Z",
+      "createdAt": "2025-10-31T09:14:00.807Z",
+      "role": "workflow:owner",
+      "workflowId": "vb6sSMl5XrlcvUae",
+      "projectId": "pWTWmuHnmIHw48U9"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-02-28T11:05:45.000Z",
+    "createdAt": "2026-02-28T11:05:37.923Z",
+    "versionId": "745ca5e0-ee81-483c-a255-81c07e212d10",
+    "workflowId": "vb6sSMl5XrlcvUae",
+    "nodes": [
+      {
+        "parameters": {
+          "mode": "runOnceForEachItem",
+          "jsCode": "// Deduplication: track processed messageIds in workflow static data\nconst staticData = $getWorkflowStaticData('global');\nif (!staticData.processedIds) staticData.processedIds = {};\n\nconst msgId = $json.messageId || $json.id || '';\nif (!msgId) {\n  throw new Error('No messageId found — cannot deduplicate.');\n}\n\n// Clean up entries older than 24 hours\nconst now = Date.now();\nconst ONE_DAY = 24 * 60 * 60 * 1000;\nfor (const [key, ts] of Object.entries(staticData.processedIds)) {\n  if (now - ts > ONE_DAY) delete staticData.processedIds[key];\n}\n\nif (staticData.processedIds[msgId]) {\n  // Already processed — stop execution for this item\n  return [];\n}\n\nstaticData.processedIds[msgId] = now;\nreturn { json: $json };"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          992,
+          128
+        ],
+        "id": "a7ef4a82-48d3-437c-a335-f4576ef7ceda",
+        "name": "Deduplicate"
+      },
+      {
+        "parameters": {
+          "chatId": "426570413",
+          "text": "=🚨 *ONBOARDING FAILURE — JC PATH*\n\n❌ *Error:* {{$json.error?.message || $json.message || $json.stderr || $json.errorMessage || JSON.stringify($json).substring(0, 500)}}\n\n📧 *Original request from:* {{$('Email Parser JC').item.json.originalEmail?.from || 'Unknown'}}\n👤 *Name:* {{$('Email Parser JC').item.json.body?.firstname || '?'}} {{$('Email Parser JC').item.json.body?.lastname || '?'}}\n\n⏰ {{new Date().toISOString()}}\n\nPlease investigate and process manually if needed.",
+          "additionalFields": {}
+        },
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1.2,
+        "position": [
+          2400,
+          448
+        ],
+        "id": "7f1e043a-56ae-4333-8610-b75ee85a26e4",
+        "name": "Error Alert JC",
+        "webhookId": "c7e912bc-d583-4904-8cc6-b1b6edd9cbb1",
+        "credentials": {
+          "telegramApi": {
+            "id": "QH2SVpRQkhmpSDsN",
+            "name": "Users Bot"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "chatId": "426570413",
+          "text": "=🚨 *ONBOARDING FAILURE — AD PATH*\n\n❌ *Error:* {{$json.error?.message || $json.message || $json.stderr || $json.errorMessage || JSON.stringify($json).substring(0, 500)}}\n\n📧 *Original request from:* {{$('Email Parser AD').item.json.originalEmail?.from || 'Unknown'}}\n👤 *Name:* {{$('Email Parser AD').item.json.body?.firstname || '?'}} {{$('Email Parser AD').item.json.body?.lastname || '?'}}\n\n⏰ {{new Date().toISOString()}}\n\nPlease investigate and process manually if needed.",
+          "additionalFields": {}
+        },
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1.2,
+        "position": [
+          2320,
+          1056
+        ],
+        "id": "8ccf2cfa-18ca-41a7-9d96-d495d8cc0a11",
+        "name": "Error Alert AD",
+        "webhookId": "813f62f4-4082-4190-a6e6-3904d3063856",
+        "credentials": {
+          "telegramApi": {
+            "id": "QH2SVpRQkhmpSDsN",
+            "name": "Users Bot"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "pollTimes": {
+            "item": [
+              {
+                "mode": "everyMinute"
+              }
+            ]
+          },
+          "simple": false,
+          "filters": {},
+          "options": {}
+        },
+        "type": "n8n-nodes-base.gmailTrigger",
+        "typeVersion": 1.3,
+        "position": [
+          816,
+          128
+        ],
+        "id": "cc1ac205-2457-413b-b04d-e67fda7df1aa",
+        "name": "Gmail Trigger",
+        "credentials": {
+          "gmailOAuth2": {
+            "id": "C5742Grqr9Rpnxid",
+            "name": "Gmail account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "rules": {
+            "values": [
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "strict",
+                    "version": 2
+                  },
+                  "conditions": [
+                    {
+                      "id": "7dd6a3f5-aa13-4fdc-88f8-a9798fbf925d",
+                      "leftValue": "={{$json.subject || $json.headers?.subject?.replace(/^Subject:\\s*/i,'').trim() || ''}}",
+                      "rightValue": "JC",
+                      "operator": {
+                        "type": "string",
+                        "operation": "contains"
+                      }
+                    }
+                  ],
+                  "combinator": "and"
+                }
+              },
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "strict",
+                    "version": 2
+                  },
+                  "conditions": [
+                    {
+                      "id": "3367d402-3127-4cf0-b3de-69d8cdc8cf90",
+                      "leftValue": "={{$json.subject || $json.headers?.subject?.replace(/^Subject:\\s*/i,'').trim() || ''}}",
+                      "rightValue": "AD",
+                      "operator": {
+                        "type": "string",
+                        "operation": "contains"
+                      }
+                    }
+                  ],
+                  "combinator": "and"
+                }
+              }
+            ]
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.switch",
+        "typeVersion": 3.2,
+        "position": [
+          1152,
+          128
+        ],
+        "id": "a38a0337-54ba-48b7-9494-0460a3d5b512",
+        "name": "Switch"
+      },
+      {
+        "parameters": {
+          "mode": "runOnceForEachItem",
+          "jsCode": "// ===== AD EMAIL PARSER WITH SANITIZATION =====\n\nfunction sanitize(val) {\n  if (!val || typeof val !== 'string') return '';\n  return val.replace(/[;'\"\\`$|&><\\\\{}()]/g, '').trim();\n}\n\nfunction htmlToText(html) {\n  if (!html) return '';\n  html = html\n    .replace(/<br\\s*\\/?>/gi, '\\n')\n    .replace(/<\\/(p|div|li|tr|h\\d)>/gi, '\\n')\n    .replace(/&nbsp;/gi, ' ');\n  const text = html.replace(/<[^>]+>/g, ' ');\n  return text.replace(/\\r?\\n/g, '\\n').replace(/[ \\t]+\\n/g, '\\n').replace(/[ \\t]{2,}/g, ' ').trim();\n}\n\nlet emailBody =\n  ($json.text && String($json.text)) ||\n  htmlToText($json.html) ||\n  htmlToText($json.textAsHtml) ||\n  ($json.snippet && String($json.snippet)) ||\n  '';\n\nif (!emailBody && $json.payload && $json.payload.body && $json.payload.body.data) {\n  try {\n    const buff = Buffer.from($json.payload.body.data, 'base64');\n    emailBody = buff.toString('utf8');\n  } catch (_) {}\n}\n\nconst flat = (emailBody || '').replace(/\\r/g, '').replace(/[ \\t]+/g, ' ').trim();\n\nconst LABELS = [\n  'First Name','Last Name','Employee Number','Job Title',\n  'Department','Manager SAM','Manager','Office Phone','Phone',\n  'Office Location','Location'\n];\n\nfunction esc(s){ return s.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&'); }\n\nfunction captureAfter(label, src) {\n  const labelEsc = esc(label);\n  const next = LABELS.filter(l => l !== label).map(esc);\n  const lookahead = next.length ? `(?=\\\\s*(?:${next.join('|')})\\\\s*:|$)` : '$';\n  const re = new RegExp(`${labelEsc}\\\\s*:\\\\s*([\\\\s\\\\S]*?)\\\\s*${lookahead}`, 'i');\n  const m = src.match(re);\n  return m ? m[1].trim() : '';\n}\n\nconst userData = {\n  firstname:      sanitize(captureAfter('First Name', flat)),\n  lastname:       sanitize(captureAfter('Last Name', flat)),\n  employeenumber: sanitize(captureAfter('Employee Number', flat)),\n  jobtitle:       sanitize(captureAfter('Job Title', flat)),\n  department:     sanitize(captureAfter('Department', flat)),\n  managersam:     sanitize(captureAfter('Manager SAM', flat) || captureAfter('Manager', flat)),\n  officephone:    sanitize(captureAfter('Office Phone', flat) || captureAfter('Phone', flat)),\n  officelocation: sanitize(captureAfter('Office Location', flat) || captureAfter('Location', flat)),\n};\n\nconst required = ['firstname','lastname','employeenumber','jobtitle','department','managersam'];\nconst missing = required.filter(f => !userData[f] || userData[f].trim() === '');\nif (missing.length) {\n  throw new Error(`[AD] Missing required fields: ${missing.join(', ')}. Parsed body was empty or labels didn't match.`);\n}\n\nconst subj = $json.subject || ($json.headers?.subject?.replace(/^Subject:\\s*/i,'').trim()) || '';\nconst fromText = ($json.from?.text) || ($json.headers?.from?.replace(/^From:\\s*/i,'').trim()) || '';\nconst msgId = $json.messageId || ($json.headers?.['message-id']?.replace(/^Message-Id:\\s*/i,'').trim()) || '';\n\nreturn {\n  body: userData,\n  originalEmail: { subject: subj, from: fromText, messageId: msgId },\n  sanitized: true,\n  path: 'AD'\n};"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1552,
+          800
+        ],
+        "id": "a9910222-0e86-4f4e-9a1a-3b2df1d5a6b5",
+        "name": "Email Parser AD"
+      },
+      {
+        "parameters": {
+          "sendTo": "={{ $('Gmail Trigger').item.json.from?.value?.map(v => v.address).join(', ') }}",
+          "subject": "=Re: {{$('Gmail Trigger').item.json.subject}} - Processing Started",
+          "message": "=<h2 style=\"color:blue;\">📧 User Creation Request Received</h2>\n\n<p>Thank you for your user creation request. We have received your email and are processing the following information:</p>\n\n<ul>\n<li><b>First Name:</b> {{$json[\"body\"][\"firstname\"]}}</li>\n<li><b>Last Name:</b> {{$json[\"body\"][\"lastname\"]}}</li>\n<li><b>Employee Number:</b> {{$json[\"body\"][\"employeenumber\"]}}</li>\n<li><b>Job Title:</b> {{$json[\"body\"][\"jobtitle\"]}}</li>\n<li><b>Department:</b> {{$json[\"body\"][\"department\"]}}</li>\n<li><b>Manager SAM:</b> {{$json[\"body\"][\"managersam\"]}}</li>\n<li><b>Office Phone:</b> {{$json[\"body\"][\"officephone\"] || 'Not provided'}}</li>\n<li><b>Office Location:</b> {{$json[\"body\"][\"officelocation\"] || 'Not provided'}}</li>\n</ul>\n\n<p style=\"color:green;\"><b>Status:</b> Processing...</p>\n<p>You will receive another notification once the user account has been created successfully.</p>\n\n<hr>\n<small>This is an automated message from Alex IT Systems.</small>",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.gmail",
+        "typeVersion": 2.1,
+        "position": [
+          1664,
+          352
+        ],
+        "id": "b70c8b4a-65c5-40ca-9c39-ec98f69df5b0",
+        "name": "Send Acknowledgment AD",
+        "webhookId": "799b1b4d-00fd-4a0c-890c-9991db9a7c75",
+        "credentials": {
+          "gmailOAuth2": {
+            "id": "C5742Grqr9Rpnxid",
+            "name": "Gmail account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "mode": "runOnceForEachItem",
+          "jsCode": "// ===== JC EMAIL PARSER WITH SANITIZATION =====\n\nfunction sanitize(val) {\n  if (!val || typeof val !== 'string') return '';\n  return val.replace(/[;'\"\\`$|&><\\\\{}()]/g, '').trim();\n}\n\nfunction htmlToText(html) {\n  if (!html) return '';\n  html = html\n    .replace(/<br\\s*\\/?>/gi, '\\n')\n    .replace(/<\\/(p|div|li|tr|h\\d)>/gi, '\\n')\n    .replace(/&nbsp;/gi, ' ');\n  const text = html.replace(/<[^>]+>/g, ' ');\n  return text.replace(/\\r?\\n/g, '\\n').replace(/[ \\t]+\\n/g, '\\n').replace(/[ \\t]{2,}/g, ' ').trim();\n}\n\nlet emailBody =\n  ($json.text && String($json.text)) ||\n  htmlToText($json.html) ||\n  htmlToText($json.textAsHtml) ||\n  ($json.snippet && String($json.snippet)) ||\n  '';\n\nif (!emailBody && $json.payload && $json.payload.body && $json.payload.body.data) {\n  try {\n    const buff = Buffer.from($json.payload.body.data, 'base64');\n    emailBody = buff.toString('utf8');\n  } catch (_) {}\n}\n\nconst flat = (emailBody || '').replace(/\\r/g, '').replace(/[ \\t]+/g, ' ').trim();\n\nconst LABELS = [\n  'First Name','Last Name','Employee Number','Job Title',\n  'Department','Manager SAM','Manager','Office Phone','Phone',\n  'Office Location','Location','Source Username'\n];\n\nfunction esc(s){ return s.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&'); }\n\nfunction captureAfter(label, src) {\n  const labelEsc = esc(label);\n  const next = LABELS.filter(l => l !== label).map(esc);\n  const lookahead = next.length ? `(?=\\\\s*(?:${next.join('|')})\\\\s*:|$)` : '$';\n  const re = new RegExp(`${labelEsc}\\\\s*:\\\\s*([\\\\s\\\\S]*?)\\\\s*${lookahead}`, 'i');\n  const m = src.match(re);\n  return m ? m[1].trim() : '';\n}\n\nconst userData = {\n  firstname:      sanitize(captureAfter('First Name', flat)),\n  lastname:       sanitize(captureAfter('Last Name', flat)),\n  employeenumber: sanitize(captureAfter('Employee Number', flat)),\n  jobtitle:       sanitize(captureAfter('Job Title', flat)),\n  department:     sanitize(captureAfter('Department', flat)),\n  managersam:     sanitize(captureAfter('Manager SAM', flat) || captureAfter('Manager', flat)),\n  officephone:    sanitize(captureAfter('Office Phone', flat) || captureAfter('Phone', flat)),\n  officelocation: sanitize(captureAfter('Office Location', flat) || captureAfter('Location', flat)),\n  sourceusername: sanitize(captureAfter('Source Username', flat)),\n};\n\nconst required = ['firstname','lastname','employeenumber','jobtitle','department','managersam'];\nconst missing = required.filter(f => !userData[f] || userData[f].trim() === '');\nif (missing.length) {\n  throw new Error(`[JC] Missing required fields: ${missing.join(', ')}. Parsed body was empty or labels didn't match.`);\n}\n\nconst subj = $json.subject || ($json.headers?.subject?.replace(/^Subject:\\s*/i,'').trim()) || '';\nconst fromText = ($json.from?.text) || ($json.headers?.from?.replace(/^From:\\s*/i,'').trim()) || '';\nconst msgId = $json.messageId || ($json.headers?.['message-id']?.replace(/^Message-Id:\\s*/i,'').trim()) || '';\n\nreturn {\n  body: userData,\n  originalEmail: { subject: subj, from: fromText, messageId: msgId },\n  sanitized: true,\n  path: 'JC'\n};"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1568,
+          112
+        ],
+        "id": "46b61ee4-242d-4cdc-a6fa-608a7967e0f5",
+        "name": "Email Parser JC"
+      },
+      {
+        "parameters": {
+          "command": "=powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"C:\\Scripts\\Create-ADUser-From-n8n.ps1\" -FirstName \"{{$json[\"body\"][\"firstname\"]}}\" -LastName \"{{$json[\"body\"][\"lastname\"]}}\" -EmployeeNumber {{$json[\"body\"][\"employeenumber\"]}} -JobTitle \"{{$json[\"body\"][\"jobtitle\"]}}\" -Department \"{{$json[\"body\"][\"department\"]}}\" -ManagerSam \"{{$json[\"body\"][\"managersam\"]}}\" -OfficePhone \"{{$json[\"body\"][\"officephone\"]}}\" -OfficeLocation \"{{$json[\"body\"][\"officelocation\"]}}\"",
+          "cwd": "="
+        },
+        "type": "n8n-nodes-base.ssh",
+        "typeVersion": 1,
+        "position": [
+          2032,
+          800
+        ],
+        "id": "2ad0f91a-0a92-4f00-902d-0cb6b40e1b16",
+        "name": "Create New AD User",
+        "credentials": {
+          "sshPassword": {
+            "id": "umWU43lA8b3R4GcA",
+            "name": "SSH Password account"
+          }
+        },
+        "onError": "continueErrorOutput"
+      },
+      {
+        "parameters": {
+          "mode": "runOnceForEachItem",
+          "jsCode": "if (!$json[\"stdout\"] || $json[\"stdout\"].trim() === \"\") {\n  throw new Error(\"[AD] No JSON output received from PowerShell script. Stdout was empty.\");\n}\nlet out;\ntry {\n  out = JSON.parse($json[\"stdout\"]);\n} catch (e) {\n  throw new Error(\"[AD] Failed to parse JSON from PowerShell script: \" + e.message + \"\\n\\nOutput was:\\n\" + $json[\"stdout\"]);\n}\nif (out.error) {\n  throw new Error(\"[AD] PowerShell script error: \" + out.error);\n}\nreturn out;"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          2400,
+          784
+        ],
+        "id": "6be49db5-a313-4638-be7f-895a8f95532b",
+        "name": "PowerShell Output Parser AD",
+        "onError": "continueErrorOutput"
+      },
+      {
+        "parameters": {
+          "select": "channel",
+          "channelId": {
+            "__rl": true,
+            "value": "C099QKJSCTD",
+            "mode": "list",
+            "cachedResultName": "new-user-created"
+          },
+          "text": "=🤖 *New AD User Created Successfully!*\n\n👤 *First Name:* {{$json[\"FirstName\"]}}\n👥 *Last Name:* {{$json[\"LastName\"]}}\n🪪 *Display Name:* {{$json[\"DisplayName\"]}}\n🆔 *Username:* `{{$json[\"Username\"]}}`\n🔢 *Employee ID:* `{{$json[\"EmployeeNumber\"]}}`\n💼 *Job Title:* {{$json[\"JobTitle\"]}}\n🏢 *Department:* {{$json[\"Department\"]}}\n👔 *Manager:* {{$json[\"Manager\"]}}\n📍 *Office Location:* {{$json[\"OfficeLocation\"]}}\n📞 *Phone:* {{$json[\"OfficePhone\"]}}\n📧 *Email:* {{$json[\"Email\"]}}\n🔑 *Password:* `{{$json[\"Password\"]}}`\n✉️ *DL Groups:* {{ $json[\"DLGroupsCopied\"]?.length > 0 ? $json[\"DLGroupsCopied\"].join(', ') : '_None_' }}\n🛡️ *Security Groups:* {{ $json[\"SecurityGroupsCopied\"]?.length > 0 ? $json[\"SecurityGroupsCopied\"].join(', ') : '_None_' }}\n\n{{ $json[\"ConflictMessage\"] ? '⚠️ *Note:*\\n' + $json[\"ConflictMessage\"].split('\\n').join('\\n') : '✅ No conflicts detected.' }}",
+          "otherOptions": {}
+        },
+        "type": "n8n-nodes-base.slack",
+        "typeVersion": 2.3,
+        "position": [
+          2752,
+          1008
+        ],
+        "id": "ff0f7afc-1671-480f-86ff-505c8896831d",
+        "name": "Send a message AD",
+        "webhookId": "619d4034-0d7d-43f0-9691-ea960aef7115",
+        "credentials": {
+          "slackApi": {
+            "id": "obEYVo8oQOJ22JqX",
+            "name": "AD Admin Bot"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "sendTo": "vinokura@alex-it.net",
+          "subject": "New AD User Created",
+          "message": "=<h1 style=\"color:blue;\">🤖 New AD User Created:</h1>\n<p style=\"color:black; font-size:1.1em;\"><b>First Name:</b> {{$json[\"FirstName\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>Last Name:</b> {{$json[\"LastName\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>Display Name:</b> {{$json[\"DisplayName\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>Username:</b> {{$json[\"Username\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>Employee Number:</b> {{$json[\"EmployeeNumber\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>Department:</b> {{$json[\"Department\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>Job Title:</b> {{$json[\"JobTitle\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>Manager:</b> {{$json[\"Manager\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>Office Location:</b> {{$json[\"OfficeLocation\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>Office Phone:</b> {{$json[\"OfficePhone\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>E-mail:</b> {{$json[\"Email\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>DL Groups Copied:</b> {{$json[\"DLGroupsCopied\"]?.join(', ') || 'None'}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>Security Groups Copied:</b> {{$json[\"SecurityGroupsCopied\"]?.join(', ') || 'None'}}</p>\n<p style=\"color:red; font-size:1.3em;\"><b>Initial Password:</b> <code>{{$json[\"Password\"]}}</code></p>\n<p style=\"color:red; font-size:1.1em;\"><b>Make sure to save the initial password in a safe location!</b></p>\n<p style=\"color:green; font-size:1.3em;\"><b>Alex IT</b></p>\n<hr>\n<small>This is an automated message. Do not reply.</small>",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.gmail",
+        "typeVersion": 2.1,
+        "position": [
+          2736,
+          576
+        ],
+        "id": "39f39052-5503-490e-9b77-48f692a6bfed",
+        "name": "Send Message AD",
+        "webhookId": "961eced4-af4c-4015-a632-1c5dcecb5a5f",
+        "executeOnce": false,
+        "credentials": {
+          "gmailOAuth2": {
+            "id": "C5742Grqr9Rpnxid",
+            "name": "Gmail account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "sendTo": "={{ $('Gmail Trigger').item.json.from?.value?.map(v => v.address).join(', ') }}",
+          "subject": "=Re: {{$('Gmail Trigger').item.json.subject}} - Processing Started",
+          "message": "=<h2 style=\"color:blue;\">📧 User Creation Request Received</h2>\n\n<p>Thank you for your user creation request. We have received your email and are processing the following information:</p>\n\n<ul>\n<li><b>First Name:</b> {{$json[\"body\"][\"firstname\"]}}</li>\n<li><b>Last Name:</b> {{$json[\"body\"][\"lastname\"]}}</li>\n<li><b>Employee Number:</b> {{$json[\"body\"][\"employeenumber\"]}}</li>\n<li><b>Job Title:</b> {{$json[\"body\"][\"jobtitle\"]}}</li>\n<li><b>Department:</b> {{$json[\"body\"][\"department\"]}}</li>\n<li><b>Manager SAM:</b> {{$json[\"body\"][\"managersam\"]}}</li>\n<li><b>Office Phone:</b> {{$json[\"body\"][\"officephone\"] || 'Not provided'}}</li>\n<li><b>Office Location:</b> {{$json[\"body\"][\"officelocation\"] || 'Not provided'}}</li>\n</ul>\n\n<p style=\"color:green;\"><b>Status:</b> Processing...</p>\n<p>You will receive another notification once the user account has been created successfully.</p>\n\n<hr>\n<small>This is an automated message from Alex IT Systems.</small>",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.gmail",
+        "typeVersion": 2.1,
+        "position": [
+          1680,
+          -256
+        ],
+        "id": "b15b3821-7f63-4604-9515-efa35518e27e",
+        "name": "Send Acknowledgment JC",
+        "webhookId": "799b1b4d-00fd-4a0c-890c-9991db9a7c75",
+        "credentials": {
+          "gmailOAuth2": {
+            "id": "C5742Grqr9Rpnxid",
+            "name": "Gmail account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "command": "=powershell.exe -NoProfile -Command \"& { C:\\Scripts\\Create-JCUser-From-n8n.ps1 -FirstName '{{$json[\"body\"][\"firstname\"]}}' -LastName '{{$json[\"body\"][\"lastname\"]}}' -EmployeeNumber '{{$json[\"body\"][\"employeenumber\"]}}' -JobTitle '{{$json[\"body\"][\"jobtitle\"]}}' -Department '{{$json[\"body\"][\"department\"]}}' -ManagerSam '{{$json[\"body\"][\"managersam\"]}}' -OfficePhone '{{$json[\"body\"][\"officephone\"]}}' -OfficeLocation '{{$json[\"body\"][\"officelocation\"]}}' -SourceUsername '{{$json[\"body\"][\"sourceusername\"]}}' }\"",
+          "cwd": "="
+        },
+        "type": "n8n-nodes-base.ssh",
+        "typeVersion": 1,
+        "position": [
+          2016,
+          112
+        ],
+        "id": "24fab732-aaca-4376-a5a9-c0bdfec35bd1",
+        "name": "Create New JC User",
+        "credentials": {
+          "sshPassword": {
+            "id": "umWU43lA8b3R4GcA",
+            "name": "SSH Password account"
+          }
+        },
+        "onError": "continueErrorOutput"
+      },
+      {
+        "parameters": {
+          "mode": "runOnceForEachItem",
+          "jsCode": "if (!$json[\"stdout\"] || $json[\"stdout\"].trim() === \"\") {\n  throw new Error(\"[JC] No JSON output received from PowerShell script. Stdout was empty.\");\n}\nlet out;\ntry {\n  out = JSON.parse($json[\"stdout\"]);\n} catch (e) {\n  throw new Error(\"[JC] Failed to parse JSON from PowerShell script: \" + e.message + \"\\n\\nOutput was:\\n\" + $json[\"stdout\"]);\n}\nif (out.error) {\n  throw new Error(\"[JC] PowerShell script error: \" + out.error);\n}\nreturn out;"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          2288,
+          96
+        ],
+        "id": "d9be7da2-ed34-43f7-84c7-ff4f59a6116a",
+        "name": "PowerShell Output Parser JC",
+        "onError": "continueErrorOutput"
+      },
+      {
+        "parameters": {
+          "sendTo": "vinokura@alex-it.net",
+          "subject": "New JC User Created",
+          "message": "=<h1 style=\"color:blue;\">🤖 New JC User Created:</h1>\n\n<p style=\"color:black; font-size:1.1em;\"><b>First Name:</b> {{$json[\"FirstName\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>Last Name:</b> {{$json[\"LastName\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>Display Name:</b> {{$json[\"FirstName\"]}} {{$json[\"LastName\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>Employee Number:</b> {{$json[\"EmployeeNumber\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>Department:</b> {{$json[\"Department\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>Job Title:</b> {{$json[\"JobTitle\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>Username:</b> {{$json[\"Username\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>Manager:</b> {{$json[\"Manager\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>Office Location:</b> {{$json[\"OfficeLocation\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>Office Phone:</b> {{$json[\"OfficePhone\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>E-mail:</b> {{$json[\"Email\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>DL Groups Copied:</b> {{$json[\"DLGroupsCopied\"]?.join(', ') || 'None'}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>Security Groups Copied:</b> {{$json[\"SecurityGroupsCopied\"]?.join(', ') || 'None'}}</p>\n<p style=\"color:red; font-size:1.3em;\"><b>Initial Password:</b> <code>{{$json[\"Password\"]}}</code></p>\n<p style=\"color:red; font-size:1.1em;\"><b>Make sure to save the initial password in a safe location!</b></p>\n<p style=\"color:green; font-size:1.3em;\"><b>Alex IT</b></p>\n<hr>\n<small>This is an automated message. Do not reply.</small>",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.gmail",
+        "typeVersion": 2.1,
+        "position": [
+          2720,
+          -160
+        ],
+        "id": "20faa24c-c0c3-4845-94d2-dd7b345ef97f",
+        "name": "Send Message JC",
+        "webhookId": "961eced4-af4c-4015-a632-1c5dcecb5a5f",
+        "executeOnce": false,
+        "credentials": {
+          "gmailOAuth2": {
+            "id": "C5742Grqr9Rpnxid",
+            "name": "Gmail account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "chatId": "426570413",
+          "text": "=🤖 *New JC User Created Successfully!*\n\n*First Name:* {{$json[\"FirstName\"]}}\n*Last Name:* {{$json[\"LastName\"]}}\n*Display Name:* {{$json[\"FirstName\"]}} {{$json[\"LastName\"]}}\n*Employee Number:* {{$json[\"EmployeeNumber\"]}}\n*Job Title:* {{$json[\"JobTitle\"]}}\n*Department:* {{$json[\"Department\"]}}\n*Manager:* {{$json[\"Manager\"]}}\n*Office Location:* {{$json[\"OfficeLocation\"]}}\n*Phone:* {{$json[\"OfficePhone\"]}}\n*Email:* {{$json[\"Email\"]}}\n*Username:* {{$json[\"Username\"]}}\n*Password:* `{{$json[\"Password\"]}}`\n{{$json[\"ConflictMessage\"]}}",
+          "additionalFields": {}
+        },
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1.2,
+        "position": [
+          2720,
+          80
+        ],
+        "id": "ea5b9a3d-7969-4bae-a50c-e4f65b22a241",
+        "name": "Send a text message JC",
+        "webhookId": "ae9b49c5-f740-4d7f-b4af-c7ce2935e45f",
+        "executeOnce": false,
+        "credentials": {
+          "telegramApi": {
+            "id": "QH2SVpRQkhmpSDsN",
+            "name": "Users Bot"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "select": "channel",
+          "channelId": {
+            "__rl": true,
+            "value": "C099QKJSCTD",
+            "mode": "list",
+            "cachedResultName": "new-user-created"
+          },
+          "text": "=🤖 *New JC User Created Successfully!*\n\n👤 *First Name:* {{$json[\"FirstName\"]}}\n👥 *Last Name:* {{$json[\"LastName\"]}}\n🪪 *Display Name:* {{$json[\"FirstName\"]}} {{$json[\"LastName\"]}}\n🔢 *Employee ID:* `{{$json[\"EmployeeNumber\"]}}`\n💼 *Job Title:* {{$json[\"JobTitle\"]}}\n🏢 *Department:* {{$json[\"Department\"]}}\n👔 *Manager:* {{$json[\"Manager\"]}}\n📍 *Office Location:* {{$json[\"OfficeLocation\"]}}\n📞 *Phone:* {{$json[\"OfficePhone\"]}}\n📧 *Email:* {{$json[\"Email\"]}}\n🆔 *Username:* `{{$json[\"Username\"]}}`\n🔑 *Password:* `{{$json[\"Password\"]}}`\n\n{{$json[\"ConflictMessage\"] ? '⚠️ *Note:* ' + $json[\"ConflictMessage\"] : '✅ No conflicts detected.'}}",
+          "otherOptions": {}
+        },
+        "type": "n8n-nodes-base.slack",
+        "typeVersion": 2.3,
+        "position": [
+          2720,
+          320
+        ],
+        "id": "ca120eab-5c60-4288-8a7c-978c439fd15b",
+        "name": "Send a message JC",
+        "webhookId": "619d4034-0d7d-43f0-9691-ea960aef7115",
+        "credentials": {
+          "slackApi": {
+            "id": "obEYVo8oQOJ22JqX",
+            "name": "AD Admin Bot"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "chatId": "426570413",
+          "text": "=🤖 <b>New AD User Created Successfully!</b>\n\n<b>First Name:</b> {{$json[\"FirstName\"]}}\n<b>Last Name:</b> {{$json[\"LastName\"]}}\n<b>Display Name:</b> {{$json[\"DisplayName\"]}}\n<b>Employee Number:</b> {{$json[\"EmployeeNumber\"]}}\n<b>Job Title:</b> {{$json[\"JobTitle\"]}}\n<b>Department:</b> {{$json[\"Department\"]}}\n<b>Manager:</b> {{$json[\"Manager\"]}}\n<b>Office Location:</b> {{$json[\"OfficeLocation\"]}}\n<b>Phone:</b> {{$json[\"OfficePhone\"]}}\n<b>Email:</b> {{$json[\"Email\"]}}\n<b>Username:</b> <code>{{$json[\"Username\"]}}</code>\n<b>Password:</b> <code>{{$json[\"Password\"].replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}}</code>\n<b>DL Groups Copied:</b> {{$json[\"DLGroupsCopied\"]?.join(', ') || 'None'}}\n<b>Security Groups Copied:</b> {{$json[\"SecurityGroupsCopied\"]?.join(', ') || 'None'}}\n{{ $json[\"ConflictMessage\"] ? '⚠️ <b>Note:</b>\\n' + $json[\"ConflictMessage\"].replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') : '✅ No conflicts detected.' }}",
+          "additionalFields": {
+            "parse_mode": "HTML"
+          }
+        },
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1.2,
+        "position": [
+          2736,
+          768
+        ],
+        "id": "ecaeb4f5-7d99-4bc1-9bbe-77793b733d88",
+        "name": "Send a text message AD",
+        "webhookId": "ae9b49c5-f740-4d7f-b4af-c7ce2935e45f",
+        "executeOnce": false,
+        "credentials": {
+          "telegramApi": {
+            "id": "QH2SVpRQkhmpSDsN",
+            "name": "Users Bot"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Deduplicate": {
+        "main": [
+          [
+            {
+              "node": "Switch",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Gmail Trigger": {
+        "main": [
+          [
+            {
+              "node": "Deduplicate",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Switch": {
+        "main": [
+          [
+            {
+              "node": "Email Parser JC",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Email Parser AD",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Email Parser AD": {
+        "main": [
+          [
+            {
+              "node": "Send Acknowledgment AD",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Create New AD User",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Email Parser JC": {
+        "main": [
+          [
+            {
+              "node": "Create New JC User",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Send Acknowledgment JC",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Create New AD User": {
+        "main": [
+          [
+            {
+              "node": "PowerShell Output Parser AD",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Error Alert AD",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "PowerShell Output Parser AD": {
+        "main": [
+          [
+            {
+              "node": "Send a message AD",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Send Message AD",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Send a text message AD",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Error Alert AD",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Create New JC User": {
+        "main": [
+          [
+            {
+              "node": "PowerShell Output Parser JC",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Error Alert JC",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "PowerShell Output Parser JC": {
+        "main": [
+          [
+            {
+              "node": "Send a message JC",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Send Message JC",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Send a text message JC",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Error Alert JC",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Alex Vinokur",
+    "name": "Version 745ca5e0",
+    "description": "",
+    "autosaved": true
+  },
+  "tags": []
+}
