@@ -1,0 +1,140 @@
+{
+  "updatedAt": "2026-03-15T14:52:32.857Z",
+  "createdAt": "2026-03-13T09:39:55.700Z",
+  "id": "pceCVB1FXBroAJQm",
+  "name": "WhatsApp Send Message",
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "4242c490-60d5-478b-85dc-adc4c4d5869d",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -336,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "format-chat-id",
+              "name": "chatId",
+              "value": "972525683197@c.us",
+              "type": "string"
+            },
+            {
+              "id": "pass-text",
+              "name": "text",
+              "value": "כולם מתפפלים למען דן ביטון",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "572dbc31-5d18-4974-90c7-e9b63a3f4001",
+      "name": "Format Phone Number",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -80,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://waha:3000/api/sendText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Key",
+              "value": "1ENEwO3sB28lWYzMEhmDYNpW7xc2Om0y"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "session",
+              "value": "default"
+            },
+            {
+              "name": "chatId",
+              "value": "={{ $json.chatId }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.text }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a9e68447-395c-4c86-872c-2c922f9dc697",
+      "name": "Send to WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        192,
+        -160
+      ]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Format Phone Number",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Phone Number": {
+      "main": [
+        [
+          {
+            "node": "Send to WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "timezone": "Asia/Jerusalem",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "a134749c-e262-403b-b1ee-fd60149aaacb",
+  "activeVersionId": null,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-13T09:39:55.706Z",
+      "createdAt": "2026-03-13T09:39:55.706Z",
+      "role": "workflow:owner",
+      "workflowId": "pceCVB1FXBroAJQm",
+      "projectId": "pWTWmuHnmIHw48U9"
+    }
+  ],
+  "activeVersion": null,
+  "tags": []
+}
