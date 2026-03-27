@@ -1,11 +1,11 @@
 # n8n-Raspberry-PI-Workflow-Backup
 
-## Latest Backup: 2026-03-27 16:00
+## Latest Backup: 2026-03-27 20:00
 
 ### Backup URL
-https://github.com/alexxx55555/n8n-Raspberry-PI-Workflow-Backup/tree/main/PI%20workflows%20backup%202026-03-27%2016-00
+https://github.com/alexxx55555/n8n-Raspberry-PI-Workflow-Backup/tree/main/PI%20workflows%20backup%202026-03-27%2020-00
 
-### Workflows Backed Up (28 total)
+### Workflows Backed Up (29 total)
 - AD Unlock & Reset Password
 - Create New JC User
 - AD Inactive Users - Weekly Report & Auto Disable
@@ -15,6 +15,7 @@ https://github.com/alexxx55555/n8n-Raspberry-PI-Workflow-Backup/tree/main/PI%20w
 - Disable JC User
 - Get AD User Info
 - Get JumpCloud User Info
+- ClickUp New Task → Slack Notification
 - DNS Update
 - AD Brute Force Detection
 - WhatsApp AI Bot
