@@ -1,0 +1,282 @@
+{
+  "updatedAt": "2026-03-27T16:59:26.989Z",
+  "createdAt": "2026-03-27T16:50:00.099Z",
+  "id": "QSg089s0wQt6NSqe",
+  "name": "ClickUp New Task → Slack Notification",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "team": "90182562733",
+        "events": [
+          "goalCreated"
+        ],
+        "filters": {}
+      },
+      "id": "79a47072-defc-45f0-b90e-ea7cefa90a62",
+      "name": "ClickUp Trigger",
+      "type": "n8n-nodes-base.clickUpTrigger",
+      "typeVersion": 1,
+      "position": [
+        -352,
+        192
+      ],
+      "webhookId": "aaab0d02-8495-4dbe-9435-c3d99c5de318",
+      "credentials": {
+        "clickUpApi": {
+          "id": "LzEObyuompSaVxsi",
+          "name": "ClickUp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "team": "90182562733",
+        "space": "901810356305",
+        "folder": "901813080088",
+        "list": "901816964420",
+        "name": "Alex",
+        "additionalFields": {}
+      },
+      "id": "3e8a36ba-c0cf-47c2-92aa-ee30adb9d717",
+      "name": "Get Task Details",
+      "type": "n8n-nodes-base.clickUp",
+      "typeVersion": 1,
+      "position": [
+        288,
+        16
+      ],
+      "credentials": {
+        "clickUpApi": {
+          "id": "LzEObyuompSaVxsi",
+          "name": "ClickUp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "user",
+        "user": {
+          "__rl": true,
+          "value": "C08B3Q6QWDA",
+          "mode": "id"
+        },
+        "text": "Hi its test",
+        "otherOptions": {}
+      },
+      "id": "18e31442-dbf6-4dfc-a9d6-9ad6ca5f2652",
+      "name": "Slack Notification",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        512,
+        16
+      ],
+      "webhookId": "566f470f-4f2e-41af-bfc9-766607ec6053",
+      "credentials": {
+        "slackApi": {
+          "id": "obEYVo8oQOJ22JqX",
+          "name": "AD Admin Bot"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        16,
+        16
+      ],
+      "id": "ed78d584-46fa-48fb-8fc5-eeb9333aa4fb",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "resource": "spaceTag"
+      },
+      "type": "n8n-nodes-base.clickUp",
+      "typeVersion": 1,
+      "position": [
+        912,
+        -144
+      ],
+      "id": "a456bd58-4546-46b6-8520-a90d7862a5b3",
+      "name": "Create a space tag",
+      "credentials": {
+        "clickUpApi": {
+          "id": "LzEObyuompSaVxsi",
+          "name": "ClickUp account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "ClickUp Trigger": {
+      "main": [
+        []
+      ]
+    },
+    "Get Task Details": {
+      "main": [
+        [
+          {
+            "node": "Slack Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Get Task Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": {
+    "node:ClickUp Trigger": {
+      "webhookId": "e4f92410-ceb1-4e45-8e10-872a71f286fe",
+      "secret": "CVLHG45JXDO2XJD72DM9KPVWUCUDIC44LKX0QQTGU6GU9VOUCR7M3DCNH3NR9YHI"
+    }
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "173920e9-280b-4e19-ad0a-32a579679c49",
+  "activeVersionId": "e53e563e-a228-4c88-bdb1-724ccfd91ebb",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-27T16:50:00.109Z",
+      "createdAt": "2026-03-27T16:50:00.109Z",
+      "role": "workflow:owner",
+      "workflowId": "QSg089s0wQt6NSqe",
+      "projectId": "pWTWmuHnmIHw48U9"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-03-27T16:54:23.000Z",
+    "createdAt": "2026-03-27T16:54:12.626Z",
+    "versionId": "e53e563e-a228-4c88-bdb1-724ccfd91ebb",
+    "workflowId": "QSg089s0wQt6NSqe",
+    "nodes": [
+      {
+        "parameters": {
+          "team": "90182562733",
+          "events": [
+            "goalCreated"
+          ],
+          "filters": {}
+        },
+        "id": "79a47072-defc-45f0-b90e-ea7cefa90a62",
+        "name": "ClickUp Trigger",
+        "type": "n8n-nodes-base.clickUpTrigger",
+        "typeVersion": 1,
+        "position": [
+          48,
+          16
+        ],
+        "webhookId": "aaab0d02-8495-4dbe-9435-c3d99c5de318",
+        "credentials": {
+          "clickUpApi": {
+            "id": "LzEObyuompSaVxsi",
+            "name": "ClickUp account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "team": "90182562733",
+          "space": "901810356305",
+          "folder": "901813080088",
+          "list": "901816964420",
+          "name": "Alex",
+          "additionalFields": {}
+        },
+        "id": "3e8a36ba-c0cf-47c2-92aa-ee30adb9d717",
+        "name": "Get Task Details",
+        "type": "n8n-nodes-base.clickUp",
+        "typeVersion": 1,
+        "position": [
+          288,
+          16
+        ],
+        "credentials": {
+          "clickUpApi": {
+            "id": "LzEObyuompSaVxsi",
+            "name": "ClickUp account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "select": "user",
+          "user": {
+            "__rl": true,
+            "value": "C08B3Q6QWDA",
+            "mode": "id"
+          },
+          "text": "Hi its test",
+          "otherOptions": {}
+        },
+        "id": "18e31442-dbf6-4dfc-a9d6-9ad6ca5f2652",
+        "name": "Slack Notification",
+        "type": "n8n-nodes-base.slack",
+        "typeVersion": 2.2,
+        "position": [
+          512,
+          16
+        ],
+        "webhookId": "566f470f-4f2e-41af-bfc9-766607ec6053",
+        "credentials": {
+          "slackApi": {
+            "id": "obEYVo8oQOJ22JqX",
+            "name": "AD Admin Bot"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "ClickUp Trigger": {
+        "main": [
+          [
+            {
+              "node": "Get Task Details",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Task Details": {
+        "main": [
+          [
+            {
+              "node": "Slack Notification",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Alex Vinokur",
+    "name": "Version e53e563e",
+    "description": "",
+    "autosaved": true
+  },
+  "tags": []
+}
