@@ -1,0 +1,81 @@
+{
+  "updatedAt": "2026-03-28T10:21:27.444Z",
+  "createdAt": "2026-03-28T10:00:43.417Z",
+  "id": "ExSSfaNuWllm5NNG",
+  "name": "My workflow",
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "1e35479c-d8fb-4172-a1d2-ceb54cb7422d",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "https://vikunja.alex-it.net/api/v1/projects/2/tasks",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"title\": \"Full task from n8n\",\n  \"description\": \"Task with all fields set\",\n  \"priority\": 3,\n  \"percent_done\": 0.5,\n  \"hex_color\": \"ff4136\",\n  \"due_date\": \"2026-04-01T00:00:00Z\",\n  \"start_date\": \"2026-03-28T00:00:00Z\",\n  \"end_date\": \"2026-04-01T00:00:00Z\",\n  \"repeat_after\": 86400,\n  \"is_favorite\": true,\n  \"labels\": [{\"title\": \"urgent\"}],\n  \"reminders\": [{\"reminder\": \"2026-03-31T09:00:00Z\"}],\n  \"assignees\": [{\"id\": 1}]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        208,
+        0
+      ],
+      "id": "d70fe877-38c6-4907-92de-90f33bbb8b52",
+      "name": "HTTP Request",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "0yGD9exVtarvzjzg",
+          "name": "Vikunja API"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "51519738-d767-4d33-8d5e-1f6eec993eec",
+  "activeVersionId": null,
+  "triggerCount": 0,
+  "shared": [
+    {
+      "updatedAt": "2026-03-28T10:00:43.421Z",
+      "createdAt": "2026-03-28T10:00:43.421Z",
+      "role": "workflow:owner",
+      "workflowId": "ExSSfaNuWllm5NNG",
+      "projectId": "pWTWmuHnmIHw48U9"
+    }
+  ],
+  "activeVersion": null,
+  "tags": []
+}
