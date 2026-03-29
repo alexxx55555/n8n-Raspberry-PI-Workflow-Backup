@@ -1,0 +1,608 @@
+{
+  "updatedAt": "2026-03-06T19:53:46.409Z",
+  "createdAt": "2026-03-01T20:18:08.901Z",
+  "id": "ETxwCmCpqhIkILZ0",
+  "name": "JC Device Monitor",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "seconds"
+            }
+          ]
+        }
+      },
+      "id": "e72b0673-77d7-46f9-b2ee-e04a4ffc435d",
+      "name": "Schedule - Every 30 Sec",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1456,
+        -208
+      ]
+    },
+    {
+      "parameters": {
+        "command": "powershell.exe -NonInteractive -ExecutionPolicy Bypass -File C:\\Scripts\\Get-JCDeviceChanges.ps1",
+        "cwd": "="
+      },
+      "id": "c44f0be4-78e8-46ee-bb65-7ea2d8de6204",
+      "name": "SSH - Run Script",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        -1216,
+        -208
+      ],
+      "credentials": {
+        "sshPassword": {
+          "id": "umWU43lA8b3R4GcA",
+          "name": "SSH Password account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.stdout?.trim();\n\nif (!raw || raw === '' || raw === '[]') {\n  return [{ json: { noChanges: true } }];\n}\n\ntry {\n  const parsed = JSON.parse(raw);\n  \n  // Single object\n  if (!Array.isArray(parsed)) {\n    return [{ json: parsed }];\n  }\n  \n  // Empty array\n  if (parsed.length === 0) {\n    return [{ json: { noChanges: true } }];\n  }\n  \n  // Array of events\n  return parsed.map(e => ({ json: e }));\n} catch (e) {\n  return [{ json: { noChanges: true } }];\n}"
+      },
+      "id": "a0284d6f-83a8-4e83-8e5e-922751662829",
+      "name": "Parse Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -976,
+        -208
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "filter-no-changes",
+              "leftValue": "={{ !!$json.noChanges || !!$json.error }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b4963deb-ce04-4634-a93d-e785c7342a55",
+      "name": "Filter: Changes Only",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [
+        -736,
+        -208
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "#new-devices",
+          "mode": "name"
+        },
+        "text": "=🖥️ *JUMPCLOUD — New Device Enrolled*\n\n• *Computer:* {{ $json.name }}\n• *Hostname:* {{ $json.hostname }}\n• *OS:* {{ $json.os }}{{ $json.version !== 'Unknown' ? ' (' + $json.version + ')' : '' }}\n• *IP:* {{ $json.ipAddress }}\n• *Serial:* {{ $json.serialNumber }}\n• *Device ID:* {{ $json.id }}\n• *Source:* JumpCloud Systems API\n• *Time:* {{ new Date(new Date().getTime() + 2*60*60*1000).toLocaleDateString('en-GB', {day:'numeric',month:'numeric',year:'numeric'}) + ' ' + new Date(new Date().getTime() + 2*60*60*1000).toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit',hour12:true}) }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "id": "ef8b3c9c-cbd4-4c99-a7ba-abb718675fac",
+      "name": "Slack - Device Created",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        -256,
+        -368
+      ],
+      "webhookId": "bc2f2cb5-b3f2-4771-84b6-aac1c7b82875",
+      "credentials": {
+        "slackApi": {
+          "id": "obEYVo8oQOJ22JqX",
+          "name": "AD Admin Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "#device-deleted",
+          "mode": "name"
+        },
+        "text": "=🗑️ *JUMPCLOUD — Device Deleted*\n\n• *Computer:* {{ $json.name }}\n• *Hostname:* {{ $json.hostname }}\n• *OS:* {{ $json.os }}{{ $json.version !== 'Unknown' ? ' (' + $json.version + ')' : '' }}\n• *Serial:* {{ $json.serialNumber }}\n• *Last Seen:* {{ $json.lastContact ? new Date(new Date($json.lastContact).getTime() + 2*60*60*1000).toLocaleDateString('en-GB', {day:'numeric',month:'numeric',year:'numeric'}) + ' ' + new Date(new Date($json.lastContact).getTime() + 2*60*60*1000).toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit',hour12:true}) : 'N/A' }}\n• *Device ID:* {{ $json.id }}\n• *Source:* JumpCloud Systems API\n• *Time:* {{ new Date(new Date().getTime() + 2*60*60*1000).toLocaleDateString('en-GB', {day:'numeric',month:'numeric',year:'numeric'}) + ' ' + new Date(new Date().getTime() + 2*60*60*1000).toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit',hour12:true}) }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "id": "08a133ba-4e2f-4940-b2c8-f9e659a5fcbf",
+      "name": "Slack - Device Deleted",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        -256,
+        -48
+      ],
+      "webhookId": "caa59db7-98cb-47d0-86dc-67d4f8a1092c",
+      "credentials": {
+        "slackApi": {
+          "id": "obEYVo8oQOJ22JqX",
+          "name": "AD Admin Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.actionType }}",
+                    "rightValue": "system_created",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "switch-created"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.actionType }}",
+                    "rightValue": "system_deleted",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "switch-deleted"
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ad245dc4-6702-4cf0-97e0-fdf0e252857b",
+      "name": "Switch: Created or Deleted1",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -480,
+        -208
+      ]
+    }
+  ],
+  "connections": {
+    "Schedule - Every 30 Sec": {
+      "main": [
+        [
+          {
+            "node": "SSH - Run Script",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH - Run Script": {
+      "main": [
+        [
+          {
+            "node": "Parse Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Output": {
+      "main": [
+        [
+          {
+            "node": "Filter: Changes Only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter: Changes Only": {
+      "main": [
+        [
+          {
+            "node": "Switch: Created or Deleted1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch: Created or Deleted1": {
+      "main": [
+        [
+          {
+            "node": "Slack - Device Created",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Slack - Device Deleted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "staticData": {
+    "node:Schedule - Every 1 Min": {
+      "recurrenceRules": []
+    },
+    "global": {
+      "systemsSnapshot": {
+        "67b06fdb67dd89379193d0ea": {
+          "id": "67b06fdb67dd89379193d0ea",
+          "name": "Unknown",
+          "os": "Unknown",
+          "version": "Unknown",
+          "serialNumber": "N/A"
+        },
+        "6839eecd69eaa2b866b57ed1": {
+          "id": "6839eecd69eaa2b866b57ed1",
+          "name": "Unknown",
+          "os": "Unknown",
+          "version": "Unknown",
+          "serialNumber": "N/A"
+        }
+      }
+    },
+    "node:Schedule - Every 30 Sec": {
+      "recurrenceRules": []
+    }
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "ccfbd241-60f0-4b1c-b812-e1b7dd619021",
+  "activeVersionId": "ccfbd241-60f0-4b1c-b812-e1b7dd619021",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-01T20:18:08.905Z",
+      "createdAt": "2026-03-01T20:18:08.905Z",
+      "role": "workflow:owner",
+      "workflowId": "ETxwCmCpqhIkILZ0",
+      "projectId": "pWTWmuHnmIHw48U9"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-03-06T19:53:52.000Z",
+    "createdAt": "2026-03-06T19:53:43.480Z",
+    "versionId": "ccfbd241-60f0-4b1c-b812-e1b7dd619021",
+    "workflowId": "ETxwCmCpqhIkILZ0",
+    "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "seconds"
+              }
+            ]
+          }
+        },
+        "id": "e72b0673-77d7-46f9-b2ee-e04a4ffc435d",
+        "name": "Schedule - Every 30 Sec",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          -1456,
+          -208
+        ]
+      },
+      {
+        "parameters": {
+          "command": "powershell.exe -NonInteractive -ExecutionPolicy Bypass -File C:\\Scripts\\Get-JCDeviceChanges.ps1",
+          "cwd": "="
+        },
+        "id": "c44f0be4-78e8-46ee-bb65-7ea2d8de6204",
+        "name": "SSH - Run Script",
+        "type": "n8n-nodes-base.ssh",
+        "typeVersion": 1,
+        "position": [
+          -1216,
+          -208
+        ],
+        "credentials": {
+          "sshPassword": {
+            "id": "umWU43lA8b3R4GcA",
+            "name": "SSH Password account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "const raw = $input.first().json.stdout?.trim();\n\nif (!raw || raw === '' || raw === '[]') {\n  return [{ json: { noChanges: true } }];\n}\n\ntry {\n  const parsed = JSON.parse(raw);\n  \n  // Single object\n  if (!Array.isArray(parsed)) {\n    return [{ json: parsed }];\n  }\n  \n  // Empty array\n  if (parsed.length === 0) {\n    return [{ json: { noChanges: true } }];\n  }\n  \n  // Array of events\n  return parsed.map(e => ({ json: e }));\n} catch (e) {\n  return [{ json: { noChanges: true } }];\n}"
+        },
+        "id": "a0284d6f-83a8-4e83-8e5e-922751662829",
+        "name": "Parse Output",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -976,
+          -208
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 1
+            },
+            "conditions": [
+              {
+                "id": "filter-no-changes",
+                "leftValue": "={{ !!$json.noChanges || !!$json.error }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "boolean",
+                  "operation": "false",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "b4963deb-ce04-4634-a93d-e785c7342a55",
+        "name": "Filter: Changes Only",
+        "type": "n8n-nodes-base.filter",
+        "typeVersion": 2,
+        "position": [
+          -736,
+          -208
+        ]
+      },
+      {
+        "parameters": {
+          "select": "channel",
+          "channelId": {
+            "__rl": true,
+            "value": "#new-devices",
+            "mode": "name"
+          },
+          "text": "=🖥️ *JUMPCLOUD — New Device Enrolled*\n\n• *Computer:* {{ $json.name }}\n• *Hostname:* {{ $json.hostname }}\n• *OS:* {{ $json.os }}{{ $json.version !== 'Unknown' ? ' (' + $json.version + ')' : '' }}\n• *IP:* {{ $json.ipAddress }}\n• *Serial:* {{ $json.serialNumber }}\n• *Device ID:* {{ $json.id }}\n• *Source:* JumpCloud Systems API\n• *Time:* {{ new Date(new Date().getTime() + 2*60*60*1000).toLocaleDateString('en-GB', {day:'numeric',month:'numeric',year:'numeric'}) + ' ' + new Date(new Date().getTime() + 2*60*60*1000).toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit',hour12:true}) }}",
+          "otherOptions": {
+            "includeLinkToWorkflow": false
+          }
+        },
+        "id": "ef8b3c9c-cbd4-4c99-a7ba-abb718675fac",
+        "name": "Slack - Device Created",
+        "type": "n8n-nodes-base.slack",
+        "typeVersion": 2.2,
+        "position": [
+          -256,
+          -368
+        ],
+        "webhookId": "bc2f2cb5-b3f2-4771-84b6-aac1c7b82875",
+        "credentials": {
+          "slackApi": {
+            "id": "obEYVo8oQOJ22JqX",
+            "name": "AD Admin Bot"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "select": "channel",
+          "channelId": {
+            "__rl": true,
+            "value": "#device-deleted",
+            "mode": "name"
+          },
+          "text": "=🗑️ *JUMPCLOUD — Device Deleted*\n\n• *Computer:* {{ $json.name }}\n• *Hostname:* {{ $json.hostname }}\n• *OS:* {{ $json.os }}{{ $json.version !== 'Unknown' ? ' (' + $json.version + ')' : '' }}\n• *Serial:* {{ $json.serialNumber }}\n• *Last Seen:* {{ $json.lastContact ? new Date(new Date($json.lastContact).getTime() + 2*60*60*1000).toLocaleDateString('en-GB', {day:'numeric',month:'numeric',year:'numeric'}) + ' ' + new Date(new Date($json.lastContact).getTime() + 2*60*60*1000).toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit',hour12:true}) : 'N/A' }}\n• *Device ID:* {{ $json.id }}\n• *Source:* JumpCloud Systems API\n• *Time:* {{ new Date(new Date().getTime() + 2*60*60*1000).toLocaleDateString('en-GB', {day:'numeric',month:'numeric',year:'numeric'}) + ' ' + new Date(new Date().getTime() + 2*60*60*1000).toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit',hour12:true}) }}",
+          "otherOptions": {
+            "includeLinkToWorkflow": false
+          }
+        },
+        "id": "08a133ba-4e2f-4940-b2c8-f9e659a5fcbf",
+        "name": "Slack - Device Deleted",
+        "type": "n8n-nodes-base.slack",
+        "typeVersion": 2.2,
+        "position": [
+          -256,
+          -48
+        ],
+        "webhookId": "caa59db7-98cb-47d0-86dc-67d4f8a1092c",
+        "credentials": {
+          "slackApi": {
+            "id": "obEYVo8oQOJ22JqX",
+            "name": "AD Admin Bot"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "rules": {
+            "values": [
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "strict",
+                    "version": 2
+                  },
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.actionType }}",
+                      "rightValue": "system_created",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      },
+                      "id": "switch-created"
+                    }
+                  ],
+                  "combinator": "and"
+                }
+              },
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "strict",
+                    "version": 2
+                  },
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.actionType }}",
+                      "rightValue": "system_deleted",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      },
+                      "id": "switch-deleted"
+                    }
+                  ],
+                  "combinator": "and"
+                }
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "ad245dc4-6702-4cf0-97e0-fdf0e252857b",
+        "name": "Switch: Created or Deleted1",
+        "type": "n8n-nodes-base.switch",
+        "typeVersion": 3.2,
+        "position": [
+          -480,
+          -208
+        ]
+      }
+    ],
+    "connections": {
+      "Schedule - Every 30 Sec": {
+        "main": [
+          [
+            {
+              "node": "SSH - Run Script",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "SSH - Run Script": {
+        "main": [
+          [
+            {
+              "node": "Parse Output",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Parse Output": {
+        "main": [
+          [
+            {
+              "node": "Filter: Changes Only",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Filter: Changes Only": {
+        "main": [
+          [
+            {
+              "node": "Switch: Created or Deleted1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Switch: Created or Deleted1": {
+        "main": [
+          [
+            {
+              "node": "Slack - Device Created",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Slack - Device Deleted",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Alex Vinokur",
+    "name": "Version ccfbd241",
+    "description": "",
+    "autosaved": true
+  },
+  "tags": []
+}
