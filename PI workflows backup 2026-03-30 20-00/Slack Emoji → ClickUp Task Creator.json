@@ -1,0 +1,293 @@
+{
+  "updatedAt": "2026-03-30T12:36:03.880Z",
+  "createdAt": "2026-03-27T16:50:00.099Z",
+  "id": "QSg089s0wQt6NSqe",
+  "name": "Slack Emoji → ClickUp Task Creator",
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "channelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "options": {}
+      },
+      "id": "6534cf6b-0312-4beb-88b5-5d1a0d9a992d",
+      "name": "Slack Trigger",
+      "type": "n8n-nodes-base.slackTrigger",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        48
+      ],
+      "webhookId": "01a2f7b9-92f9-4ebf-b9bb-8b6196648dfd",
+      "credentials": {
+        "slackApi": {
+          "id": "F4TbMFcYC0qqJERR",
+          "name": "Subnet Calculator"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "emoji-check",
+              "leftValue": "={{ $json.event.reaction }}",
+              "rightValue": "clipboard",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b1463fb4-e998-4089-88cb-de9c9600e449",
+      "name": "Filter Emoji (📋)",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [
+        144,
+        48
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://slack.com/api/conversations.history",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $credentials.slackApi.accessToken }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "channel",
+              "value": "={{ $json.event.item.channel }}"
+            },
+            {
+              "name": "latest",
+              "value": "={{ $json.event.item.ts }}"
+            },
+            {
+              "name": "inclusive",
+              "value": "true"
+            },
+            {
+              "name": "limit",
+              "value": "1"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "60cc99ca-7bc3-4216-91af-0e3ec7602ce7",
+      "name": "Get Slack Message",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        368,
+        48
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "msg-text",
+              "name": "messageText",
+              "value": "={{ $json.messages[0].text }}",
+              "type": "string"
+            },
+            {
+              "id": "msg-user",
+              "name": "messageUser",
+              "value": "={{ $json.messages[0].user }}",
+              "type": "string"
+            },
+            {
+              "id": "channel-id",
+              "name": "channelId",
+              "value": "={{ $('Slack Trigger').item.json.event.item.channel }}",
+              "type": "string"
+            },
+            {
+              "id": "msg-ts",
+              "name": "messageTs",
+              "value": "={{ $('Slack Trigger').item.json.event.item.ts }}",
+              "type": "string"
+            },
+            {
+              "id": "slack-link",
+              "name": "slackLink",
+              "value": "=https://app.slack.com/archives/{{ $('Slack Trigger').item.json.event.item.channel }}/p{{ $('Slack Trigger').item.json.event.item.ts.replace('.', '') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7880c1bd-77a2-4de3-b347-8d3fcbe59cdf",
+      "name": "Extract Message Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        592,
+        48
+      ]
+    },
+    {
+      "parameters": {
+        "name": "={{ $json.messageText.substring(0, 100) }}",
+        "additionalFields": {
+          "content": "=**Slack Message:**\n{{ $json.messageText }}\n\n**Slack Link:** {{ $json.slackLink }}\n\n**Posted by:** <@{{ $json.messageUser }}>",
+          "dueDate": "={{ new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() }}",
+          "priority": 3,
+          "status": "to do"
+        }
+      },
+      "id": "e37a6e77-fb5e-4722-9e26-bdad6fdd63dc",
+      "name": "Create ClickUp Task",
+      "type": "n8n-nodes-base.clickUp",
+      "typeVersion": 1,
+      "position": [
+        800,
+        48
+      ]
+    },
+    {
+      "parameters": {
+        "messageType": "block",
+        "blocksUi": {
+          "blocksValues": [
+            {
+              "type": "section",
+              "text": {
+                "type": "mrkdwn",
+                "text": "=✅ *ClickUp task created!*\n\n*<{{ $json.url }}|{{ $json.name }}>*\n📌 Priority: Normal | 📅 Due: {{ new Date($json.due_date).toLocaleDateString('en-IL', {timeZone: 'Asia/Jerusalem'}) }}\n🗂️ List: {{ $json.list.name }}"
+              }
+            }
+          ]
+        },
+        "otherOptions": {
+          "thread_ts": {
+            "replyValues": {
+              "thread_ts": "={{ $('Extract Message Data').item.json.messageTs }}"
+            }
+          }
+        }
+      },
+      "id": "483729f4-334d-4be3-9bb6-7257e4ceeba7",
+      "name": "Reply in Slack Thread",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        1024,
+        48
+      ],
+      "webhookId": "2163e672-dbb8-47c2-9906-2dd691f73552"
+    }
+  ],
+  "connections": {
+    "Slack Trigger": {
+      "main": [
+        [
+          {
+            "node": "Filter Emoji (📋)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Emoji (📋)": {
+      "main": [
+        [
+          {
+            "node": "Get Slack Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Slack Message": {
+      "main": [
+        [
+          {
+            "node": "Extract Message Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Message Data": {
+      "main": [
+        [
+          {
+            "node": "Create ClickUp Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create ClickUp Task": {
+      "main": [
+        [
+          {
+            "node": "Reply in Slack Thread",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": {
+    "node:ClickUp Trigger": {}
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "eaec4b6d-a15b-4d07-845b-f8eb9761d718",
+  "activeVersionId": null,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-27T16:50:00.109Z",
+      "createdAt": "2026-03-27T16:50:00.109Z",
+      "role": "workflow:owner",
+      "workflowId": "QSg089s0wQt6NSqe",
+      "projectId": "pWTWmuHnmIHw48U9"
+    }
+  ],
+  "activeVersion": null,
+  "tags": []
+}
