@@ -1,0 +1,1595 @@
+{
+  "updatedAt": "2026-03-30T13:15:39.203Z",
+  "createdAt": "2025-09-02T14:14:42.893Z",
+  "id": "GzAlS0kt9q4YI0n7",
+  "name": "Slack Article Summarizer",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "url": "={{$json.url}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            },
+            {
+              "name": "Accept",
+              "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+            },
+            {
+              "name": "Accept-Language",
+              "value": "en-US,en;q=0.9,he;q=0.8,ru;q=0.7"
+            }
+          ]
+        },
+        "options": {
+          "redirect": {
+            "redirect": {
+              "maxRedirects": 5
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1952,
+        2576
+      ],
+      "id": "1c7a435f-bf21-4629-a566-f613af780621",
+      "name": "Fetch Page",
+      "retryOnFail": true,
+      "maxTries": 2
+    },
+    {
+      "parameters": {
+        "jsCode": "const err = $json.error || 'Unknown error';\nconst url = $json.url || '';\nconst lang = $json.language || 'en';\nconst channel = $('Is Duplicate?').first().json.slack_channel || $('Extract URL & Deduplicate').first().json.slack_channel || '';\n\nconst msgs = { he: '⚠️ נכשל בסיכום המאמר', ru: '⚠️ Не удалось обобщить статью', en: '⚠️ Failed to summarize article' };\nconst reasons = { he: 'סיבה:', ru: 'Причина:', en: 'Reason:' };\nreturn [{ json: { text: `${msgs[lang] || msgs.en}\\n${reasons[lang] || reasons.en} ${err}\\n\\n${url ? `<${url}|Link>` : ''}`, slack_channel: channel } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -752,
+        2752
+      ],
+      "id": "4906c1e6-4caf-48e0-b55c-6cf8c32eb977",
+      "name": "Format Error"
+    },
+    {
+      "parameters": {
+        "jsCode": "let raw = $json.output || $json.text || $json.content || '';\nif (typeof raw !== 'string') raw = JSON.stringify(raw);\n\nconst url = $('Build Prompt1').first().json.url || '';\nconst language = $('Build Prompt1').first().json.language || 'en';\nconst slack_channel = $('Is Duplicate?').first().json.slack_channel || $('Extract URL & Deduplicate').first().json.slack_channel || '';\n\n// HTML entity decoder\nconst decodeEntities = (str) => str\n  .replace(/&quot;/g, '\"')\n  .replace(/&amp;/g, '&')\n  .replace(/&lt;/g, '<')\n  .replace(/&gt;/g, '>')\n  .replace(/&#39;/g, \"'\")\n  .replace(/&apos;/g, \"'\")\n  .replace(/&#x27;/g, \"'\")\n  .replace(/&#(\\d+);/g, (_, n) => String.fromCharCode(Number(n)));\n\n// Unwrap double-encoded string\ntry {\n  const unwrapped = JSON.parse(raw);\n  if (typeof unwrapped === 'string') raw = unwrapped;\n} catch (e) {}\n\n// Strip <think>...</think> blocks (Gemma/DeepSeek reasoning traces)\nraw = raw.replace(/<think>[\\s\\S]*?<\\/think>/gi, '').trim();\n\n// Strip markdown fences\nlet s = raw.replace(/```json\\s*/gi, '').replace(/```\\s*/g, '');\n\n// Extract first JSON object\nconst si = s.indexOf('{');\nconst ei = s.lastIndexOf('}');\nif (si > -1 && ei > si) s = s.substring(si, ei + 1);\n\n// Normalize whitespace and smart quotes\ns = s.replace(/[\\r\\n]+/g, ' ').replace(/[\\u2018\\u2019]/g, \"'\").replace(/[\\u201C\\u201D]/g, '\"').trim();\n\nlet title = 'Summary';\nlet bullets = [];\n\n// Attempt 1: Direct JSON parse\ntry {\n  const obj = JSON.parse(s);\n  title = obj.title || 'Summary';\n  bullets = Array.isArray(obj.bullets) ? obj.bullets : [];\n} catch (e) {\n  // Attempt 2: Fix trailing commas\n  try {\n    let fixed = s.replace(/,\\s*]/g, ']').replace(/,\\s*}/g, '}');\n    const obj = JSON.parse(fixed);\n    title = obj.title || 'Summary';\n    bullets = Array.isArray(obj.bullets) ? obj.bullets : [];\n  } catch (e2) {\n    // Attempt 3: Truncated JSON repair - close open brackets/braces\n    try {\n      let repair = s;\n      const openBrackets = (repair.match(/\\[/g) || []).length;\n      const closeBrackets = (repair.match(/\\]/g) || []).length;\n      const openBraces = (repair.match(/\\{/g) || []).length;\n      const closeBraces = (repair.match(/\\}/g) || []).length;\n      const quotes = repair.match(/(?<!\\\\)\"/g) || [];\n      if (quotes.length % 2 !== 0) repair += '\"';\n      for (let i = 0; i < (openBrackets - closeBrackets); i++) repair += ']';\n      for (let i = 0; i < (openBraces - closeBraces); i++) repair += '}';\n      repair = repair.replace(/,\\s*]/g, ']').replace(/,\\s*}/g, '}');\n      const obj = JSON.parse(repair);\n      title = obj.title || 'Summary';\n      bullets = Array.isArray(obj.bullets) ? obj.bullets : [];\n    } catch (e3) {\n      // Attempt 4: Aggressive truncation salvage\n      try {\n        const tm = s.match(/\"title\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"/);\n        if (tm) title = tm[1].replace(/\\\\\"/g, '\"').replace(/\\\\n/g, ' ');\n        \n        const bulletsStart = s.indexOf('\"bullets\"');\n        if (bulletsStart > -1) {\n          const afterBullets = s.substring(bulletsStart);\n          const bracketStart = afterBullets.indexOf('[');\n          if (bracketStart > -1) {\n            const bulletsContent = afterBullets.substring(bracketStart + 1);\n            const completeStrings = [];\n            let inString = false;\n            let current = '';\n            let escaped = false;\n            for (let i = 0; i < bulletsContent.length; i++) {\n              const ch = bulletsContent[i];\n              if (escaped) { current += ch; escaped = false; continue; }\n              if (ch === '\\\\') { current += ch; escaped = true; continue; }\n              if (ch === '\"') {\n                if (inString) {\n                  if (current.length > 25) completeStrings.push(current.replace(/\\\\\"/g, '\"').replace(/\\\\n/g, ' '));\n                  current = '';\n                  inString = false;\n                } else {\n                  inString = false;\n                  current = '';\n                  inString = true;\n                }\n              } else if (inString) {\n                current += ch;\n              }\n            }\n            if (completeStrings.length > 0) bullets = completeStrings;\n          }\n        }\n      } catch (e4) {\n        // Attempt 5: Simple regex fallback\n        const tm = s.match(/\"title\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"/);\n        const bm = s.match(/\"bullets\"\\s*:\\s*\\[([\\s\\S]*?)\\]/);\n        if (tm) title = tm[1];\n        if (bm) bullets = [...bm[1].matchAll(/\"((?:[^\"\\\\]|\\\\.){10,})\"/g)].map(m => m[1]).filter(b => b.length > 15);\n      }\n    }\n  }\n}\n\n// Decode HTML entities in title\ntitle = decodeEntities(title);\n\nbullets = bullets\n  .map(b => {\n    let cleaned = String(b).replace(/^[•\\-\\s]+/, '').replace(/\\.{2,}/g, '.').replace(/\\s+/g, ' ').replace(/\\\\n/g, ' ').replace(/\\\\\"/g, '\"').trim();\n    return decodeEntities(cleaned);\n  })\n  .filter(b => {\n    if (!b || b.length < 25) return false;\n    const lc = b.toLowerCase();\n    return !lc.includes('no further details') && !lc.includes('no additional details') &&\n           !lc.includes('לא נמצאו פרטים') && !lc.includes('אין פרטים') &&\n           !lc.includes('информация недоступна');\n  });\n\nif (bullets.length === 0) {\n  const noContent = { he: 'לא הצלחתי לחלץ מידע מהמאמר', ru: 'Не удалось извлечь информацию', en: 'Could not extract summary from article' };\n  return [{ json: { text: `⚠️ ${noContent[language] || noContent.en}\\n\\n${url ? `<${url}|Link>` : ''}`, slack_channel } }];\n}\n\nconst RLM = '\\u200F';\nconst LRM = '\\u200E';\nconst wrapLatin = t => t.replace(/([A-Za-z0-9]+(?:[.,:/\\-][A-Za-z0-9]+)*)/g, `${LRM}$1${LRM}`);\n\nlet titleLine, bulletLines;\n\nif (language === 'he') {\n  const wt = url ? `<${url}|${wrapLatin(title)}>` : wrapLatin(title);\n  titleLine = `${RLM}:brain: ${wt}`;\n  bulletLines = bullets.map(b => `${RLM}• ${wrapLatin(b)}`);\n} else if (language === 'ru') {\n  titleLine = url ? `:brain: <${url}|${title}>` : `:brain: ${title}`;\n  bulletLines = bullets.map(b => `• ${b}`);\n} else {\n  titleLine = url ? `:brain: Summary: <${url}|${title}>` : `:brain: Summary: ${title}`;\n  bulletLines = bullets.map(b => `• ${b}`);\n}\n\nreturn [{ json: { text: [titleLine, '', ...bulletLines].join('\\n'), slack_channel } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        112,
+        2592
+      ],
+      "id": "e827fc27-9438-40ef-957d-7ba603a003cb",
+      "name": "Validate & Format"
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "={{ $json.slack_channel }}",
+          "mode": "id"
+        },
+        "text": "={{$json.text}}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        304,
+        2752
+      ],
+      "id": "164d064e-1271-4d21-844f-974d9a91319c",
+      "name": "Send to Slack",
+      "webhookId": "946820e3-d85c-43a1-a0e5-58777a4a0c86",
+      "credentials": {
+        "slackApi": {
+          "id": "I5astSkOODZZU76Y",
+          "name": "n8n Summery"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Check content-type — skip non-HTML responses (PDFs, images, etc.)\nconst headers = $json.headers || {};\nconst contentType = (headers['content-type'] || headers['Content-Type'] || '').toLowerCase();\nconst url = $('Is Duplicate?').first().json.url || '';\n\n// HTML entity decoder\nconst decodeEntities = (str) => str\n  .replace(/&quot;/g, '\"')\n  .replace(/&amp;/g, '&')\n  .replace(/&lt;/g, '<')\n  .replace(/&gt;/g, '>')\n  .replace(/&#39;/g, \"'\")\n  .replace(/&apos;/g, \"'\")\n  .replace(/&#x27;/g, \"'\")\n  .replace(/&#(\\d+);/g, (_, n) => String.fromCharCode(Number(n)));\n\n// Accept text/html and application/xhtml+xml\nif (contentType && !contentType.includes('text/html') && !contentType.includes('application/xhtml') && !contentType.includes('text/plain')) {\n  return [{ json: { error: `Non-HTML content (${contentType.split(';')[0]}). Cannot extract article text.`, url, needsJina: false } }];\n}\nconst html = $json.body || $json.data || $json.html || $json.content || '';\nif (!html || (typeof html === 'string' && html.length < 100)) {\n  return [{ json: { error: 'No HTML content received', url, needsJina: true } }];\n}\nconst MAX_LEN = 12000;\nlet text = '';\ntry {\n  const ld = html.match(/<script[^>]*type=[\"']application\\/ld\\+json[\"'][^>]*>([\\s\\S]*?)<\\/script>/i);\n  if (ld) { const d = JSON.parse(ld[1]); if (d.articleBody && d.articleBody.length > 300) text = d.articleBody; }\n} catch (e) {}\nif (text.length < 300) {\n  const art = html.match(/<article[^>]*>([\\s\\S]*?)<\\/article>/i);\n  if (art) {\n    const ex = art[1].replace(/<script[\\s\\S]*?<\\/script>/gi,'').replace(/<style[\\s\\S]*?<\\/style>/gi,'').replace(/<nav[\\s\\S]*?<\\/nav>/gi,'').replace(/<aside[\\s\\S]*?<\\/aside>/gi,'').replace(/<footer[\\s\\S]*?<\\/footer>/gi,'').replace(/<[^>]+>/g,' ').replace(/\\s+/g,' ').trim();\n    if (ex.length > text.length) text = ex;\n  }\n}\nif (text.length < 300) {\n  const main = html.match(/<main[^>]*>([\\s\\S]*?)<\\/main>/i);\n  if (main) {\n    const ex = main[1].replace(/<script[\\s\\S]*?<\\/script>/gi,'').replace(/<style[\\s\\S]*?<\\/style>/gi,'').replace(/<nav[\\s\\S]*?<\\/nav>/gi,'').replace(/<[^>]+>/g,' ').replace(/\\s+/g,' ').trim();\n    if (ex.length > text.length) text = ex;\n  }\n}\nif (text.length < 300) {\n  const pat = /<div[^>]*class=\"[^\"]*(?:art_body|article_text|article-body|post-content|entry-content|story-body|article__content|content-body)[^\"]*\"[^>]*>([\\s\\S]*?)<\\/div>/i;\n  const match = html.match(pat);\n  if (match) { const ex = match[1].replace(/<[^>]+>/g,' ').replace(/\\s+/g,' ').trim(); if (ex.length > text.length) text = ex; }\n}\nif (text.length < 300) {\n  const paras = html.match(/<p[^>]*>(.*?)<\\/p>/gis);\n  if (paras && paras.length > 3) {\n    const good = paras.map(p => p.replace(/<[^>]+>/g,'').trim()).filter(p => p.length > 40 && !/cookie|privacy|subscribe|newsletter|הרשמה|פרטיות/i.test(p));\n    if (good.length >= 3) text = good.join('\\n\\n');\n  }\n}\ntext = text.replace(/all rights reserved|כל הזכויות שמורות|copyright \\d{4}|©\\s*\\d{4}/gi,'').replace(/follow us on.*|עקבו אחרינו.*/gi,'').replace(/\\s+/g,' ').trim();\n// If extraction failed, flag for Jina fallback\nif (!text || text.length < 200) {\n  return [{ json: { error: 'Direct extraction failed', url, needsJina: true } }];\n}\n// Detect language\nconst israeliSites = ['walla.co.il','ynet.co.il','mako.co.il','haaretz.co.il','calcalist.co.il','globes.co.il','maariv.co.il','sport5.co.il','kan.org.il','n12.co.il','reshet13.co.il','ice.co.il','arutz7.co.il','hidabroot.com'];\nconst russianSites = ['rbc.ru','lenta.ru','ria.ru','tass.ru','kommersant.ru','meduza.io','novayagazeta.ru','iz.ru'];\nlet language = 'en';\nif (israeliSites.some(s => url.includes(s))) language = 'he';\nelse if (russianSites.some(s => url.includes(s))) language = 'ru';\nelse {\n  const heb = (text.match(/[\\u0590-\\u05FF]/g) || []).length;\n  const cyr = (text.match(/[\\u0400-\\u04FF]/g) || []).length;\n  const total = text.length;\n  if (heb / total > 0.08) language = 'he';\n  else if (cyr / total > 0.08) language = 'ru';\n}\n\n// Decode HTML entities before sending to LLM\ntext = decodeEntities(text);\n\nif (text.length > MAX_LEN) text = text.substring(0, MAX_LEN) + '... [truncated]';\nreturn [{ json: { article: text, url, language, charCount: text.length, needsJina: false } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1712,
+        2576
+      ],
+      "id": "2be08bb4-de82-4b4d-875d-879f557a0766",
+      "name": "Extract Text & Detect Language"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "dup-check",
+              "leftValue": "={{ $json.isDuplicate }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -2192,
+        2480
+      ],
+      "id": "94716a17-f037-4535-bd38-f283450b58aa",
+      "name": "Is Duplicate?"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body || $json;\nconst event = body.event || {};\nconst headers = $json.headers || {};\n\n// --- Retry filter ---\nif (headers['x-slack-retry-num']) return [];\n\n// --- Bot user ID from env or fallback ---\nconst BOT_USER_ID = 'U07K8QJ9XYZ';\n\n// --- Handle message_changed: only process if a NEW URL was added ---\nif (event.subtype === 'message_changed') {\n  const prev = event.previous_message?.text || '';\n  const curr = event.message?.text || '';\n  if (prev === curr) return [];\n\n  // Extract URLs from both versions\n  const extractUrls = (text) => {\n    const urls = new Set();\n    const slackRx = /<(https?:\\/\\/[^>|]+)(\\|[^>]+)?>/g;\n    let m;\n    while ((m = slackRx.exec(text)) !== null) urls.add(m[1]);\n    const plainRx = /https?:\\/\\/[^\\s<>\"'\\[\\]{}]+/g;\n    while ((m = plainRx.exec(text)) !== null) urls.add(m[0].replace(/[.,;:)]+$/, ''));\n    return urls;\n  };\n\n  const prevUrls = extractUrls(prev);\n  const currUrls = extractUrls(curr);\n  const newUrls = [...currUrls].filter(u => !prevUrls.has(u) && u.match(/^https?:\\/\\/.+\\..+/));\n\n  if (newUrls.length === 0) return [];\n\n  const user = event.message?.user || event.previous_message?.user || '';\n  if (!user || user === BOT_USER_ID || event.message?.bot_id) return [];\n\n  // Dedup\n  const staticData = $getWorkflowStaticData('global');\n  if (!staticData.processedUrls) staticData.processedUrls = {};\n  if (!staticData.processedMsgs) staticData.processedMsgs = {};\n\n  const msgKey = `${user}_${event.message?.ts || event.ts}_edited`;\n  if (staticData.processedMsgs[msgKey]) return [];\n  staticData.processedMsgs[msgKey] = Date.now();\n\n  // Clean old entries\n  const twoDaysAgo = Date.now() - 172800000;\n  for (const k of Object.keys(staticData.processedUrls)) {\n    if (staticData.processedUrls[k] < twoDaysAgo) delete staticData.processedUrls[k];\n  }\n  for (const k of Object.keys(staticData.processedMsgs)) {\n    if (staticData.processedMsgs[k] < twoDaysAgo) delete staticData.processedMsgs[k];\n  }\n\n  // Return all new URLs (supports multi-URL messages)\n  const results = [];\n  const fourHoursAgo = Date.now() - 14400000;\n  for (const url of newUrls) {\n    const isDuplicate = staticData.processedUrls[url] > fourHoursAgo;\n    if (!isDuplicate) staticData.processedUrls[url] = Date.now();\n    results.push({ json: { isDuplicate, url, slack_channel: event.channel, slack_user: user, slack_ts: event.message?.ts || event.ts } });\n  }\n  return results;\n}\n\n// --- Skip non-message subtypes ---\nconst skipSubtypes = ['bot_message','message_deleted','channel_join','channel_leave','channel_topic','channel_purpose','file_share','pinned_item','unpinned_item'];\nif (event.subtype && skipSubtypes.includes(event.subtype)) return [];\n\n// --- Skip bots and empty messages ---\nif (event.type !== 'message' || event.bot_id || event.user === BOT_USER_ID || !event.text) return [];\n\n// --- Extract URLs ---\nconst text = event.text || '';\nconst urls = new Set();\n\nconst slackRx = /<(https?:\\/\\/[^>|]+)(\\|[^>]+)?>/g;\nlet m;\nwhile ((m = slackRx.exec(text)) !== null) urls.add(m[1]);\n\nconst plainRx = /https?:\\/\\/[^\\s<>\"'\\[\\]{}]+/g;\nwhile ((m = plainRx.exec(text)) !== null) urls.add(m[0].replace(/[.,;:)]+$/, ''));\n\nconst validUrls = [...urls].filter(u => u.match(/^https?:\\/\\/.+\\..+/));\nif (validUrls.length === 0) return [];\n\n// --- Dedup ---\nconst staticData = $getWorkflowStaticData('global');\nif (!staticData.processedUrls) staticData.processedUrls = {};\nif (!staticData.processedMsgs) staticData.processedMsgs = {};\n\nconst msgKey = `${event.user}_${event.ts}`;\nif (staticData.processedMsgs[msgKey]) return [];\nstaticData.processedMsgs[msgKey] = Date.now();\n\nconst fourHoursAgo = Date.now() - 14400000;\nconst twoDaysAgo = Date.now() - 172800000;\n\n// Clean old entries\nfor (const k of Object.keys(staticData.processedUrls)) {\n  if (staticData.processedUrls[k] < twoDaysAgo) delete staticData.processedUrls[k];\n}\nfor (const k of Object.keys(staticData.processedMsgs)) {\n  if (staticData.processedMsgs[k] < twoDaysAgo) delete staticData.processedMsgs[k];\n}\n\n// Return ALL URLs from message (multi-URL support)\nconst results = [];\nfor (const url of validUrls) {\n  const isDuplicate = staticData.processedUrls[url] > fourHoursAgo;\n  if (!isDuplicate) staticData.processedUrls[url] = Date.now();\n  results.push({ json: { isDuplicate, url, slack_channel: event.channel, slack_user: event.user, slack_ts: event.ts } });\n}\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2400,
+        2480
+      ],
+      "id": "6e2d1dd9-dcc1-4e4f-975b-3a51b0c10a48",
+      "name": "Extract URL & Deduplicate"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        -2672,
+        2480
+      ],
+      "id": "b76c3f18-510f-41b9-b232-897e50b0e5d4",
+      "name": "Respond 200 (Ack)"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { challenge: $json.body.challenge } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2672,
+        2288
+      ],
+      "id": "8f50d3bf-c895-40d3-8ed5-2c644aaf9484",
+      "name": "Return Challenge"
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        -2400,
+        2288
+      ],
+      "id": "191044a8-419d-46fd-9aa1-df733bc5e863",
+      "name": "Respond 200 (Challenge)"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "url-verify-check",
+              "leftValue": "={{$json[\"body\"][\"type\"]}}",
+              "rightValue": "url_verification",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -2912,
+        2384
+      ],
+      "id": "916ab21f-8e4c-4710-a7c1-b5a0a795a58f",
+      "name": "Is URL Verification?"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "slack-events",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -3168,
+        2384
+      ],
+      "id": "ea9a5474-b68c-4d8f-8413-9462f2691542",
+      "name": "Webhook",
+      "webhookId": "d63266c1-1b49-4fc1-8530-cbdb5e8fb27f"
+    },
+    {
+      "parameters": {
+        "model": "google/gemini-2.5-flash-lite",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        -224,
+        2784
+      ],
+      "id": "0e02ff20-7c65-4a88-8d19-b2d9eca0fcc5",
+      "name": "OpenRouter Fallback1",
+      "credentials": {
+        "openRouterApi": {
+          "id": "hGAnvpSAhWRbFktq",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "google/gemma-3-27b",
+          "mode": "list",
+          "cachedResultName": "google/gemma-3-27b"
+        },
+        "options": {
+          "frequencyPenalty": 0.3,
+          "maxTokens": 32768,
+          "presencePenalty": 0.1,
+          "temperature": 0.2,
+          "timeout": 300000,
+          "topP": 0.9
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -400,
+        2800
+      ],
+      "id": "9b36bf41-a4ff-4dc0-ab31-63fd3dcf4066",
+      "name": "Local LLM1",
+      "credentials": {
+        "openAiApi": {
+          "id": "WJsCuec8UzGRGVIc",
+          "name": "Macbook Pro M1Pro"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.prompt }}",
+        "needsFallback": true,
+        "options": {
+          "systemMessage": "You are an expert article summarizer. Output ONLY valid JSON — no markdown fences, no preamble, no thinking."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -304,
+        2592
+      ],
+      "id": "922e526c-fcdd-48ac-bfc7-6aeb89ad9bb4",
+      "name": "AI Summarizer1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const article = $json.article || '';\nconst language = $json.language || 'en';\nconst url = $json.url || '';\n\nconst langNames = { he: 'Hebrew', ru: 'Russian', en: 'English' };\nconst langName = langNames[language] || 'English';\n\nconst prompt = `Summarize the following article in ${langName}.\n\nRules:\n- Output ONLY valid JSON, no markdown fences, no extra text.\n- Return a short headline title (5-10 words max) and exactly 5 bullet points.\n- The title should be a compelling headline capturing the main event or topic.\n- Do NOT repeat the title content in the first bullet point.\n- Each bullet: 3-4 sentences, 60-80 words, with specific details (names, dates, numbers, locations, quotes).\n- Each bullet must cover a DIFFERENT key aspect and provide enough context for someone unfamiliar with the topic.\n- The first bullet should provide essential context and background.\n- Remaining bullets should cover: key events/actions, people involved, consequences/impact, and broader context or next steps.\n- Include real names, dates, numbers, locations, and quotes mentioned in the article.\n- Do NOT invent or guess dates, facts, or details not in the article.\n- Do NOT include bullet characters in the bullets array.\n- Do NOT include filler like \"no further details available\".\n- The title and all bullets MUST be written in ${langName}.\n\nFormat:\n{\"title\": \"Short descriptive headline\", \"bullets\": [\"Point 1...\", \"Point 2...\", \"Point 3...\", \"Point 4...\", \"Point 5...\"]}\n\nArticle:\n${article}`;\n\nreturn [{ json: { prompt, language, url } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -512,
+        2592
+      ],
+      "id": "0211a157-ca03-4333-8307-4182874872d3",
+      "name": "Build Prompt1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "error-check",
+              "leftValue": "={{ $json.error }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -752,
+        2480
+      ],
+      "id": "0faf556e-7d35-4cfc-9adf-031ad062a8ac",
+      "name": "Has Error?1"
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "={{ $json.slack_channel }}",
+          "mode": "id"
+        },
+        "text": "=ℹ️ This URL was already summarized recently.\n\n<{{$json.url}}|{{$json.url}}>",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        -1952,
+        2384
+      ],
+      "id": "e4e23111-3438-41a9-897c-3d197a522489",
+      "name": "Send Duplicate Notice1",
+      "webhookId": "4c109572-f287-4e64-9bda-ffb85c1243de",
+      "credentials": {
+        "slackApi": {
+          "id": "I5astSkOODZZU76Y",
+          "name": "n8n Summery"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "error-check-direct",
+              "leftValue": "={{ $json.error }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1472,
+        2768
+      ],
+      "id": "18ebfc00-133d-4a36-ba85-b5a6a77d8bc3",
+      "name": "Has Direct Error?"
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $json.data || $json.body || $json.content || '';\nconst prevData = $('Needs Jina Fallback?').first().json;\nconst url = prevData.url || '';\n\nif (!raw || (typeof raw === 'string' && raw.length < 200)) {\n  let reason = prevData.error || 'Could not extract article text.';\n  if (reason === 'Direct extraction failed') {\n    reason += ' Jina Reader also failed — site may require login or block automated access.';\n  }\n  return [{ json: { error: reason, url, needsJina: false } }];\n}\n\nlet text = typeof raw === 'string' ? raw : JSON.stringify(raw);\nconst MAX_LEN = 12000;\n\n// Clean Jina output\ntext = text.replace(/^Title:.*\\n/i, '').replace(/^URL Source:.*\\n/i, '').replace(/^Markdown Content:\\n/i, '').replace(/!\\[.*?\\]\\(.*?\\)/g, '').replace(/\\[([^\\]]+)\\]\\(.*?\\)/g, '$1').replace(/#{1,6}\\s*/g, '').replace(/[*_]{1,3}/g, '').replace(/\\s+/g, ' ').trim();\n\ntext = text.replace(/all rights reserved|כל הזכויות שמורות|copyright \\d{4}|©\\s*\\d{4}/gi,'').replace(/follow us on.*|עקבו אחרינו.*/gi,'').replace(/\\s+/g,' ').trim();\n\n// Detect language\nconst israeliSites = ['walla.co.il','ynet.co.il','mako.co.il','haaretz.co.il','calcalist.co.il','globes.co.il','maariv.co.il','sport5.co.il','kan.org.il','n12.co.il','reshet13.co.il','ice.co.il','arutz7.co.il','hidabroot.com'];\nconst russianSites = ['rbc.ru','lenta.ru','ria.ru','tass.ru','kommersant.ru','meduza.io','novayagazeta.ru','iz.ru'];\n\nlet language = 'en';\nif (israeliSites.some(s => url.includes(s))) language = 'he';\nelse if (russianSites.some(s => url.includes(s))) language = 'ru';\nelse {\n  const heb = (text.match(/[\\u0590-\\u05FF]/g) || []).length;\n  const cyr = (text.match(/[\\u0400-\\u04FF]/g) || []).length;\n  const total = text.length;\n  if (heb / total > 0.08) language = 'he';\n  else if (cyr / total > 0.08) language = 'ru';\n}\n\nif (text.length > MAX_LEN) text = text.substring(0, MAX_LEN) + '... [truncated]';\n\nreturn [{ json: { article: text, url, language, charCount: text.length, needsJina: false } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -992,
+        2480
+      ],
+      "id": "0e2b7cf4-c8d2-4b34-91c6-7d2b7c96fb43",
+      "name": "Parse Jina Response"
+    },
+    {
+      "parameters": {
+        "url": "=https://r.jina.ai/{{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "text/plain"
+            },
+            {
+              "name": "X-Return-Format",
+              "value": "text"
+            }
+          ]
+        },
+        "options": {
+          "redirect": {
+            "redirect": {
+              "maxRedirects": 5
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1232,
+        2480
+      ],
+      "id": "053c189c-19e8-4373-bae6-e3c92e270dde",
+      "name": "Jina Reader Fallback",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "needs-jina-check",
+              "leftValue": "={{ $json.needsJina }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1472,
+        2576
+      ],
+      "id": "eea83cf5-c0fd-41d4-8377-b6a5aec7f98f",
+      "name": "Needs Jina Fallback?"
+    }
+  ],
+  "connections": {
+    "Fetch Page": {
+      "main": [
+        [
+          {
+            "node": "Extract Text & Detect Language",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Error": {
+      "main": [
+        [
+          {
+            "node": "Send to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate & Format": {
+      "main": [
+        [
+          {
+            "node": "Send to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Text & Detect Language": {
+      "main": [
+        [
+          {
+            "node": "Has Direct Error?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Needs Jina Fallback?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Duplicate?": {
+      "main": [
+        [
+          {
+            "node": "Send Duplicate Notice1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fetch Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract URL & Deduplicate": {
+      "main": [
+        [
+          {
+            "node": "Is Duplicate?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond 200 (Ack)": {
+      "main": [
+        [
+          {
+            "node": "Extract URL & Deduplicate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return Challenge": {
+      "main": [
+        [
+          {
+            "node": "Respond 200 (Challenge)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is URL Verification?": {
+      "main": [
+        [
+          {
+            "node": "Return Challenge",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond 200 (Ack)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Is URL Verification?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Fallback1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Summarizer1",
+            "type": "ai_languageModel",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Local LLM1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Summarizer1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Summarizer1": {
+      "main": [
+        [
+          {
+            "node": "Validate & Format",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Prompt1": {
+      "main": [
+        [
+          {
+            "node": "AI Summarizer1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Error?1": {
+      "main": [
+        [
+          {
+            "node": "Format Error",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Prompt1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Direct Error?": {
+      "main": [
+        [
+          {
+            "node": "Format Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Jina Response": {
+      "main": [
+        [
+          {
+            "node": "Has Error?1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Jina Reader Fallback": {
+      "main": [
+        [
+          {
+            "node": "Parse Jina Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Needs Jina Fallback?": {
+      "main": [
+        [
+          {
+            "node": "Jina Reader Fallback",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Prompt1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Jerusalem",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "binaryMode": "separate"
+  },
+  "staticData": {
+    "global": {
+      "metrics": {
+        "total": 216,
+        "success": 216
+      },
+      "processedUrls": {
+        "https://www.geektime.co.il/reports-claim-oneplus-is-about-to-shut-down-in-global-markets/": 1774874258939,
+        "https://www.jpost.com/middle-east/iran-news/article-891437": 1774874433919,
+        "https://www.cbr.com/nintendo-switch-2-price-change-may-2026/": 1774874497039,
+        "https://www.geektime.co.il/one-more-thing-macintosh-apple-50th-anniversary/": 1774875913972,
+        "https://www.geektime.co.il/netflix-and-sony-playstation-price-hike/": 1774876388235
+      },
+      "processedEvents": {
+        "1762243942.321019-undefined": 1762243945452
+      },
+      "processedMessages": {
+        "U08AYDL2FQD_1771354645.863239": 1771354647255
+      },
+      "processedMsgs": {
+        "U08AYDL2FQD_1774874257.163319": 1774874258939,
+        "U08AYDL2FQD_1774874433.026659": 1774874433919,
+        "U08AYDL2FQD_1774874495.321349": 1774874497039,
+        "U08AYDL2FQD_1774875912.873699": 1774875913972,
+        "U08AYDL2FQD_1774876386.788689": 1774876388235
+      }
+    }
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "8e01663c-f1ee-432b-a28a-9f72cc56db44",
+  "activeVersionId": "8e01663c-f1ee-432b-a28a-9f72cc56db44",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2025-10-31T09:14:00.820Z",
+      "createdAt": "2025-10-31T09:14:00.820Z",
+      "role": "workflow:owner",
+      "workflowId": "GzAlS0kt9q4YI0n7",
+      "projectId": "pWTWmuHnmIHw48U9"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-03-30T13:15:40.000Z",
+    "createdAt": "2026-03-30T13:15:39.205Z",
+    "versionId": "8e01663c-f1ee-432b-a28a-9f72cc56db44",
+    "workflowId": "GzAlS0kt9q4YI0n7",
+    "nodes": [
+      {
+        "parameters": {
+          "url": "={{$json.url}}",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "User-Agent",
+                "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+              },
+              {
+                "name": "Accept",
+                "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+              },
+              {
+                "name": "Accept-Language",
+                "value": "en-US,en;q=0.9,he;q=0.8,ru;q=0.7"
+              }
+            ]
+          },
+          "options": {
+            "redirect": {
+              "redirect": {
+                "maxRedirects": 5
+              }
+            },
+            "response": {
+              "response": {
+                "fullResponse": true
+              }
+            },
+            "timeout": 15000
+          }
+        },
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          -1952,
+          2576
+        ],
+        "id": "1c7a435f-bf21-4629-a566-f613af780621",
+        "name": "Fetch Page",
+        "retryOnFail": true,
+        "maxTries": 2
+      },
+      {
+        "parameters": {
+          "jsCode": "const err = $json.error || 'Unknown error';\nconst url = $json.url || '';\nconst lang = $json.language || 'en';\nconst channel = $('Is Duplicate?').first().json.slack_channel || $('Extract URL & Deduplicate').first().json.slack_channel || '';\n\nconst msgs = { he: '⚠️ נכשל בסיכום המאמר', ru: '⚠️ Не удалось обобщить статью', en: '⚠️ Failed to summarize article' };\nconst reasons = { he: 'סיבה:', ru: 'Причина:', en: 'Reason:' };\nreturn [{ json: { text: `${msgs[lang] || msgs.en}\\n${reasons[lang] || reasons.en} ${err}\\n\\n${url ? `<${url}|Link>` : ''}`, slack_channel: channel } }];"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -752,
+          2752
+        ],
+        "id": "4906c1e6-4caf-48e0-b55c-6cf8c32eb977",
+        "name": "Format Error"
+      },
+      {
+        "parameters": {
+          "jsCode": "let raw = $json.output || $json.text || $json.content || '';\nif (typeof raw !== 'string') raw = JSON.stringify(raw);\n\nconst url = $('Build Prompt1').first().json.url || '';\nconst language = $('Build Prompt1').first().json.language || 'en';\nconst slack_channel = $('Is Duplicate?').first().json.slack_channel || $('Extract URL & Deduplicate').first().json.slack_channel || '';\n\n// HTML entity decoder\nconst decodeEntities = (str) => str\n  .replace(/&quot;/g, '\"')\n  .replace(/&amp;/g, '&')\n  .replace(/&lt;/g, '<')\n  .replace(/&gt;/g, '>')\n  .replace(/&#39;/g, \"'\")\n  .replace(/&apos;/g, \"'\")\n  .replace(/&#x27;/g, \"'\")\n  .replace(/&#(\\d+);/g, (_, n) => String.fromCharCode(Number(n)));\n\n// Unwrap double-encoded string\ntry {\n  const unwrapped = JSON.parse(raw);\n  if (typeof unwrapped === 'string') raw = unwrapped;\n} catch (e) {}\n\n// Strip <think>...</think> blocks (Gemma/DeepSeek reasoning traces)\nraw = raw.replace(/<think>[\\s\\S]*?<\\/think>/gi, '').trim();\n\n// Strip markdown fences\nlet s = raw.replace(/```json\\s*/gi, '').replace(/```\\s*/g, '');\n\n// Extract first JSON object\nconst si = s.indexOf('{');\nconst ei = s.lastIndexOf('}');\nif (si > -1 && ei > si) s = s.substring(si, ei + 1);\n\n// Normalize whitespace and smart quotes\ns = s.replace(/[\\r\\n]+/g, ' ').replace(/[\\u2018\\u2019]/g, \"'\").replace(/[\\u201C\\u201D]/g, '\"').trim();\n\nlet title = 'Summary';\nlet bullets = [];\n\n// Attempt 1: Direct JSON parse\ntry {\n  const obj = JSON.parse(s);\n  title = obj.title || 'Summary';\n  bullets = Array.isArray(obj.bullets) ? obj.bullets : [];\n} catch (e) {\n  // Attempt 2: Fix trailing commas\n  try {\n    let fixed = s.replace(/,\\s*]/g, ']').replace(/,\\s*}/g, '}');\n    const obj = JSON.parse(fixed);\n    title = obj.title || 'Summary';\n    bullets = Array.isArray(obj.bullets) ? obj.bullets : [];\n  } catch (e2) {\n    // Attempt 3: Truncated JSON repair - close open brackets/braces\n    try {\n      let repair = s;\n      const openBrackets = (repair.match(/\\[/g) || []).length;\n      const closeBrackets = (repair.match(/\\]/g) || []).length;\n      const openBraces = (repair.match(/\\{/g) || []).length;\n      const closeBraces = (repair.match(/\\}/g) || []).length;\n      const quotes = repair.match(/(?<!\\\\)\"/g) || [];\n      if (quotes.length % 2 !== 0) repair += '\"';\n      for (let i = 0; i < (openBrackets - closeBrackets); i++) repair += ']';\n      for (let i = 0; i < (openBraces - closeBraces); i++) repair += '}';\n      repair = repair.replace(/,\\s*]/g, ']').replace(/,\\s*}/g, '}');\n      const obj = JSON.parse(repair);\n      title = obj.title || 'Summary';\n      bullets = Array.isArray(obj.bullets) ? obj.bullets : [];\n    } catch (e3) {\n      // Attempt 4: Aggressive truncation salvage\n      try {\n        const tm = s.match(/\"title\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"/);\n        if (tm) title = tm[1].replace(/\\\\\"/g, '\"').replace(/\\\\n/g, ' ');\n        \n        const bulletsStart = s.indexOf('\"bullets\"');\n        if (bulletsStart > -1) {\n          const afterBullets = s.substring(bulletsStart);\n          const bracketStart = afterBullets.indexOf('[');\n          if (bracketStart > -1) {\n            const bulletsContent = afterBullets.substring(bracketStart + 1);\n            const completeStrings = [];\n            let inString = false;\n            let current = '';\n            let escaped = false;\n            for (let i = 0; i < bulletsContent.length; i++) {\n              const ch = bulletsContent[i];\n              if (escaped) { current += ch; escaped = false; continue; }\n              if (ch === '\\\\') { current += ch; escaped = true; continue; }\n              if (ch === '\"') {\n                if (inString) {\n                  if (current.length > 25) completeStrings.push(current.replace(/\\\\\"/g, '\"').replace(/\\\\n/g, ' '));\n                  current = '';\n                  inString = false;\n                } else {\n                  inString = false;\n                  current = '';\n                  inString = true;\n                }\n              } else if (inString) {\n                current += ch;\n              }\n            }\n            if (completeStrings.length > 0) bullets = completeStrings;\n          }\n        }\n      } catch (e4) {\n        // Attempt 5: Simple regex fallback\n        const tm = s.match(/\"title\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"/);\n        const bm = s.match(/\"bullets\"\\s*:\\s*\\[([\\s\\S]*?)\\]/);\n        if (tm) title = tm[1];\n        if (bm) bullets = [...bm[1].matchAll(/\"((?:[^\"\\\\]|\\\\.){10,})\"/g)].map(m => m[1]).filter(b => b.length > 15);\n      }\n    }\n  }\n}\n\n// Decode HTML entities in title\ntitle = decodeEntities(title);\n\nbullets = bullets\n  .map(b => {\n    let cleaned = String(b).replace(/^[•\\-\\s]+/, '').replace(/\\.{2,}/g, '.').replace(/\\s+/g, ' ').replace(/\\\\n/g, ' ').replace(/\\\\\"/g, '\"').trim();\n    return decodeEntities(cleaned);\n  })\n  .filter(b => {\n    if (!b || b.length < 25) return false;\n    const lc = b.toLowerCase();\n    return !lc.includes('no further details') && !lc.includes('no additional details') &&\n           !lc.includes('לא נמצאו פרטים') && !lc.includes('אין פרטים') &&\n           !lc.includes('информация недоступна');\n  });\n\nif (bullets.length === 0) {\n  const noContent = { he: 'לא הצלחתי לחלץ מידע מהמאמר', ru: 'Не удалось извлечь информацию', en: 'Could not extract summary from article' };\n  return [{ json: { text: `⚠️ ${noContent[language] || noContent.en}\\n\\n${url ? `<${url}|Link>` : ''}`, slack_channel } }];\n}\n\nconst RLM = '\\u200F';\nconst LRM = '\\u200E';\nconst wrapLatin = t => t.replace(/([A-Za-z0-9]+(?:[.,:/\\-][A-Za-z0-9]+)*)/g, `${LRM}$1${LRM}`);\n\nlet titleLine, bulletLines;\n\nif (language === 'he') {\n  const wt = url ? `<${url}|${wrapLatin(title)}>` : wrapLatin(title);\n  titleLine = `${RLM}:brain: ${wt}`;\n  bulletLines = bullets.map(b => `${RLM}• ${wrapLatin(b)}`);\n} else if (language === 'ru') {\n  titleLine = url ? `:brain: <${url}|${title}>` : `:brain: ${title}`;\n  bulletLines = bullets.map(b => `• ${b}`);\n} else {\n  titleLine = url ? `:brain: Summary: <${url}|${title}>` : `:brain: Summary: ${title}`;\n  bulletLines = bullets.map(b => `• ${b}`);\n}\n\nreturn [{ json: { text: [titleLine, '', ...bulletLines].join('\\n'), slack_channel } }];"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          112,
+          2592
+        ],
+        "id": "e827fc27-9438-40ef-957d-7ba603a003cb",
+        "name": "Validate & Format"
+      },
+      {
+        "parameters": {
+          "select": "channel",
+          "channelId": {
+            "__rl": true,
+            "value": "={{ $json.slack_channel }}",
+            "mode": "id"
+          },
+          "text": "={{$json.text}}",
+          "otherOptions": {
+            "includeLinkToWorkflow": false
+          }
+        },
+        "type": "n8n-nodes-base.slack",
+        "typeVersion": 2.3,
+        "position": [
+          304,
+          2752
+        ],
+        "id": "164d064e-1271-4d21-844f-974d9a91319c",
+        "name": "Send to Slack",
+        "webhookId": "946820e3-d85c-43a1-a0e5-58777a4a0c86",
+        "credentials": {
+          "slackApi": {
+            "id": "I5astSkOODZZU76Y",
+            "name": "n8n Summery"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "// Check content-type — skip non-HTML responses (PDFs, images, etc.)\nconst headers = $json.headers || {};\nconst contentType = (headers['content-type'] || headers['Content-Type'] || '').toLowerCase();\nconst url = $('Is Duplicate?').first().json.url || '';\n\n// HTML entity decoder\nconst decodeEntities = (str) => str\n  .replace(/&quot;/g, '\"')\n  .replace(/&amp;/g, '&')\n  .replace(/&lt;/g, '<')\n  .replace(/&gt;/g, '>')\n  .replace(/&#39;/g, \"'\")\n  .replace(/&apos;/g, \"'\")\n  .replace(/&#x27;/g, \"'\")\n  .replace(/&#(\\d+);/g, (_, n) => String.fromCharCode(Number(n)));\n\n// Accept text/html and application/xhtml+xml\nif (contentType && !contentType.includes('text/html') && !contentType.includes('application/xhtml') && !contentType.includes('text/plain')) {\n  return [{ json: { error: `Non-HTML content (${contentType.split(';')[0]}). Cannot extract article text.`, url, needsJina: false } }];\n}\nconst html = $json.body || $json.data || $json.html || $json.content || '';\nif (!html || (typeof html === 'string' && html.length < 100)) {\n  return [{ json: { error: 'No HTML content received', url, needsJina: true } }];\n}\nconst MAX_LEN = 12000;\nlet text = '';\ntry {\n  const ld = html.match(/<script[^>]*type=[\"']application\\/ld\\+json[\"'][^>]*>([\\s\\S]*?)<\\/script>/i);\n  if (ld) { const d = JSON.parse(ld[1]); if (d.articleBody && d.articleBody.length > 300) text = d.articleBody; }\n} catch (e) {}\nif (text.length < 300) {\n  const art = html.match(/<article[^>]*>([\\s\\S]*?)<\\/article>/i);\n  if (art) {\n    const ex = art[1].replace(/<script[\\s\\S]*?<\\/script>/gi,'').replace(/<style[\\s\\S]*?<\\/style>/gi,'').replace(/<nav[\\s\\S]*?<\\/nav>/gi,'').replace(/<aside[\\s\\S]*?<\\/aside>/gi,'').replace(/<footer[\\s\\S]*?<\\/footer>/gi,'').replace(/<[^>]+>/g,' ').replace(/\\s+/g,' ').trim();\n    if (ex.length > text.length) text = ex;\n  }\n}\nif (text.length < 300) {\n  const main = html.match(/<main[^>]*>([\\s\\S]*?)<\\/main>/i);\n  if (main) {\n    const ex = main[1].replace(/<script[\\s\\S]*?<\\/script>/gi,'').replace(/<style[\\s\\S]*?<\\/style>/gi,'').replace(/<nav[\\s\\S]*?<\\/nav>/gi,'').replace(/<[^>]+>/g,' ').replace(/\\s+/g,' ').trim();\n    if (ex.length > text.length) text = ex;\n  }\n}\nif (text.length < 300) {\n  const pat = /<div[^>]*class=\"[^\"]*(?:art_body|article_text|article-body|post-content|entry-content|story-body|article__content|content-body)[^\"]*\"[^>]*>([\\s\\S]*?)<\\/div>/i;\n  const match = html.match(pat);\n  if (match) { const ex = match[1].replace(/<[^>]+>/g,' ').replace(/\\s+/g,' ').trim(); if (ex.length > text.length) text = ex; }\n}\nif (text.length < 300) {\n  const paras = html.match(/<p[^>]*>(.*?)<\\/p>/gis);\n  if (paras && paras.length > 3) {\n    const good = paras.map(p => p.replace(/<[^>]+>/g,'').trim()).filter(p => p.length > 40 && !/cookie|privacy|subscribe|newsletter|הרשמה|פרטיות/i.test(p));\n    if (good.length >= 3) text = good.join('\\n\\n');\n  }\n}\ntext = text.replace(/all rights reserved|כל הזכויות שמורות|copyright \\d{4}|©\\s*\\d{4}/gi,'').replace(/follow us on.*|עקבו אחרינו.*/gi,'').replace(/\\s+/g,' ').trim();\n// If extraction failed, flag for Jina fallback\nif (!text || text.length < 200) {\n  return [{ json: { error: 'Direct extraction failed', url, needsJina: true } }];\n}\n// Detect language\nconst israeliSites = ['walla.co.il','ynet.co.il','mako.co.il','haaretz.co.il','calcalist.co.il','globes.co.il','maariv.co.il','sport5.co.il','kan.org.il','n12.co.il','reshet13.co.il','ice.co.il','arutz7.co.il','hidabroot.com'];\nconst russianSites = ['rbc.ru','lenta.ru','ria.ru','tass.ru','kommersant.ru','meduza.io','novayagazeta.ru','iz.ru'];\nlet language = 'en';\nif (israeliSites.some(s => url.includes(s))) language = 'he';\nelse if (russianSites.some(s => url.includes(s))) language = 'ru';\nelse {\n  const heb = (text.match(/[\\u0590-\\u05FF]/g) || []).length;\n  const cyr = (text.match(/[\\u0400-\\u04FF]/g) || []).length;\n  const total = text.length;\n  if (heb / total > 0.08) language = 'he';\n  else if (cyr / total > 0.08) language = 'ru';\n}\n\n// Decode HTML entities before sending to LLM\ntext = decodeEntities(text);\n\nif (text.length > MAX_LEN) text = text.substring(0, MAX_LEN) + '... [truncated]';\nreturn [{ json: { article: text, url, language, charCount: text.length, needsJina: false } }];"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -1712,
+          2576
+        ],
+        "id": "2be08bb4-de82-4b4d-875d-879f557a0766",
+        "name": "Extract Text & Detect Language"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "id": "dup-check",
+                "leftValue": "={{ $json.isDuplicate }}",
+                "rightValue": "true",
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [
+          -2192,
+          2480
+        ],
+        "id": "94716a17-f037-4535-bd38-f283450b58aa",
+        "name": "Is Duplicate?"
+      },
+      {
+        "parameters": {
+          "jsCode": "const body = $json.body || $json;\nconst event = body.event || {};\nconst headers = $json.headers || {};\n\n// --- Retry filter ---\nif (headers['x-slack-retry-num']) return [];\n\n// --- Bot user ID from env or fallback ---\nconst BOT_USER_ID = 'U07K8QJ9XYZ';\n\n// --- Handle message_changed: only process if a NEW URL was added ---\nif (event.subtype === 'message_changed') {\n  const prev = event.previous_message?.text || '';\n  const curr = event.message?.text || '';\n  if (prev === curr) return [];\n\n  // Extract URLs from both versions\n  const extractUrls = (text) => {\n    const urls = new Set();\n    const slackRx = /<(https?:\\/\\/[^>|]+)(\\|[^>]+)?>/g;\n    let m;\n    while ((m = slackRx.exec(text)) !== null) urls.add(m[1]);\n    const plainRx = /https?:\\/\\/[^\\s<>\"'\\[\\]{}]+/g;\n    while ((m = plainRx.exec(text)) !== null) urls.add(m[0].replace(/[.,;:)]+$/, ''));\n    return urls;\n  };\n\n  const prevUrls = extractUrls(prev);\n  const currUrls = extractUrls(curr);\n  const newUrls = [...currUrls].filter(u => !prevUrls.has(u) && u.match(/^https?:\\/\\/.+\\..+/));\n\n  if (newUrls.length === 0) return [];\n\n  const user = event.message?.user || event.previous_message?.user || '';\n  if (!user || user === BOT_USER_ID || event.message?.bot_id) return [];\n\n  // Dedup\n  const staticData = $getWorkflowStaticData('global');\n  if (!staticData.processedUrls) staticData.processedUrls = {};\n  if (!staticData.processedMsgs) staticData.processedMsgs = {};\n\n  const msgKey = `${user}_${event.message?.ts || event.ts}_edited`;\n  if (staticData.processedMsgs[msgKey]) return [];\n  staticData.processedMsgs[msgKey] = Date.now();\n\n  // Clean old entries\n  const twoDaysAgo = Date.now() - 172800000;\n  for (const k of Object.keys(staticData.processedUrls)) {\n    if (staticData.processedUrls[k] < twoDaysAgo) delete staticData.processedUrls[k];\n  }\n  for (const k of Object.keys(staticData.processedMsgs)) {\n    if (staticData.processedMsgs[k] < twoDaysAgo) delete staticData.processedMsgs[k];\n  }\n\n  // Return all new URLs (supports multi-URL messages)\n  const results = [];\n  const fourHoursAgo = Date.now() - 14400000;\n  for (const url of newUrls) {\n    const isDuplicate = staticData.processedUrls[url] > fourHoursAgo;\n    if (!isDuplicate) staticData.processedUrls[url] = Date.now();\n    results.push({ json: { isDuplicate, url, slack_channel: event.channel, slack_user: user, slack_ts: event.message?.ts || event.ts } });\n  }\n  return results;\n}\n\n// --- Skip non-message subtypes ---\nconst skipSubtypes = ['bot_message','message_deleted','channel_join','channel_leave','channel_topic','channel_purpose','file_share','pinned_item','unpinned_item'];\nif (event.subtype && skipSubtypes.includes(event.subtype)) return [];\n\n// --- Skip bots and empty messages ---\nif (event.type !== 'message' || event.bot_id || event.user === BOT_USER_ID || !event.text) return [];\n\n// --- Extract URLs ---\nconst text = event.text || '';\nconst urls = new Set();\n\nconst slackRx = /<(https?:\\/\\/[^>|]+)(\\|[^>]+)?>/g;\nlet m;\nwhile ((m = slackRx.exec(text)) !== null) urls.add(m[1]);\n\nconst plainRx = /https?:\\/\\/[^\\s<>\"'\\[\\]{}]+/g;\nwhile ((m = plainRx.exec(text)) !== null) urls.add(m[0].replace(/[.,;:)]+$/, ''));\n\nconst validUrls = [...urls].filter(u => u.match(/^https?:\\/\\/.+\\..+/));\nif (validUrls.length === 0) return [];\n\n// --- Dedup ---\nconst staticData = $getWorkflowStaticData('global');\nif (!staticData.processedUrls) staticData.processedUrls = {};\nif (!staticData.processedMsgs) staticData.processedMsgs = {};\n\nconst msgKey = `${event.user}_${event.ts}`;\nif (staticData.processedMsgs[msgKey]) return [];\nstaticData.processedMsgs[msgKey] = Date.now();\n\nconst fourHoursAgo = Date.now() - 14400000;\nconst twoDaysAgo = Date.now() - 172800000;\n\n// Clean old entries\nfor (const k of Object.keys(staticData.processedUrls)) {\n  if (staticData.processedUrls[k] < twoDaysAgo) delete staticData.processedUrls[k];\n}\nfor (const k of Object.keys(staticData.processedMsgs)) {\n  if (staticData.processedMsgs[k] < twoDaysAgo) delete staticData.processedMsgs[k];\n}\n\n// Return ALL URLs from message (multi-URL support)\nconst results = [];\nfor (const url of validUrls) {\n  const isDuplicate = staticData.processedUrls[url] > fourHoursAgo;\n  if (!isDuplicate) staticData.processedUrls[url] = Date.now();\n  results.push({ json: { isDuplicate, url, slack_channel: event.channel, slack_user: event.user, slack_ts: event.ts } });\n}\nreturn results;"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -2400,
+          2480
+        ],
+        "id": "6e2d1dd9-dcc1-4e4f-975b-3a51b0c10a48",
+        "name": "Extract URL & Deduplicate"
+      },
+      {
+        "parameters": {
+          "respondWith": "text",
+          "options": {
+            "responseCode": 200
+          }
+        },
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.4,
+        "position": [
+          -2672,
+          2480
+        ],
+        "id": "b76c3f18-510f-41b9-b232-897e50b0e5d4",
+        "name": "Respond 200 (Ack)"
+      },
+      {
+        "parameters": {
+          "jsCode": "return [{ json: { challenge: $json.body.challenge } }];"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -2672,
+          2288
+        ],
+        "id": "8f50d3bf-c895-40d3-8ed5-2c644aaf9484",
+        "name": "Return Challenge"
+      },
+      {
+        "parameters": {
+          "options": {
+            "responseCode": 200
+          }
+        },
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.4,
+        "position": [
+          -2400,
+          2288
+        ],
+        "id": "191044a8-419d-46fd-9aa1-df733bc5e863",
+        "name": "Respond 200 (Challenge)"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "id": "url-verify-check",
+                "leftValue": "={{$json[\"body\"][\"type\"]}}",
+                "rightValue": "url_verification",
+                "operator": {
+                  "type": "string",
+                  "operation": "equals"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [
+          -2912,
+          2384
+        ],
+        "id": "916ab21f-8e4c-4710-a7c1-b5a0a795a58f",
+        "name": "Is URL Verification?"
+      },
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "slack-events",
+          "responseMode": "responseNode",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2.1,
+        "position": [
+          -3168,
+          2384
+        ],
+        "id": "ea9a5474-b68c-4d8f-8413-9462f2691542",
+        "name": "Webhook",
+        "webhookId": "d63266c1-1b49-4fc1-8530-cbdb5e8fb27f"
+      },
+      {
+        "parameters": {
+          "model": "google/gemini-2.5-flash-lite",
+          "options": {}
+        },
+        "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+        "typeVersion": 1,
+        "position": [
+          -224,
+          2784
+        ],
+        "id": "0e02ff20-7c65-4a88-8d19-b2d9eca0fcc5",
+        "name": "OpenRouter Fallback1",
+        "credentials": {
+          "openRouterApi": {
+            "id": "hGAnvpSAhWRbFktq",
+            "name": "OpenRouter account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "model": {
+            "__rl": true,
+            "value": "google/gemma-3-27b",
+            "mode": "list",
+            "cachedResultName": "google/gemma-3-27b"
+          },
+          "options": {
+            "frequencyPenalty": 0.3,
+            "maxTokens": 32768,
+            "presencePenalty": 0.1,
+            "temperature": 0.2,
+            "timeout": 300000,
+            "topP": 0.9
+          }
+        },
+        "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+        "typeVersion": 1.2,
+        "position": [
+          -400,
+          2800
+        ],
+        "id": "9b36bf41-a4ff-4dc0-ab31-63fd3dcf4066",
+        "name": "Local LLM1",
+        "credentials": {
+          "openAiApi": {
+            "id": "WJsCuec8UzGRGVIc",
+            "name": "Macbook Pro M1Pro"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "promptType": "define",
+          "text": "={{ $json.prompt }}",
+          "needsFallback": true,
+          "options": {
+            "systemMessage": "You are an expert article summarizer. Output ONLY valid JSON — no markdown fences, no preamble, no thinking."
+          }
+        },
+        "type": "@n8n/n8n-nodes-langchain.agent",
+        "typeVersion": 3.1,
+        "position": [
+          -304,
+          2592
+        ],
+        "id": "922e526c-fcdd-48ac-bfc7-6aeb89ad9bb4",
+        "name": "AI Summarizer1"
+      },
+      {
+        "parameters": {
+          "jsCode": "const article = $json.article || '';\nconst language = $json.language || 'en';\nconst url = $json.url || '';\n\nconst langNames = { he: 'Hebrew', ru: 'Russian', en: 'English' };\nconst langName = langNames[language] || 'English';\n\nconst prompt = `Summarize the following article in ${langName}.\n\nRules:\n- Output ONLY valid JSON, no markdown fences, no extra text.\n- Return a short headline title (5-10 words max) and exactly 5 bullet points.\n- The title should be a compelling headline capturing the main event or topic.\n- Do NOT repeat the title content in the first bullet point.\n- Each bullet: 3-4 sentences, 60-80 words, with specific details (names, dates, numbers, locations, quotes).\n- Each bullet must cover a DIFFERENT key aspect and provide enough context for someone unfamiliar with the topic.\n- The first bullet should provide essential context and background.\n- Remaining bullets should cover: key events/actions, people involved, consequences/impact, and broader context or next steps.\n- Include real names, dates, numbers, locations, and quotes mentioned in the article.\n- Do NOT invent or guess dates, facts, or details not in the article.\n- Do NOT include bullet characters in the bullets array.\n- Do NOT include filler like \"no further details available\".\n- The title and all bullets MUST be written in ${langName}.\n\nFormat:\n{\"title\": \"Short descriptive headline\", \"bullets\": [\"Point 1...\", \"Point 2...\", \"Point 3...\", \"Point 4...\", \"Point 5...\"]}\n\nArticle:\n${article}`;\n\nreturn [{ json: { prompt, language, url } }];"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -512,
+          2592
+        ],
+        "id": "0211a157-ca03-4333-8307-4182874872d3",
+        "name": "Build Prompt1"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "id": "error-check",
+                "leftValue": "={{ $json.error }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "string",
+                  "operation": "notEmpty",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [
+          -752,
+          2480
+        ],
+        "id": "0faf556e-7d35-4cfc-9adf-031ad062a8ac",
+        "name": "Has Error?1"
+      },
+      {
+        "parameters": {
+          "select": "channel",
+          "channelId": {
+            "__rl": true,
+            "value": "={{ $json.slack_channel }}",
+            "mode": "id"
+          },
+          "text": "=ℹ️ This URL was already summarized recently.\n\n<{{$json.url}}|{{$json.url}}>",
+          "otherOptions": {}
+        },
+        "type": "n8n-nodes-base.slack",
+        "typeVersion": 2.3,
+        "position": [
+          -1952,
+          2384
+        ],
+        "id": "e4e23111-3438-41a9-897c-3d197a522489",
+        "name": "Send Duplicate Notice1",
+        "webhookId": "4c109572-f287-4e64-9bda-ffb85c1243de",
+        "credentials": {
+          "slackApi": {
+            "id": "I5astSkOODZZU76Y",
+            "name": "n8n Summery"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "id": "error-check-direct",
+                "leftValue": "={{ $json.error }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "string",
+                  "operation": "notEmpty",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [
+          -1472,
+          2768
+        ],
+        "id": "18ebfc00-133d-4a36-ba85-b5a6a77d8bc3",
+        "name": "Has Direct Error?"
+      },
+      {
+        "parameters": {
+          "jsCode": "const raw = $json.data || $json.body || $json.content || '';\nconst prevData = $('Needs Jina Fallback?').first().json;\nconst url = prevData.url || '';\n\nif (!raw || (typeof raw === 'string' && raw.length < 200)) {\n  let reason = prevData.error || 'Could not extract article text.';\n  if (reason === 'Direct extraction failed') {\n    reason += ' Jina Reader also failed — site may require login or block automated access.';\n  }\n  return [{ json: { error: reason, url, needsJina: false } }];\n}\n\nlet text = typeof raw === 'string' ? raw : JSON.stringify(raw);\nconst MAX_LEN = 12000;\n\n// Clean Jina output\ntext = text.replace(/^Title:.*\\n/i, '').replace(/^URL Source:.*\\n/i, '').replace(/^Markdown Content:\\n/i, '').replace(/!\\[.*?\\]\\(.*?\\)/g, '').replace(/\\[([^\\]]+)\\]\\(.*?\\)/g, '$1').replace(/#{1,6}\\s*/g, '').replace(/[*_]{1,3}/g, '').replace(/\\s+/g, ' ').trim();\n\ntext = text.replace(/all rights reserved|כל הזכויות שמורות|copyright \\d{4}|©\\s*\\d{4}/gi,'').replace(/follow us on.*|עקבו אחרינו.*/gi,'').replace(/\\s+/g,' ').trim();\n\n// Detect language\nconst israeliSites = ['walla.co.il','ynet.co.il','mako.co.il','haaretz.co.il','calcalist.co.il','globes.co.il','maariv.co.il','sport5.co.il','kan.org.il','n12.co.il','reshet13.co.il','ice.co.il','arutz7.co.il','hidabroot.com'];\nconst russianSites = ['rbc.ru','lenta.ru','ria.ru','tass.ru','kommersant.ru','meduza.io','novayagazeta.ru','iz.ru'];\n\nlet language = 'en';\nif (israeliSites.some(s => url.includes(s))) language = 'he';\nelse if (russianSites.some(s => url.includes(s))) language = 'ru';\nelse {\n  const heb = (text.match(/[\\u0590-\\u05FF]/g) || []).length;\n  const cyr = (text.match(/[\\u0400-\\u04FF]/g) || []).length;\n  const total = text.length;\n  if (heb / total > 0.08) language = 'he';\n  else if (cyr / total > 0.08) language = 'ru';\n}\n\nif (text.length > MAX_LEN) text = text.substring(0, MAX_LEN) + '... [truncated]';\n\nreturn [{ json: { article: text, url, language, charCount: text.length, needsJina: false } }];"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -992,
+          2480
+        ],
+        "id": "0e2b7cf4-c8d2-4b34-91c6-7d2b7c96fb43",
+        "name": "Parse Jina Response"
+      },
+      {
+        "parameters": {
+          "url": "=https://r.jina.ai/{{ $json.url }}",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Accept",
+                "value": "text/plain"
+              },
+              {
+                "name": "X-Return-Format",
+                "value": "text"
+              }
+            ]
+          },
+          "options": {
+            "redirect": {
+              "redirect": {
+                "maxRedirects": 5
+              }
+            },
+            "timeout": 30000
+          }
+        },
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          -1232,
+          2480
+        ],
+        "id": "053c189c-19e8-4373-bae6-e3c92e270dde",
+        "name": "Jina Reader Fallback",
+        "retryOnFail": true,
+        "maxTries": 2,
+        "onError": "continueRegularOutput"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "id": "needs-jina-check",
+                "leftValue": "={{ $json.needsJina }}",
+                "rightValue": "true",
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [
+          -1472,
+          2576
+        ],
+        "id": "eea83cf5-c0fd-41d4-8377-b6a5aec7f98f",
+        "name": "Needs Jina Fallback?"
+      }
+    ],
+    "connections": {
+      "Fetch Page": {
+        "main": [
+          [
+            {
+              "node": "Extract Text & Detect Language",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Format Error": {
+        "main": [
+          [
+            {
+              "node": "Send to Slack",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Validate & Format": {
+        "main": [
+          [
+            {
+              "node": "Send to Slack",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Extract Text & Detect Language": {
+        "main": [
+          [
+            {
+              "node": "Has Direct Error?",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Needs Jina Fallback?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Is Duplicate?": {
+        "main": [
+          [
+            {
+              "node": "Send Duplicate Notice1",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Fetch Page",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Extract URL & Deduplicate": {
+        "main": [
+          [
+            {
+              "node": "Is Duplicate?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Respond 200 (Ack)": {
+        "main": [
+          [
+            {
+              "node": "Extract URL & Deduplicate",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Return Challenge": {
+        "main": [
+          [
+            {
+              "node": "Respond 200 (Challenge)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Is URL Verification?": {
+        "main": [
+          [
+            {
+              "node": "Return Challenge",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Respond 200 (Ack)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Is URL Verification?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "OpenRouter Fallback1": {
+        "ai_languageModel": [
+          [
+            {
+              "node": "AI Summarizer1",
+              "type": "ai_languageModel",
+              "index": 1
+            }
+          ]
+        ]
+      },
+      "Local LLM1": {
+        "ai_languageModel": [
+          [
+            {
+              "node": "AI Summarizer1",
+              "type": "ai_languageModel",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "AI Summarizer1": {
+        "main": [
+          [
+            {
+              "node": "Validate & Format",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build Prompt1": {
+        "main": [
+          [
+            {
+              "node": "AI Summarizer1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Has Error?1": {
+        "main": [
+          [
+            {
+              "node": "Format Error",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Build Prompt1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Has Direct Error?": {
+        "main": [
+          [
+            {
+              "node": "Format Error",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Parse Jina Response": {
+        "main": [
+          [
+            {
+              "node": "Has Error?1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Jina Reader Fallback": {
+        "main": [
+          [
+            {
+              "node": "Parse Jina Response",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Needs Jina Fallback?": {
+        "main": [
+          [
+            {
+              "node": "Jina Reader Fallback",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Build Prompt1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Alex Vinokur",
+    "name": "Version 8e01663c",
+    "description": "",
+    "autosaved": false
+  },
+  "tags": []
+}
