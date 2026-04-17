@@ -1,0 +1,367 @@
+{
+  "updatedAt": "2026-04-16T20:21:25.532Z",
+  "createdAt": "2026-04-16T20:16:08.903Z",
+  "id": "nMfm8xnt9vbaANUG",
+  "name": "My workflow",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "filters": {
+          "labelIds": [
+            "Label_1514785059647271496"
+          ],
+          "readStatus": "unread"
+        }
+      },
+      "id": "c1ea0dab-d9cc-4ef5-a030-272a67a187dd",
+      "name": "Gmail Trigger (labeled)",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -320,
+        -80
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "RppOCR2PhsLintBH",
+          "name": "vinokura.it@gmail.com"
+        }
+      },
+      "notes": "Create a Gmail label like 'monday-task', then forward or apply it to any email you want turned into a task."
+    },
+    {
+      "parameters": {
+        "jsCode": "const m = $input.first().json;\nconst subject = m.subject || m.Subject || '(no subject)';\nconst from = m.from?.text || m.From || '';\nconst snippet = (m.snippet || m.text || '').substring(0, 500).replace(/\\n/g, ' ').replace(/\"/g, \"'\");\nreturn [{ json: { name: subject.substring(0, 200), notes: `From: ${from}\\n\\n${snippet}`, messageId: m.id || '' } }];"
+      },
+      "id": "976fefcd-3ef6-4a23-8b78-e7fcd71ed335",
+      "name": "Build Task",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -96,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.monday.com/v2",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "API-Version",
+              "value": "2024-10"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: `mutation { create_item(board_id: 5093821351, group_id: \"new_group29179\", item_name: ${JSON.stringify($json.name)}) { id } }` }) }}",
+        "options": {}
+      },
+      "id": "37ba3698-5669-4c5f-b8b8-2202241cf7b9",
+      "name": "Create Monday Item",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        112,
+        -80
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "DEEjaXy7pOncZeQ1",
+          "name": "Monday.com"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.monday.com/v2",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "API-Version",
+              "value": "2024-10"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: `mutation { create_update(item_id: ${$json.data.create_item.id}, body: ${JSON.stringify($('Build Task').item.json.notes)}) { id } }` }) }}",
+        "options": {}
+      },
+      "id": "b442daac-4a0f-4e7d-b973-861ea9c33682",
+      "name": "Add Email as Update",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        336,
+        -80
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "DEEjaXy7pOncZeQ1",
+          "name": "Monday.com"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Gmail Trigger (labeled)": {
+      "main": [
+        [
+          {
+            "node": "Build Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Task": {
+      "main": [
+        [
+          {
+            "node": "Create Monday Item",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Monday Item": {
+      "main": [
+        [
+          {
+            "node": "Add Email as Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": {
+    "node:Gmail Trigger (labeled)": {
+      "Gmail Trigger (labeled)": {
+        "lastTimeChecked": 1776371396,
+        "possibleDuplicates": [
+          "19d97fd03d8523e1"
+        ]
+      }
+    }
+  },
+  "meta": null,
+  "pinData": {},
+  "versionId": "ff3f5ff9-874c-4dec-80c4-0abaf3ebe094",
+  "activeVersionId": "ff3f5ff9-874c-4dec-80c4-0abaf3ebe094",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-04-16T20:16:08.905Z",
+      "createdAt": "2026-04-16T20:16:08.905Z",
+      "role": "workflow:owner",
+      "workflowId": "nMfm8xnt9vbaANUG",
+      "projectId": "pWTWmuHnmIHw48U9"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-04-16T20:38:47.000Z",
+    "createdAt": "2026-04-16T20:21:25.533Z",
+    "versionId": "ff3f5ff9-874c-4dec-80c4-0abaf3ebe094",
+    "workflowId": "nMfm8xnt9vbaANUG",
+    "nodes": [
+      {
+        "parameters": {
+          "pollTimes": {
+            "item": [
+              {
+                "mode": "everyMinute"
+              }
+            ]
+          },
+          "filters": {
+            "labelIds": [
+              "Label_1514785059647271496"
+            ],
+            "readStatus": "unread"
+          }
+        },
+        "id": "c1ea0dab-d9cc-4ef5-a030-272a67a187dd",
+        "name": "Gmail Trigger (labeled)",
+        "type": "n8n-nodes-base.gmailTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          -320,
+          -80
+        ],
+        "credentials": {
+          "gmailOAuth2": {
+            "id": "RppOCR2PhsLintBH",
+            "name": "vinokura.it@gmail.com"
+          }
+        },
+        "notes": "Create a Gmail label like 'monday-task', then forward or apply it to any email you want turned into a task."
+      },
+      {
+        "parameters": {
+          "jsCode": "const m = $input.first().json;\nconst subject = m.subject || m.Subject || '(no subject)';\nconst from = m.from?.text || m.From || '';\nconst snippet = (m.snippet || m.text || '').substring(0, 500).replace(/\\n/g, ' ').replace(/\"/g, \"'\");\nreturn [{ json: { name: subject.substring(0, 200), notes: `From: ${from}\\n\\n${snippet}`, messageId: m.id || '' } }];"
+        },
+        "id": "976fefcd-3ef6-4a23-8b78-e7fcd71ed335",
+        "name": "Build Task",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -96,
+          -80
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "https://api.monday.com/v2",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpHeaderAuth",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "name": "API-Version",
+                "value": "2024-10"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({ query: `mutation { create_item(board_id: 5093821351, group_id: \"new_group29179\", item_name: ${JSON.stringify($json.name)}) { id } }` }) }}",
+          "options": {}
+        },
+        "id": "37ba3698-5669-4c5f-b8b8-2202241cf7b9",
+        "name": "Create Monday Item",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          112,
+          -80
+        ],
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "DEEjaXy7pOncZeQ1",
+            "name": "Monday.com"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "https://api.monday.com/v2",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpHeaderAuth",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "name": "API-Version",
+                "value": "2024-10"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({ query: `mutation { create_update(item_id: ${$json.data.create_item.id}, body: ${JSON.stringify($('Build Task').item.json.notes)}) { id } }` }) }}",
+          "options": {}
+        },
+        "id": "b442daac-4a0f-4e7d-b973-861ea9c33682",
+        "name": "Add Email as Update",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          336,
+          -80
+        ],
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "DEEjaXy7pOncZeQ1",
+            "name": "Monday.com"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Gmail Trigger (labeled)": {
+        "main": [
+          [
+            {
+              "node": "Build Task",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build Task": {
+        "main": [
+          [
+            {
+              "node": "Create Monday Item",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Create Monday Item": {
+        "main": [
+          [
+            {
+              "node": "Add Email as Update",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Alex Vinokur",
+    "name": "Version ff3f5ff9",
+    "description": "",
+    "autosaved": true
+  },
+  "tags": []
+}
