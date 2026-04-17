@@ -1,21 +1,28 @@
 # n8n-Raspberry-PI-Workflow-Backup
 
-## Latest Backup: 2026-04-16 21:00
+## Latest Backup: 2026-04-17 13:43
 
 ### Backup URL
-https://github.com/alexxx55555/n8n-Raspberry-PI-Workflow-Backup/tree/main/PI%20workflows%20backup%202026-04-16%2021-00
+https://github.com/alexxx55555/n8n-Raspberry-PI-Workflow-Backup/tree/main/PI%20workflows%20backup%202026-04-17%2013-43
 
-### Workflows Backed Up (30 total)
+### Workflows Backed Up (41 total)
 - AD Unlock & Reset Password
+- Monday - Auto Due Date by Status
+- Daily Digest — Monday.com
+- Monday → Google Calendar Sync
 - Create New JC User
+- Monday Overdue Enforcer
 - AD Inactive Users - Weekly Report & Auto Disable
 - JC Device Monitor
-- Monday - Board Discovery (run once)
+- Monday Auto-Move Done Tasks
 - Slack Article Summarizer
 - User AD/JC Offboarding
 - Disable JC User
 - Get AD User Info
+- Monday Auto-Archive Completed
 - Get JumpCloud User Info
+- Monday Due Date Alerts to Slack
+- Monday Weekly Snapshot
 - Slack Emoji → ClickUp Task Creator
 - DNS Update
 - AD Brute Force Detection
@@ -29,12 +36,16 @@ https://github.com/alexxx55555/n8n-Raspberry-PI-Workflow-Backup/tree/main/PI%20w
 - AI Translator
 - WAHA Webhook Auto Start
 - PI Workflows Backup
+- My workflow
+- Monday Auto-Assign Owner
 - WhatsApp Send Message
 - Create new AD account
 - AD Device Monitor
 - AD Group Security Alert
 - Users AD/JC Onboarding
+- Board Status Change Monitor
 - Disable AD User
+- Monday Recurring Tasks
 - WhatsApp Pi Manager
 
 ---
