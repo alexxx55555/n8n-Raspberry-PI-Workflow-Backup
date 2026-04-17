@@ -1,0 +1,749 @@
+{
+  "updatedAt": "2026-04-16T20:15:46.790Z",
+  "createdAt": "2026-04-16T20:13:37.675Z",
+  "id": "AybqEE0n7FFKyQea",
+  "name": "Monday → Google Calendar Sync",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "4e5a86fd-42e7-4399-987f-bf32f3ff9db5",
+      "name": "Every 15 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -880,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\nstaticData.eventMap = staticData.eventMap || {}; // itemId -> { eventId, due, updated_at }\nconst items = $input.first().json?.data?.boards?.[0]?.items_page?.items || [];\nconst toCreate = [];\nconst toUpdate = [];\nconst toDelete = [];\nconst seen = new Set();\nfor (const item of items) {\n  seen.add(item.id);\n  const status = (item.column_values || []).find(c => c.id === 'project_status');\n  const due = (item.column_values || []).find(c => c.id === 'date');\n  const dueStr = due?.text?.split(' ')[0] || '';\n  const prev = staticData.eventMap[item.id];\n  const shouldHaveEvent = dueStr && status?.text !== 'Done';\n  if (shouldHaveEvent && !prev) {\n    toCreate.push({ json: { itemId: item.id, itemName: item.name, dueDate: dueStr, url: `https://alex-it.monday.com/boards/5093821351/pulses/${item.id}` } });\n  } else if (shouldHaveEvent && prev && (prev.due !== dueStr || prev.updated_at !== item.updated_at)) {\n    toUpdate.push({ json: { itemId: item.id, itemName: item.name, dueDate: dueStr, eventId: prev.eventId, url: `https://alex-it.monday.com/boards/5093821351/pulses/${item.id}` } });\n  } else if (!shouldHaveEvent && prev) {\n    toDelete.push({ json: { itemId: item.id, eventId: prev.eventId } });\n  }\n}\n// Clean up stale entries for deleted items\nfor (const id in staticData.eventMap) {\n  if (!seen.has(id)) {\n    toDelete.push({ json: { itemId: id, eventId: staticData.eventMap[id].eventId } });\n  }\n}\nreturn [...toCreate.map(x => ({ json: { ...x.json, op: 'create' } })), ...toUpdate.map(x => ({ json: { ...x.json, op: 'update' } })), ...toDelete.map(x => ({ json: { ...x.json, op: 'delete' } }))];"
+      },
+      "id": "53d1f0bb-80e6-4065-a4d8-1bc22afd29ef",
+      "name": "Diff Calendar State",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -448,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "c1",
+                    "leftValue": "={{$json.op}}",
+                    "rightValue": "create",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "create"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "c2",
+                    "leftValue": "={{$json.op}}",
+                    "rightValue": "update",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "update"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "c3",
+                    "leftValue": "={{$json.op}}",
+                    "rightValue": "delete",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "delete"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e52c2d4a-58ca-4493-810c-68bfcdae13e3",
+      "name": "Route by Op",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -224,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "value": "primary",
+          "mode": "list"
+        },
+        "start": "={{$json.dueDate}}T09:00:00",
+        "end": "={{$json.dueDate}}T09:30:00",
+        "additionalFields": {
+          "description": "=Monday item: {{$json.url}}",
+          "summary": "={{'📋 ' + $json.itemName}}"
+        }
+      },
+      "id": "461fb867-19a1-4f4a-92c5-42e5a59ff9c5",
+      "name": "Create Event",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "ceazxv6ZgDLso5CX",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "calendar": {
+          "__rl": true,
+          "value": "primary",
+          "mode": "list"
+        },
+        "eventId": "={{$json.eventId}}",
+        "updateFields": {
+          "description": "=Monday item: {{$json.url}}",
+          "end": "={{$json.dueDate}}T09:30:00",
+          "start": "={{$json.dueDate}}T09:00:00",
+          "summary": "={{'📋 ' + $json.itemName}}"
+        }
+      },
+      "id": "76242505-9a26-4e9b-bfdb-5a71b0e35dca",
+      "name": "Update Event",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        208
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "ceazxv6ZgDLso5CX",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "calendar": {
+          "__rl": true,
+          "value": "primary",
+          "mode": "list"
+        },
+        "eventId": "={{$json.eventId}}",
+        "options": {}
+      },
+      "id": "235f5075-2665-42ee-a315-c9407c694e34",
+      "name": "Delete Event",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        400
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "ceazxv6ZgDLso5CX",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge all 3 branches and update static map\nconst staticData = $getWorkflowStaticData('global');\nstaticData.eventMap = staticData.eventMap || {};\nconst all = $input.all();\nfor (const row of all) {\n  const j = row.json;\n  if (j.op === 'create' && j.id) { staticData.eventMap[j.itemId] = { eventId: j.id, due: j.dueDate, updated_at: new Date().toISOString() }; }\n  if (j.op === 'update' && j.id) { staticData.eventMap[j.itemId] = { eventId: j.id, due: j.dueDate, updated_at: new Date().toISOString() }; }\n  if (j.op === 'delete') { delete staticData.eventMap[j.itemId]; }\n}\nreturn [{ json: { processed: all.length } }];"
+      },
+      "id": "441c603c-9929-4b68-b210-9a74eddc8dee",
+      "name": "Persist State",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.monday.com/v2",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "API-Version",
+              "value": "2024-10"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: `query { boards(ids: 5093821351) { items_page(limit: 200) { items { id name updated_at column_values(ids: [\"project_status\", \"date\"]) { id text value } } } } }` }) }}",
+        "options": {}
+      },
+      "id": "76147a52-bd02-4027-b3aa-bf3c7aa0abae",
+      "name": "Get Items2",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -656,
+        208
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "DEEjaXy7pOncZeQ1",
+          "name": "Monday.com"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every 15 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Get Items2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Diff Calendar State": {
+      "main": [
+        [
+          {
+            "node": "Route by Op",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Op": {
+      "main": [
+        [
+          {
+            "node": "Create Event",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Event",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Delete Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Event": {
+      "main": [
+        [
+          {
+            "node": "Persist State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Event": {
+      "main": [
+        [
+          {
+            "node": "Persist State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Event": {
+      "main": [
+        [
+          {
+            "node": "Persist State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Items2": {
+      "main": [
+        [
+          {
+            "node": "Diff Calendar State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": {
+    "node:Every 15 Minutes": {
+      "recurrenceRules": []
+    },
+    "global": {
+      "eventMap": {}
+    }
+  },
+  "meta": null,
+  "pinData": {},
+  "versionId": "1b7a1e3b-24ec-4c92-8669-f20199746e8a",
+  "activeVersionId": "1b7a1e3b-24ec-4c92-8669-f20199746e8a",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-04-16T20:13:37.678Z",
+      "createdAt": "2026-04-16T20:13:37.678Z",
+      "role": "workflow:owner",
+      "workflowId": "AybqEE0n7FFKyQea",
+      "projectId": "pWTWmuHnmIHw48U9"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-04-16T20:15:51.000Z",
+    "createdAt": "2026-04-16T20:13:46.744Z",
+    "versionId": "1b7a1e3b-24ec-4c92-8669-f20199746e8a",
+    "workflowId": "AybqEE0n7FFKyQea",
+    "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "minutes",
+                "minutesInterval": 15
+              }
+            ]
+          }
+        },
+        "id": "4e5a86fd-42e7-4399-987f-bf32f3ff9db5",
+        "name": "Every 15 Minutes",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          -880,
+          208
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const staticData = $getWorkflowStaticData('global');\nstaticData.eventMap = staticData.eventMap || {}; // itemId -> { eventId, due, updated_at }\nconst items = $input.first().json?.data?.boards?.[0]?.items_page?.items || [];\nconst toCreate = [];\nconst toUpdate = [];\nconst toDelete = [];\nconst seen = new Set();\nfor (const item of items) {\n  seen.add(item.id);\n  const status = (item.column_values || []).find(c => c.id === 'project_status');\n  const due = (item.column_values || []).find(c => c.id === 'date');\n  const dueStr = due?.text?.split(' ')[0] || '';\n  const prev = staticData.eventMap[item.id];\n  const shouldHaveEvent = dueStr && status?.text !== 'Done';\n  if (shouldHaveEvent && !prev) {\n    toCreate.push({ json: { itemId: item.id, itemName: item.name, dueDate: dueStr, url: `https://alex-it.monday.com/boards/5093821351/pulses/${item.id}` } });\n  } else if (shouldHaveEvent && prev && (prev.due !== dueStr || prev.updated_at !== item.updated_at)) {\n    toUpdate.push({ json: { itemId: item.id, itemName: item.name, dueDate: dueStr, eventId: prev.eventId, url: `https://alex-it.monday.com/boards/5093821351/pulses/${item.id}` } });\n  } else if (!shouldHaveEvent && prev) {\n    toDelete.push({ json: { itemId: item.id, eventId: prev.eventId } });\n  }\n}\n// Clean up stale entries for deleted items\nfor (const id in staticData.eventMap) {\n  if (!seen.has(id)) {\n    toDelete.push({ json: { itemId: id, eventId: staticData.eventMap[id].eventId } });\n  }\n}\nreturn [...toCreate.map(x => ({ json: { ...x.json, op: 'create' } })), ...toUpdate.map(x => ({ json: { ...x.json, op: 'update' } })), ...toDelete.map(x => ({ json: { ...x.json, op: 'delete' } }))];"
+        },
+        "id": "53d1f0bb-80e6-4065-a4d8-1bc22afd29ef",
+        "name": "Diff Calendar State",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -448,
+          208
+        ]
+      },
+      {
+        "parameters": {
+          "rules": {
+            "values": [
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "strict"
+                  },
+                  "conditions": [
+                    {
+                      "id": "c1",
+                      "leftValue": "={{$json.op}}",
+                      "rightValue": "create",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      }
+                    }
+                  ],
+                  "combinator": "and"
+                },
+                "renameOutput": true,
+                "outputKey": "create"
+              },
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "strict"
+                  },
+                  "conditions": [
+                    {
+                      "id": "c2",
+                      "leftValue": "={{$json.op}}",
+                      "rightValue": "update",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      }
+                    }
+                  ],
+                  "combinator": "and"
+                },
+                "renameOutput": true,
+                "outputKey": "update"
+              },
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "strict"
+                  },
+                  "conditions": [
+                    {
+                      "id": "c3",
+                      "leftValue": "={{$json.op}}",
+                      "rightValue": "delete",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      }
+                    }
+                  ],
+                  "combinator": "and"
+                },
+                "renameOutput": true,
+                "outputKey": "delete"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "e52c2d4a-58ca-4493-810c-68bfcdae13e3",
+        "name": "Route by Op",
+        "type": "n8n-nodes-base.switch",
+        "typeVersion": 3.2,
+        "position": [
+          -224,
+          192
+        ]
+      },
+      {
+        "parameters": {
+          "calendar": {
+            "__rl": true,
+            "value": "primary",
+            "mode": "list"
+          },
+          "start": "={{$json.dueDate}}T09:00:00",
+          "end": "={{$json.dueDate}}T09:30:00",
+          "additionalFields": {
+            "description": "=Monday item: {{$json.url}}",
+            "summary": "={{'📋 ' + $json.itemName}}"
+          }
+        },
+        "id": "461fb867-19a1-4f4a-92c5-42e5a59ff9c5",
+        "name": "Create Event",
+        "type": "n8n-nodes-base.googleCalendar",
+        "typeVersion": 1.3,
+        "position": [
+          0,
+          0
+        ],
+        "credentials": {
+          "googleCalendarOAuth2Api": {
+            "id": "ceazxv6ZgDLso5CX",
+            "name": "Google Calendar account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "operation": "update",
+          "calendar": {
+            "__rl": true,
+            "value": "primary",
+            "mode": "list"
+          },
+          "eventId": "={{$json.eventId}}",
+          "updateFields": {
+            "description": "=Monday item: {{$json.url}}",
+            "end": "={{$json.dueDate}}T09:30:00",
+            "start": "={{$json.dueDate}}T09:00:00",
+            "summary": "={{'📋 ' + $json.itemName}}"
+          }
+        },
+        "id": "76242505-9a26-4e9b-bfdb-5a71b0e35dca",
+        "name": "Update Event",
+        "type": "n8n-nodes-base.googleCalendar",
+        "typeVersion": 1.3,
+        "position": [
+          0,
+          208
+        ],
+        "credentials": {
+          "googleCalendarOAuth2Api": {
+            "id": "ceazxv6ZgDLso5CX",
+            "name": "Google Calendar account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "operation": "delete",
+          "calendar": {
+            "__rl": true,
+            "value": "primary",
+            "mode": "list"
+          },
+          "eventId": "={{$json.eventId}}",
+          "options": {}
+        },
+        "id": "235f5075-2665-42ee-a315-c9407c694e34",
+        "name": "Delete Event",
+        "type": "n8n-nodes-base.googleCalendar",
+        "typeVersion": 1.3,
+        "position": [
+          0,
+          400
+        ],
+        "credentials": {
+          "googleCalendarOAuth2Api": {
+            "id": "ceazxv6ZgDLso5CX",
+            "name": "Google Calendar account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "// Merge all 3 branches and update static map\nconst staticData = $getWorkflowStaticData('global');\nstaticData.eventMap = staticData.eventMap || {};\nconst all = $input.all();\nfor (const row of all) {\n  const j = row.json;\n  if (j.op === 'create' && j.id) { staticData.eventMap[j.itemId] = { eventId: j.id, due: j.dueDate, updated_at: new Date().toISOString() }; }\n  if (j.op === 'update' && j.id) { staticData.eventMap[j.itemId] = { eventId: j.id, due: j.dueDate, updated_at: new Date().toISOString() }; }\n  if (j.op === 'delete') { delete staticData.eventMap[j.itemId]; }\n}\nreturn [{ json: { processed: all.length } }];"
+        },
+        "id": "441c603c-9929-4b68-b210-9a74eddc8dee",
+        "name": "Persist State",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          224,
+          208
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "https://api.monday.com/v2",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpHeaderAuth",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "name": "API-Version",
+                "value": "2024-10"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({ query: `query { boards(ids: 5093821351) { items_page(limit: 200) { items { id name updated_at column_values(ids: [\"project_status\", \"date\"]) { id text value } } } } }` }) }}",
+          "options": {}
+        },
+        "id": "76147a52-bd02-4027-b3aa-bf3c7aa0abae",
+        "name": "Get Items2",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          -656,
+          208
+        ],
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "DEEjaXy7pOncZeQ1",
+            "name": "Monday.com"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Every 15 Minutes": {
+        "main": [
+          [
+            {
+              "node": "Get Items2",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Diff Calendar State": {
+        "main": [
+          [
+            {
+              "node": "Route by Op",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Route by Op": {
+        "main": [
+          [
+            {
+              "node": "Create Event",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Update Event",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Delete Event",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Create Event": {
+        "main": [
+          [
+            {
+              "node": "Persist State",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Update Event": {
+        "main": [
+          [
+            {
+              "node": "Persist State",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Delete Event": {
+        "main": [
+          [
+            {
+              "node": "Persist State",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Items2": {
+        "main": [
+          [
+            {
+              "node": "Diff Calendar State",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Alex Vinokur",
+    "name": "Version 1b7a1e3b",
+    "description": "",
+    "autosaved": true
+  },
+  "tags": []
+}
