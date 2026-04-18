@@ -1,0 +1,473 @@
+{
+  "updatedAt": "2026-04-18T06:47:43.143Z",
+  "createdAt": "2026-04-16T20:13:37.675Z",
+  "id": "AybqEE0n7FFKyQea",
+  "name": "Monday → Google Calendar Sync",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes"
+            }
+          ]
+        }
+      },
+      "id": "c0a2dbd7-39fb-4ae9-b89b-c91ff7ecfd8b",
+      "name": "Every 5 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        608,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.monday.com/v2",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "API-Version",
+              "value": "2024-10"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: `query { boards(ids: 5093821351) { items_page(limit: 200) { items { id name column_values(ids: [\"project_status\", \"date\"]) { id text value } } } } }` }) }}",
+        "options": {}
+      },
+      "id": "b81079ef-68f8-4ac3-a667-6b2fca976e9e",
+      "name": "Get Monday Items",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        832,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "DEEjaXy7pOncZeQ1",
+          "name": "Monday.com"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "value": "primary",
+          "mode": "list"
+        },
+        "returnAll": true,
+        "options": {}
+      },
+      "id": "28463240-9c06-49dc-a6eb-2270315a803d",
+      "name": "Get Calendar Events",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        1056,
+        0
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "ceazxv6ZgDLso5CX",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Find Monday items that need a calendar event and don't already have one\nconst mondayResponse = $('Get Monday Items').first().json;\nconst items = mondayResponse?.data?.boards?.[0]?.items_page?.items || [];\nconst calendarEvents = $input.all().map(x => x.json).filter(e => e && e.status !== 'cancelled');\n\nconst toCreate = [];\n\nfor (const item of items) {\n  const status = (item.column_values || []).find(c => c.id === 'project_status');\n  const due = (item.column_values || []).find(c => c.id === 'date');\n\n  let dueStr = due?.text?.split(' ')[0] || '';\n  if (!dueStr && due?.value) {\n    try {\n      const parsed = typeof due.value === 'string' ? JSON.parse(due.value) : due.value;\n      dueStr = parsed?.date || '';\n    } catch (e) {}\n  }\n\n  if (!dueStr) continue;\n  if (status?.text === 'Done') continue;\n\n  const mondayUrl = `https://alex-it.monday.com/boards/5093821351/pulses/${item.id}`;\n\n  // Dedupe by Monday URL in description — unique per Monday item, emoji-proof\n  const alreadyExists = calendarEvents.some(e => {\n    return e.description && e.description.includes(mondayUrl);\n  });\n\n  if (!alreadyExists) {\n    toCreate.push({\n      json: {\n        itemId: item.id,\n        itemName: item.name,\n        dueDate: dueStr,\n        url: mondayUrl\n      }\n    });\n  }\n}\n\nreturn toCreate;"
+      },
+      "id": "e64728b4-544f-4985-b44e-da8836db67ca",
+      "name": "Find Missing Events",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1280,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "value": "primary",
+          "mode": "list"
+        },
+        "start": "={{$json.dueDate}}T09:00:00",
+        "end": "={{$json.dueDate}}T09:30:00",
+        "additionalFields": {
+          "description": "=Monday item: {{$json.url}}",
+          "summary": "={{'📋 ' + $json.itemName}}"
+        }
+      },
+      "id": "345c8b01-e714-456f-875d-e0bc8bcd1c3f",
+      "name": "Create Event",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        1488,
+        0
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "ceazxv6ZgDLso5CX",
+          "name": "Google Calendar account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const all = $input.all();\nconst items = all.map(x => {\n  const j = x.json;\n  const startRaw = j.start?.dateTime || j.start?.date || '';\n  const date = startRaw.split('T')[0];\n  return {\n    title: j.summary || '(no title)',\n    date: date || '(no date)',\n    eventId: j.id || null,\n    link: j.htmlLink || null\n  };\n});\nreturn [{ json: { created: all.length, items } }];"
+      },
+      "id": "bfd19fa9-05df-486e-aba8-f5769477e680",
+      "name": "Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1712,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Every 5 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Get Monday Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Monday Items": {
+      "main": [
+        [
+          {
+            "node": "Get Calendar Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Calendar Events": {
+      "main": [
+        [
+          {
+            "node": "Find Missing Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Missing Events": {
+      "main": [
+        [
+          {
+            "node": "Create Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Event": {
+      "main": [
+        [
+          {
+            "node": "Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "timezone": "Asia/Jerusalem",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": {
+    "node:Every 15 Minutes": {
+      "recurrenceRules": []
+    },
+    "global": {
+      "eventMap": {
+        "2847517619": {
+          "eventId": "hmau5gg6qmsfd29g05d04040ms",
+          "due": "2026-04-21",
+          "updated_at": "2026-04-16T20:12:09Z"
+        },
+        "2847525816": {
+          "eventId": "jnmg3h66br3lnh8i7rj34lq0bc",
+          "due": "2026-04-15",
+          "updated_at": "2026-04-16T20:12:09Z"
+        },
+        "2847648672": {
+          "eventId": "lvplnum19rjjjugl57dfee4fok",
+          "due": "2026-04-16",
+          "updated_at": "2026-04-17T07:00:01Z"
+        },
+        "2850644792": {
+          "eventId": "bjukcptdfhee7d52fhc81ih4t8",
+          "due": "2026-04-20",
+          "updated_at": "2026-04-18T06:35:49Z"
+        }
+      }
+    },
+    "node:Every 5 Minutes": {
+      "recurrenceRules": []
+    }
+  },
+  "meta": null,
+  "pinData": {},
+  "versionId": "1766d24d-0ee9-44ed-b41b-1315d3b0ea1b",
+  "activeVersionId": "1766d24d-0ee9-44ed-b41b-1315d3b0ea1b",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-04-16T20:13:37.678Z",
+      "createdAt": "2026-04-16T20:13:37.678Z",
+      "role": "workflow:owner",
+      "workflowId": "AybqEE0n7FFKyQea",
+      "projectId": "pWTWmuHnmIHw48U9"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-04-18T06:50:04.000Z",
+    "createdAt": "2026-04-18T06:47:43.144Z",
+    "versionId": "1766d24d-0ee9-44ed-b41b-1315d3b0ea1b",
+    "workflowId": "AybqEE0n7FFKyQea",
+    "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "minutes"
+              }
+            ]
+          }
+        },
+        "id": "c0a2dbd7-39fb-4ae9-b89b-c91ff7ecfd8b",
+        "name": "Every 5 Minutes",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          608,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "https://api.monday.com/v2",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpHeaderAuth",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "name": "API-Version",
+                "value": "2024-10"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({ query: `query { boards(ids: 5093821351) { items_page(limit: 200) { items { id name column_values(ids: [\"project_status\", \"date\"]) { id text value } } } } }` }) }}",
+          "options": {}
+        },
+        "id": "b81079ef-68f8-4ac3-a667-6b2fca976e9e",
+        "name": "Get Monday Items",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          832,
+          0
+        ],
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "DEEjaXy7pOncZeQ1",
+            "name": "Monday.com"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "operation": "getAll",
+          "calendar": {
+            "__rl": true,
+            "value": "primary",
+            "mode": "list"
+          },
+          "returnAll": true,
+          "options": {}
+        },
+        "id": "28463240-9c06-49dc-a6eb-2270315a803d",
+        "name": "Get Calendar Events",
+        "type": "n8n-nodes-base.googleCalendar",
+        "typeVersion": 1.3,
+        "position": [
+          1056,
+          0
+        ],
+        "alwaysOutputData": true,
+        "credentials": {
+          "googleCalendarOAuth2Api": {
+            "id": "ceazxv6ZgDLso5CX",
+            "name": "Google Calendar account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "// Find Monday items that need a calendar event and don't already have one\nconst mondayResponse = $('Get Monday Items').first().json;\nconst items = mondayResponse?.data?.boards?.[0]?.items_page?.items || [];\nconst calendarEvents = $input.all().map(x => x.json).filter(e => e && e.status !== 'cancelled');\n\nconst toCreate = [];\n\nfor (const item of items) {\n  const status = (item.column_values || []).find(c => c.id === 'project_status');\n  const due = (item.column_values || []).find(c => c.id === 'date');\n\n  let dueStr = due?.text?.split(' ')[0] || '';\n  if (!dueStr && due?.value) {\n    try {\n      const parsed = typeof due.value === 'string' ? JSON.parse(due.value) : due.value;\n      dueStr = parsed?.date || '';\n    } catch (e) {}\n  }\n\n  if (!dueStr) continue;\n  if (status?.text === 'Done') continue;\n\n  const mondayUrl = `https://alex-it.monday.com/boards/5093821351/pulses/${item.id}`;\n\n  // Dedupe by Monday URL in description — unique per Monday item, emoji-proof\n  const alreadyExists = calendarEvents.some(e => {\n    return e.description && e.description.includes(mondayUrl);\n  });\n\n  if (!alreadyExists) {\n    toCreate.push({\n      json: {\n        itemId: item.id,\n        itemName: item.name,\n        dueDate: dueStr,\n        url: mondayUrl\n      }\n    });\n  }\n}\n\nreturn toCreate;"
+        },
+        "id": "e64728b4-544f-4985-b44e-da8836db67ca",
+        "name": "Find Missing Events",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1280,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "calendar": {
+            "__rl": true,
+            "value": "primary",
+            "mode": "list"
+          },
+          "start": "={{$json.dueDate}}T09:00:00",
+          "end": "={{$json.dueDate}}T09:30:00",
+          "additionalFields": {
+            "description": "=Monday item: {{$json.url}}",
+            "summary": "={{'📋 ' + $json.itemName}}"
+          }
+        },
+        "id": "345c8b01-e714-456f-875d-e0bc8bcd1c3f",
+        "name": "Create Event",
+        "type": "n8n-nodes-base.googleCalendar",
+        "typeVersion": 1.3,
+        "position": [
+          1488,
+          0
+        ],
+        "credentials": {
+          "googleCalendarOAuth2Api": {
+            "id": "ceazxv6ZgDLso5CX",
+            "name": "Google Calendar account"
+          }
+        },
+        "onError": "continueRegularOutput"
+      },
+      {
+        "parameters": {
+          "jsCode": "const all = $input.all();\nconst items = all.map(x => {\n  const j = x.json;\n  const startRaw = j.start?.dateTime || j.start?.date || '';\n  const date = startRaw.split('T')[0];\n  return {\n    title: j.summary || '(no title)',\n    date: date || '(no date)',\n    eventId: j.id || null,\n    link: j.htmlLink || null\n  };\n});\nreturn [{ json: { created: all.length, items } }];"
+        },
+        "id": "bfd19fa9-05df-486e-aba8-f5769477e680",
+        "name": "Summary",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1712,
+          0
+        ]
+      }
+    ],
+    "connections": {
+      "Every 5 Minutes": {
+        "main": [
+          [
+            {
+              "node": "Get Monday Items",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Monday Items": {
+        "main": [
+          [
+            {
+              "node": "Get Calendar Events",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Calendar Events": {
+        "main": [
+          [
+            {
+              "node": "Find Missing Events",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Find Missing Events": {
+        "main": [
+          [
+            {
+              "node": "Create Event",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Create Event": {
+        "main": [
+          [
+            {
+              "node": "Summary",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Alex Vinokur",
+    "name": "Version 1766d24d",
+    "description": "",
+    "autosaved": true
+  },
+  "tags": []
+}
