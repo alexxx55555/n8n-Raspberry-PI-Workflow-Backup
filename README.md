@@ -1,11 +1,11 @@
 # n8n-Raspberry-PI-Workflow-Backup
 
-## Latest Backup: 2026-04-17 21:00
+## Latest Backup: 2026-04-18 19:49
 
 ### Backup URL
-https://github.com/alexxx55555/n8n-Raspberry-PI-Workflow-Backup/tree/main/PI%20workflows%20backup%202026-04-17%2021-00
+https://github.com/alexxx55555/n8n-Raspberry-PI-Workflow-Backup/tree/main/PI%20workflows%20backup%202026-04-18%2019-49
 
-### Workflows Backed Up (41 total)
+### Workflows Backed Up (42 total)
 - AD Unlock & Reset Password
 - Monday - Auto Due Date by Status
 - Daily Digest — Monday.com
@@ -36,10 +36,11 @@ https://github.com/alexxx55555/n8n-Raspberry-PI-Workflow-Backup/tree/main/PI%20w
 - AI Translator
 - WAHA Webhook Auto Start
 - PI Workflows Backup
-- My workflow
+- Gmail → Monday.com Task Creator
 - Monday Auto-Assign Owner
 - WhatsApp Send Message
 - Create new AD account
+- Delete Calendar Events by Title
 - AD Device Monitor
 - AD Group Security Alert
 - Users AD/JC Onboarding
