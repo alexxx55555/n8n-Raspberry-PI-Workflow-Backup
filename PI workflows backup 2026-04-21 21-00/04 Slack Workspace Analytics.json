@@ -1,0 +1,237 @@
+{
+  "updatedAt": "2026-04-21T15:01:45.803Z",
+  "createdAt": "2026-04-21T15:01:44.201Z",
+  "id": "BonIWJMwK1qftIZ8",
+  "name": "04 Slack Workspace Analytics",
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * 0"
+            }
+          ]
+        }
+      },
+      "id": "5f8a7f91-548c-4580-9816-50d755c05442",
+      "name": "Weekly Sunday 9am",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -176,
+        -144
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "channel",
+        "operation": "getAll",
+        "returnAll": true,
+        "filters": {}
+      },
+      "id": "d6fa49ab-299d-491e-b846-a9995e7c7f93",
+      "name": "Get All Channels",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        64,
+        -144
+      ],
+      "webhookId": "e5f8fffd-4c6f-4d58-9694-82dd023da3d5",
+      "credentials": {
+        "slackApi": {
+          "id": "obEYVo8oQOJ22JqX",
+          "name": "AD Admin Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const channels = $input.all().map(i => i.json).filter(ch => !ch.is_archived);\nconst results = [];\n\nfor (const ch of channels) {\n  results.push({\n    json: {\n      channelId: ch.id,\n      channelName: ch.name,\n      memberCount: ch.num_members || 0,\n      oldest: Math.floor((Date.now() - 7 * 86400000) / 1000).toString(),\n      latest: Math.floor(Date.now() / 1000).toString()\n    }\n  });\n}\n\nreturn results;"
+      },
+      "id": "c779fe73-ec4a-48c5-b3d6-3226281ca1bd",
+      "name": "Prep Channel List",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        304,
+        -144
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://slack.com/api/conversations.history",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "channel",
+              "value": "={{ $json.channelId }}"
+            },
+            {
+              "name": "oldest",
+              "value": "={{ $json.oldest }}"
+            },
+            {
+              "name": "latest",
+              "value": "={{ $json.latest }}"
+            },
+            {
+              "name": "limit",
+              "value": "100"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $credentials.slackApi.accessToken }}"
+            }
+          ]
+        },
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 3,
+              "batchInterval": 1200
+            }
+          }
+        }
+      },
+      "id": "f1b3aca1-21bd-4b7b-9b5b-d4ea2252a369",
+      "name": "Fetch Week History",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        544,
+        -144
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst channelStats = [];\nlet totalMessages = 0;\nconst uniqueUsers = new Set();\nconst userMsgCount = {};\n\nfor (const item of items) {\n  const messages = item.json.messages || [];\n  const channelName = item.json.channelName;\n  const memberCount = item.json.memberCount;\n  let channelMsgCount = 0;\n  const channelUsers = new Set();\n  \n  for (const msg of messages) {\n    if (msg.subtype === 'channel_join' || msg.subtype === 'channel_leave') continue;\n    if (msg.bot_id) continue; // skip bot messages in stats\n    \n    channelMsgCount++;\n    totalMessages++;\n    \n    if (msg.user) {\n      uniqueUsers.add(msg.user);\n      channelUsers.add(msg.user);\n      userMsgCount[msg.user] = (userMsgCount[msg.user] || 0) + 1;\n    }\n  }\n  \n  if (channelMsgCount > 0) {\n    channelStats.push({\n      name: channelName,\n      messages: channelMsgCount,\n      uniquePosters: channelUsers.size,\n      members: memberCount\n    });\n  }\n}\n\n// Sort channels by message count\nchannelStats.sort((a, b) => b.messages - a.messages);\n\n// Top 5 most active channels\nconst topChannels = channelStats.slice(0, 5)\n  .map((ch, i) => `${i + 1}. #${ch.name} — ${ch.messages} msgs (${ch.uniquePosters} people)`)\n  .join('\\n');\n\n// Top 5 most active users\nconst topUsers = Object.entries(userMsgCount)\n  .sort((a, b) => b[1] - a[1])\n  .slice(0, 5)\n  .map((entry, i) => `${i + 1}. <@${entry[0]}> — ${entry[1]} messages`)\n  .join('\\n');\n\n// Dead channels (0 messages this week, >5 members)\nconst allChannelNames = items.map(i => i.json.channelName);\nconst activeChannelNames = channelStats.map(c => c.name);\nconst deadChannels = items\n  .filter(i => !activeChannelNames.includes(i.json.channelName) && i.json.memberCount > 5)\n  .map(i => `#${i.json.channelName} (${i.json.memberCount} members)`)\n  .slice(0, 5);\n\nconst weekStart = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];\nconst weekEnd = new Date().toISOString().split('T')[0];\n\nconst report = `:bar_chart: *Weekly Slack Analytics*\\n` +\n  `:calendar: ${weekStart} → ${weekEnd}\\n\\n` +\n  `:speech_balloon: *Total messages:* ${totalMessages}\\n` +\n  `:busts_in_silhouette: *Active users:* ${uniqueUsers.size}\\n` +\n  `:hash: *Active channels:* ${channelStats.length} / ${allChannelNames.length}\\n\\n` +\n  `:trophy: *Most Active Channels*\\n${topChannels || 'No activity'}\\n\\n` +\n  `:star: *Most Active Users*\\n${topUsers || 'No activity'}\\n\\n` +\n  (deadChannels.length > 0 ? `:zzz: *Silent Channels (0 messages, 5+ members)*\\n${deadChannels.join(', ')}` : ':white_check_mark: All channels with 5+ members had activity this week');\n\nreturn [{ json: { report } }];"
+      },
+      "id": "910ce6ad-88d2-4355-a7d0-a1bc4d42e01a",
+      "name": "Build Analytics Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        784,
+        -144
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0AJC2985U2",
+          "mode": "id"
+        },
+        "text": "={{ $json.report }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "id": "75e9ad16-bfba-4c78-948f-1ec4acd86f1f",
+      "name": "Post Analytics Report",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        1024,
+        -144
+      ],
+      "webhookId": "b5bced5f-c463-49b3-8a0a-f95dd3e999f9",
+      "credentials": {
+        "slackApi": {
+          "id": "obEYVo8oQOJ22JqX",
+          "name": "AD Admin Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Weekly Sunday 9am": {
+      "main": [
+        [
+          {
+            "node": "Get All Channels",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get All Channels": {
+      "main": [
+        [
+          {
+            "node": "Prep Channel List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep Channel List": {
+      "main": [
+        [
+          {
+            "node": "Fetch Week History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Week History": {
+      "main": [
+        [
+          {
+            "node": "Build Analytics Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Analytics Report": {
+      "main": [
+        [
+          {
+            "node": "Post Analytics Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "37101ebd-b45d-4a93-ba96-7e15597fe1a5",
+  "activeVersionId": null,
+  "triggerCount": 0,
+  "shared": [
+    {
+      "updatedAt": "2026-04-21T15:01:44.204Z",
+      "createdAt": "2026-04-21T15:01:44.204Z",
+      "role": "workflow:owner",
+      "workflowId": "BonIWJMwK1qftIZ8",
+      "projectId": "pWTWmuHnmIHw48U9"
+    }
+  ],
+  "activeVersion": null,
+  "tags": []
+}
