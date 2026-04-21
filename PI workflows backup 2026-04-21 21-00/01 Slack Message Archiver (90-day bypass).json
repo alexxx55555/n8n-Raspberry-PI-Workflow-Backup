@@ -1,0 +1,363 @@
+{
+  "updatedAt": "2026-04-21T15:01:15.142Z",
+  "createdAt": "2026-04-21T15:01:15.142Z",
+  "id": "r5po6YUjsoES3wXs",
+  "name": "01 Slack Message Archiver (90-day bypass)",
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 24
+            }
+          ]
+        }
+      },
+      "id": "1477d50b-3d4f-439b-8aa1-36d62fac3aa2",
+      "name": "Daily 2am Israel",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1312,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "channel",
+        "operation": "getAll",
+        "returnAll": true,
+        "filters": {}
+      },
+      "id": "de62c803-0e12-45f9-a276-295e05003546",
+      "name": "Get All Public Channels",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        -1072,
+        -48
+      ],
+      "webhookId": "3cc6ad9c-ef8e-4784-b267-4c3856407e03",
+      "credentials": {
+        "slackApi": {
+          "id": "obEYVo8oQOJ22JqX",
+          "name": "AD Admin Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "not-archived",
+              "leftValue": "={{ $json.is_archived }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "93933906-7943-4a5d-b515-66c436aa07e1",
+      "name": "Filter Active Channels",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -832,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// For each channel, fetch messages from last 24h\nconst items = $input.all();\nconst results = [];\n\nfor (const item of items) {\n  const channelId = item.json.id;\n  const channelName = item.json.name;\n  \n  // 24 hours ago in Unix timestamp\n  const oldest = Math.floor((Date.now() - 86400000) / 1000).toString();\n  const latest = Math.floor(Date.now() / 1000).toString();\n  \n  results.push({\n    json: {\n      channelId,\n      channelName,\n      oldest,\n      latest\n    }\n  });\n}\n\nreturn results;"
+      },
+      "id": "5df02cbf-833e-471b-bc66-3a990b5a3fb1",
+      "name": "Prepare Fetch Params",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -592,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://slack.com/api/conversations.history",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "channel",
+              "value": "={{ $json.channelId }}"
+            },
+            {
+              "name": "oldest",
+              "value": "={{ $json.oldest }}"
+            },
+            {
+              "name": "latest",
+              "value": "={{ $json.latest }}"
+            },
+            {
+              "name": "limit",
+              "value": "200"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $credentials.slackApi.accessToken }}"
+            }
+          ]
+        },
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 3,
+              "batchInterval": 1200
+            }
+          }
+        }
+      },
+      "id": "51facbf2-0259-4a59-831e-58579a5609e9",
+      "name": "Fetch Channel History",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -352,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst results = [];\nlet totalMessages = 0;\nlet channelsWithMessages = 0;\nconst today = new Date().toISOString().split('T')[0];\n\nfor (const item of items) {\n  const channelName = item.json.channelName || 'unknown';\n  const channelId = item.json.channelId || 'unknown';\n  const messages = item.json.messages || [];\n  \n  if (messages.length === 0) continue;\n  \n  channelsWithMessages++;\n  totalMessages += messages.length;\n  \n  // Build archive content as JSONL (one JSON object per line)\n  const archiveLines = messages.map(msg => JSON.stringify({\n    ts: msg.ts,\n    user: msg.user || msg.bot_id || 'unknown',\n    text: msg.text || '',\n    type: msg.type || 'message',\n    subtype: msg.subtype || null,\n    thread_ts: msg.thread_ts || null,\n    reactions: msg.reactions || [],\n    files: (msg.files || []).map(f => ({ name: f.name, url: f.url_private, mimetype: f.mimetype }))\n  }));\n  \n  const fileContent = archiveLines.join('\\n');\n  const fileName = `${channelName}_${today}.jsonl`;\n  const folderPath = `Slack-Archive/${channelName}`;\n  \n  results.push({\n    json: {\n      channelName,\n      channelId,\n      fileName,\n      folderPath,\n      messageCount: messages.length,\n      date: today\n    },\n    binary: {\n      data: {\n        data: Buffer.from(fileContent, 'utf-8').toString('base64'),\n        mimeType: 'application/jsonl',\n        fileName\n      }\n    }\n  });\n}\n\n// Add summary item at end\nif (results.length > 0) {\n  results.push({\n    json: {\n      _isSummary: true,\n      totalMessages,\n      channelsWithMessages,\n      date: today\n    }\n  });\n}\n\nreturn results.length > 0 ? results : [{ json: { _isSummary: true, totalMessages: 0, channelsWithMessages: 0, date: today } }];"
+      },
+      "id": "c047c0fe-1d89-4aec-a175-6e2fb5580bba",
+      "name": "Build Archive Files",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -112,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "not-summary",
+              "leftValue": "={{ $json._isSummary }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "3fa00dec-b31e-4866-9ef5-10befebc0eb9",
+      "name": "Is Archive File?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        128,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "name": "={{ $json.fileName }}",
+        "driveId": {
+          "__rl": true,
+          "value": "My Drive",
+          "mode": "list",
+          "cachedResultName": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{ $json.folderPath }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "ddca7d0d-3fec-4fca-8bc4-580cc23cdee0",
+      "name": "Upload to Google Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        368,
+        -144
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "92XkOPWlG0thbyjc",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0AJC2985U2",
+          "mode": "id"
+        },
+        "text": "=:file_cabinet: *Slack Archive Complete*\n\n:calendar: Date: `{{ $json.date }}`\n:speech_balloon: Messages archived: *{{ $json.totalMessages }}*\n:hash: Channels with activity: *{{ $json.channelsWithMessages }}*\n:cloud: Stored in: Google Drive → `Slack-Archive/`",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "id": "af6335cc-503b-4a6b-918e-467551a9800d",
+      "name": "Slack Summary",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        368,
+        64
+      ],
+      "webhookId": "e9bbfd2e-bdb7-4965-afb7-62a14393b518",
+      "credentials": {
+        "slackApi": {
+          "id": "obEYVo8oQOJ22JqX",
+          "name": "AD Admin Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Daily 2am Israel": {
+      "main": [
+        [
+          {
+            "node": "Get All Public Channels",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get All Public Channels": {
+      "main": [
+        [
+          {
+            "node": "Filter Active Channels",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Active Channels": {
+      "main": [
+        [
+          {
+            "node": "Prepare Fetch Params",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Fetch Params": {
+      "main": [
+        [
+          {
+            "node": "Fetch Channel History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Channel History": {
+      "main": [
+        [
+          {
+            "node": "Build Archive Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Archive Files": {
+      "main": [
+        [
+          {
+            "node": "Is Archive File?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Archive File?": {
+      "main": [
+        [
+          {
+            "node": "Upload to Google Drive",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Slack Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "c71815db-6114-4a2a-b868-2d1915a81341",
+  "activeVersionId": null,
+  "triggerCount": 0,
+  "shared": [
+    {
+      "updatedAt": "2026-04-21T15:01:15.145Z",
+      "createdAt": "2026-04-21T15:01:15.145Z",
+      "role": "workflow:owner",
+      "workflowId": "r5po6YUjsoES3wXs",
+      "projectId": "pWTWmuHnmIHw48U9"
+    }
+  ],
+  "activeVersion": null,
+  "tags": []
+}
