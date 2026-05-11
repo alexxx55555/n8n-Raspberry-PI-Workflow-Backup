@@ -1,0 +1,345 @@
+{
+  "updatedAt": "2026-04-16T18:39:44.144Z",
+  "createdAt": "2026-04-16T18:26:55.739Z",
+  "id": "2Pz3WHSYAAHKrEfq",
+  "name": "Monday - Auto Due Date by Status",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.monday.com/v2",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "API-Version",
+              "value": "2024-10"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: `query { boards(ids: 5093821351) { items_page(limit: 200) { items { id name column_values(ids: [\"project_status\", \"date\"]) { id text value } } } } }` }) }}",
+        "options": {}
+      },
+      "id": "ae78b45c-7a17-44fe-b8b6-1a22bad99a38",
+      "name": "Get Items",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -112,
+        -160
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "DEEjaXy7pOncZeQ1",
+          "name": "Monday.com"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.first().json?.data?.boards?.[0]?.items_page?.items || [];\n\n// Per-status due-date offset (in business days, Israel work week Sun-Thu)\nconst DUE_DATE_BY_STATUS = {\n  'Working on it': 3,\n  'Review': 5\n};\n\n// Add +N business days\nfunction addBizDays(n) {\n  const d = new Date();\n  let added = 0;\n  while (added < n) {\n    d.setDate(d.getDate() + 1);\n    const day = d.getDay();\n    if (day !== 5 && day !== 6) added++; // skip Fri/Sat\n  }\n  return d.toISOString().split('T')[0];\n}\n\nconst toUpdate = [];\nfor (const item of items) {\n  const status = (item.column_values || []).find(c => c.id === 'project_status');\n  const due = (item.column_values || []).find(c => c.id === 'date');\n  const offset = DUE_DATE_BY_STATUS[status?.text];\n  const hasDueDate = due?.text && due.text.length > 0;\n  if (offset !== undefined && !hasDueDate) {\n    toUpdate.push({ json: { itemId: item.id, itemName: item.name, status: status.text, offsetDays: offset, dueDate: addBizDays(offset) } });\n  }\n}\nreturn toUpdate;"
+      },
+      "id": "840ed264-bc09-469f-98fe-c0ef1c8e0adb",
+      "name": "Filter In Progress w/o Due",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        96,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.monday.com/v2",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "API-Version",
+              "value": "2024-10"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: `mutation { change_simple_column_value(board_id: 5093821351, item_id: ${$json.itemId}, column_id: \"date\", value: \"${$json.dueDate}\") { id } }` }) }}",
+        "options": {}
+      },
+      "id": "b646c1b6-104a-4465-a9ae-33e55573ae84",
+      "name": "Set Due Date",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        320,
+        -160
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "DEEjaXy7pOncZeQ1",
+          "name": "Monday.com"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "3b4b0d25-e3dc-4929-9eea-5f846c95e0fe",
+      "name": "Every Minute",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -336,
+        -160
+      ]
+    }
+  ],
+  "connections": {
+    "Get Items": {
+      "main": [
+        [
+          {
+            "node": "Filter In Progress w/o Due",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter In Progress w/o Due": {
+      "main": [
+        [
+          {
+            "node": "Set Due Date",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every Minute": {
+      "main": [
+        [
+          {
+            "node": "Get Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "timezone": "Asia/Jerusalem",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": {
+    "node:Every 2 Minutes1": {
+      "recurrenceRules": []
+    },
+    "node:Every Minute": {
+      "recurrenceRules": []
+    }
+  },
+  "meta": null,
+  "pinData": {},
+  "versionId": "0cfba362-78da-4ad9-b538-98e35be161b2",
+  "activeVersionId": "0cfba362-78da-4ad9-b538-98e35be161b2",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-04-16T18:26:55.743Z",
+      "createdAt": "2026-04-16T18:26:55.743Z",
+      "role": "workflow:owner",
+      "workflowId": "2Pz3WHSYAAHKrEfq",
+      "projectId": "pWTWmuHnmIHw48U9"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-04-16T18:37:38.000Z",
+    "createdAt": "2026-04-16T18:37:18.218Z",
+    "versionId": "0cfba362-78da-4ad9-b538-98e35be161b2",
+    "workflowId": "2Pz3WHSYAAHKrEfq",
+    "nodes": [
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "https://api.monday.com/v2",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpHeaderAuth",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "name": "API-Version",
+                "value": "2024-10"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({ query: `query { boards(ids: 5093821351) { items_page(limit: 200) { items { id name column_values(ids: [\"project_status\", \"date\"]) { id text value } } } } }` }) }}",
+          "options": {}
+        },
+        "id": "ae78b45c-7a17-44fe-b8b6-1a22bad99a38",
+        "name": "Get Items",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          -112,
+          -160
+        ],
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "DEEjaXy7pOncZeQ1",
+            "name": "Monday.com"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "const items = $input.first().json?.data?.boards?.[0]?.items_page?.items || [];\n\n// Per-status due-date offset (in business days, Israel work week Sun-Thu)\nconst DUE_DATE_BY_STATUS = {\n  'Working on it': 3,\n  'Review': 5\n};\n\n// Add +N business days\nfunction addBizDays(n) {\n  const d = new Date();\n  let added = 0;\n  while (added < n) {\n    d.setDate(d.getDate() + 1);\n    const day = d.getDay();\n    if (day !== 5 && day !== 6) added++; // skip Fri/Sat\n  }\n  return d.toISOString().split('T')[0];\n}\n\nconst toUpdate = [];\nfor (const item of items) {\n  const status = (item.column_values || []).find(c => c.id === 'project_status');\n  const due = (item.column_values || []).find(c => c.id === 'date');\n  const offset = DUE_DATE_BY_STATUS[status?.text];\n  const hasDueDate = due?.text && due.text.length > 0;\n  if (offset !== undefined && !hasDueDate) {\n    toUpdate.push({ json: { itemId: item.id, itemName: item.name, status: status.text, offsetDays: offset, dueDate: addBizDays(offset) } });\n  }\n}\nreturn toUpdate;"
+        },
+        "id": "840ed264-bc09-469f-98fe-c0ef1c8e0adb",
+        "name": "Filter In Progress w/o Due",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          96,
+          -160
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "https://api.monday.com/v2",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpHeaderAuth",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "name": "API-Version",
+                "value": "2024-10"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({ query: `mutation { change_simple_column_value(board_id: 5093821351, item_id: ${$json.itemId}, column_id: \"date\", value: \"${$json.dueDate}\") { id } }` }) }}",
+          "options": {}
+        },
+        "id": "b646c1b6-104a-4465-a9ae-33e55573ae84",
+        "name": "Set Due Date",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          320,
+          -160
+        ],
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "DEEjaXy7pOncZeQ1",
+            "name": "Monday.com"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "minutes",
+                "minutesInterval": 1
+              }
+            ]
+          }
+        },
+        "id": "3b4b0d25-e3dc-4929-9eea-5f846c95e0fe",
+        "name": "Every Minute",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          -336,
+          -160
+        ]
+      }
+    ],
+    "connections": {
+      "Get Items": {
+        "main": [
+          [
+            {
+              "node": "Filter In Progress w/o Due",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Filter In Progress w/o Due": {
+        "main": [
+          [
+            {
+              "node": "Set Due Date",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Every Minute": {
+        "main": [
+          [
+            {
+              "node": "Get Items",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Alex Vinokur",
+    "name": "Version 0cfba362",
+    "description": "",
+    "autosaved": true
+  },
+  "tags": []
+}
