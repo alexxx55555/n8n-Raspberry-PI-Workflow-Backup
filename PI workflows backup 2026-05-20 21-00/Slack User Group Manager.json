@@ -1,0 +1,602 @@
+{
+  "updatedAt": "2026-04-22T11:00:30.067Z",
+  "createdAt": "2026-04-21T15:01:32.906Z",
+  "id": "so2zgcxn1XV4tSeg",
+  "name": "Slack User Group Manager",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "slack-group-notify",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "ec31d66a-c3e1-4480-bbdc-818ba5146bab",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -480,
+        144
+      ],
+      "webhookId": "slack-group-notify"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "url-verify",
+              "leftValue": "={{ $json.body.type }}",
+              "rightValue": "url_verification",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "68923a47-a654-4769-b640-4d0dee6675f3",
+      "name": "Is URL Verify?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -240,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ challenge: $json.body.challenge }) }}",
+        "options": {}
+      },
+      "id": "b0932400-136f-4755-a347-a9517a7bef8b",
+      "name": "Return Challenge",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "noData",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "d2e3ea9d-3a8e-4f58-8c8d-566005bc0826",
+      "name": "ACK 200",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract group mention from message text\n// Supports: @team-israel, @team-uk, @team-poland, @team-all, or any custom group\nconst body = $input.first().json.body;\nconst event = body.event || {};\nconst text = event.text || '';\nconst channel = event.channel || '';\nconst sender = event.user || '';\nconst botId = event.bot_id || '';\n\n// Skip bot messages\nif (botId) return [];\n\n// Find @group-name patterns\nconst groupPattern = /@(team-[a-z]+|group-[a-z]+|notify-[a-z]+)/gi;\nconst matches = text.match(groupPattern);\n\nif (!matches || matches.length === 0) return [];\n\nconst groups = matches.map(m => m.replace('@', '').toLowerCase());\n\nreturn groups.map(group => ({\n  json: { group, channel, sender, originalText: text }\n}));"
+      },
+      "id": "9f2aac53-239b-4f8b-b252-075586652953",
+      "name": "Extract Group Mention",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const GROUP_MEMBERS = {\n  'team-all': [\n    'U08AYDL2FQD',  // Alex\n    'U06AE2KHEQ3',  // Alex Vi\n  ],\n};\n\nconst items = $input.all();\nconst results = [];\n\nfor (const item of items) {\n  const group = item.json.group;\n  const members = GROUP_MEMBERS[group];\n  \n  if (!members || members.length === 0) {\n    results.push({\n      json: {\n        ...item.json,\n        error: true,\n        message: `Unknown group: @${group}. Available groups: ${Object.keys(GROUP_MEMBERS).join(', ')}`\n      }\n    });\n    continue;\n  }\n  \n  const mentions = members.map(uid => `<@${uid}>`).join(' ');\n  \n  results.push({\n    json: {\n      ...item.json,\n      error: false,\n      members: members,\n      memberCount: members.length,\n      mentionText: `:mega: *@${group}* (${members.length} members)\\n${mentions}\\n\\n> _Triggered by <@${item.json.sender}> in <#${item.json.channel}>_`\n    }\n  });\n}\n\nreturn results;"
+      },
+      "id": "f11b12a8-224f-4126-b462-c6c8a09b5749",
+      "name": "Resolve Group Members",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "no-error",
+              "leftValue": "={{ $json.error }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "8da653dd-07c5-419b-bdb5-e7892a2c8c8d",
+      "name": "Group Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        720,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "={{ $json.channel }}",
+          "mode": "id"
+        },
+        "text": "={{ $json.mentionText }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "id": "342c4739-930c-4f8c-88e6-dd6ed03a26c1",
+      "name": "Notify Group Members",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        960,
+        192
+      ],
+      "webhookId": "bf57ee38-09e0-47b3-8b86-85eb91f592ef",
+      "credentials": {
+        "slackApi": {
+          "id": "Z2b9WxZCM4NZbr9j",
+          "name": "Slack Automation"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "={{ $json.channel }}",
+          "mode": "id"
+        },
+        "text": "={{ $json.message }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "id": "f9180f79-c492-47c6-b661-5c0051c7bc45",
+      "name": "Group Not Found",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        960,
+        384
+      ],
+      "webhookId": "6b8d9e6b-3546-478b-aa14-9586ad2caca0",
+      "credentials": {
+        "slackApi": {
+          "id": "Z2b9WxZCM4NZbr9j",
+          "name": "Slack Automation"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Is URL Verify?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is URL Verify?": {
+      "main": [
+        [
+          {
+            "node": "Return Challenge",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "ACK 200",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ACK 200": {
+      "main": [
+        [
+          {
+            "node": "Extract Group Mention",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Group Mention": {
+      "main": [
+        [
+          {
+            "node": "Resolve Group Members",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve Group Members": {
+      "main": [
+        [
+          {
+            "node": "Group Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Group Found?": {
+      "main": [
+        [
+          {
+            "node": "Notify Group Members",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Group Not Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "b8566f7c-14b9-408d-8009-8e425dfbfc01",
+  "activeVersionId": "b8566f7c-14b9-408d-8009-8e425dfbfc01",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-04-21T15:01:32.908Z",
+      "createdAt": "2026-04-21T15:01:32.908Z",
+      "role": "workflow:owner",
+      "workflowId": "so2zgcxn1XV4tSeg",
+      "projectId": "pWTWmuHnmIHw48U9"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-04-22T10:56:44.000Z",
+    "createdAt": "2026-04-22T10:56:41.608Z",
+    "versionId": "b8566f7c-14b9-408d-8009-8e425dfbfc01",
+    "workflowId": "so2zgcxn1XV4tSeg",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "slack-group-notify",
+          "responseMode": "responseNode",
+          "options": {}
+        },
+        "id": "ec31d66a-c3e1-4480-bbdc-818ba5146bab",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2.1,
+        "position": [
+          -480,
+          144
+        ],
+        "webhookId": "slack-group-notify"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "id": "url-verify",
+                "leftValue": "={{ $json.body.type }}",
+                "rightValue": "url_verification",
+                "operator": {
+                  "type": "string",
+                  "operation": "equals"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "68923a47-a654-4769-b640-4d0dee6675f3",
+        "name": "Is URL Verify?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [
+          -240,
+          144
+        ]
+      },
+      {
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "={{ JSON.stringify({ challenge: $json.body.challenge }) }}",
+          "options": {}
+        },
+        "id": "b0932400-136f-4755-a347-a9517a7bef8b",
+        "name": "Return Challenge",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.1,
+        "position": [
+          0,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "respondWith": "noData",
+          "options": {
+            "responseCode": 200
+          }
+        },
+        "id": "d2e3ea9d-3a8e-4f58-8c8d-566005bc0826",
+        "name": "ACK 200",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.1,
+        "position": [
+          0,
+          288
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "// Extract group mention from message text\n// Supports: @team-israel, @team-uk, @team-poland, @team-all, or any custom group\nconst body = $input.first().json.body;\nconst event = body.event || {};\nconst text = event.text || '';\nconst channel = event.channel || '';\nconst sender = event.user || '';\nconst botId = event.bot_id || '';\n\n// Skip bot messages\nif (botId) return [];\n\n// Find @group-name patterns\nconst groupPattern = /@(team-[a-z]+|group-[a-z]+|notify-[a-z]+)/gi;\nconst matches = text.match(groupPattern);\n\nif (!matches || matches.length === 0) return [];\n\nconst groups = matches.map(m => m.replace('@', '').toLowerCase());\n\nreturn groups.map(group => ({\n  json: { group, channel, sender, originalText: text }\n}));"
+        },
+        "id": "9f2aac53-239b-4f8b-b252-075586652953",
+        "name": "Extract Group Mention",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          240,
+          288
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const GROUP_MEMBERS = {\n  'team-all': [\n    'U08AYDL2FQD',  // Alex\n    'U06AE2KHEQ3',  // Alex Vi\n  ],\n};\n\nconst items = $input.all();\nconst results = [];\n\nfor (const item of items) {\n  const group = item.json.group;\n  const members = GROUP_MEMBERS[group];\n  \n  if (!members || members.length === 0) {\n    results.push({\n      json: {\n        ...item.json,\n        error: true,\n        message: `Unknown group: @${group}. Available groups: ${Object.keys(GROUP_MEMBERS).join(', ')}`\n      }\n    });\n    continue;\n  }\n  \n  const mentions = members.map(uid => `<@${uid}>`).join(' ');\n  \n  results.push({\n    json: {\n      ...item.json,\n      error: false,\n      members: members,\n      memberCount: members.length,\n      mentionText: `:mega: *@${group}* (${members.length} members)\\n${mentions}\\n\\n> _Triggered by <@${item.json.sender}> in <#${item.json.channel}>_`\n    }\n  });\n}\n\nreturn results;"
+        },
+        "id": "f11b12a8-224f-4126-b462-c6c8a09b5749",
+        "name": "Resolve Group Members",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          480,
+          288
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "id": "no-error",
+                "leftValue": "={{ $json.error }}",
+                "rightValue": false,
+                "operator": {
+                  "type": "boolean",
+                  "operation": "equals"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "8da653dd-07c5-419b-bdb5-e7892a2c8c8d",
+        "name": "Group Found?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [
+          720,
+          288
+        ]
+      },
+      {
+        "parameters": {
+          "select": "channel",
+          "channelId": {
+            "__rl": true,
+            "value": "={{ $json.channel }}",
+            "mode": "id"
+          },
+          "text": "={{ $json.mentionText }}",
+          "otherOptions": {
+            "includeLinkToWorkflow": false
+          }
+        },
+        "id": "342c4739-930c-4f8c-88e6-dd6ed03a26c1",
+        "name": "Notify Group Members",
+        "type": "n8n-nodes-base.slack",
+        "typeVersion": 2.2,
+        "position": [
+          960,
+          192
+        ],
+        "webhookId": "bf57ee38-09e0-47b3-8b86-85eb91f592ef",
+        "credentials": {
+          "slackApi": {
+            "id": "Z2b9WxZCM4NZbr9j",
+            "name": "Slack Automation"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "select": "channel",
+          "channelId": {
+            "__rl": true,
+            "value": "={{ $json.channel }}",
+            "mode": "id"
+          },
+          "text": "={{ $json.message }}",
+          "otherOptions": {
+            "includeLinkToWorkflow": false
+          }
+        },
+        "id": "f9180f79-c492-47c6-b661-5c0051c7bc45",
+        "name": "Group Not Found",
+        "type": "n8n-nodes-base.slack",
+        "typeVersion": 2.2,
+        "position": [
+          960,
+          384
+        ],
+        "webhookId": "6b8d9e6b-3546-478b-aa14-9586ad2caca0",
+        "credentials": {
+          "slackApi": {
+            "id": "Z2b9WxZCM4NZbr9j",
+            "name": "Slack Automation"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Is URL Verify?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Is URL Verify?": {
+        "main": [
+          [
+            {
+              "node": "Return Challenge",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "ACK 200",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "ACK 200": {
+        "main": [
+          [
+            {
+              "node": "Extract Group Mention",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Extract Group Mention": {
+        "main": [
+          [
+            {
+              "node": "Resolve Group Members",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Resolve Group Members": {
+        "main": [
+          [
+            {
+              "node": "Group Found?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Group Found?": {
+        "main": [
+          [
+            {
+              "node": "Notify Group Members",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Group Not Found",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Alex Vinokur",
+    "name": "Version b8566f7c",
+    "description": "",
+    "autosaved": true
+  },
+  "tags": []
+}
