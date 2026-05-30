@@ -1,0 +1,319 @@
+{
+  "updatedAt": "2026-04-16T18:51:34.452Z",
+  "createdAt": "2026-04-16T18:39:59.463Z",
+  "id": "PxRmES2yUcsNLgp3",
+  "name": "Monday Due Date Alerts to Slack",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours"
+            }
+          ]
+        }
+      },
+      "id": "c47bef2e-a93f-4e4a-842c-1294d9c97309",
+      "name": "Hourly",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -400,
+        -16
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\nstaticData.remindedKeys = staticData.remindedKeys || {};\n// Purge keys older than 14 days\nconst cutoff = Date.now() - 14 * 86400000;\nfor (const k in staticData.remindedKeys) {\n  if (staticData.remindedKeys[k] < cutoff) delete staticData.remindedKeys[k];\n}\n\nconst now = new Date();\nconst todayStr = now.toISOString().split('T')[0];\nconst tomorrow = new Date(now); tomorrow.setDate(tomorrow.getDate() + 1);\nconst tomorrowStr = tomorrow.toISOString().split('T')[0];\nconst hour = parseInt(new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Jerusalem', hour: '2-digit', hour12: false }).format(now));\n\nconst items = $input.first().json?.data?.boards?.[0]?.groups?.[0]?.items_page?.items || [];\nconst reminders = [];\nfor (const item of items) {\n  const due = (item.column_values || []).find(c => c.id === 'date');\n  const status = (item.column_values || []).find(c => c.id === 'project_status');\n  const priority = (item.column_values || []).find(c => c.id === 'priority');\n  if (!due?.text) continue;\n  if (status?.text === 'Done') continue;\n  const dueDate = due.text.split(' ')[0];\n\n  // 24h-before reminder (fire once when due is tomorrow, any hour)\n  if (dueDate === tomorrowStr) {\n    const key = `24h-${item.id}-${dueDate}`;\n    if (!staticData.remindedKeys[key]) {\n      staticData.remindedKeys[key] = Date.now();\n      reminders.push({ json: { type: '24h', itemId: item.id, itemName: item.name, dueDate, priority: priority?.text || '', url: `https://alex-it.monday.com/boards/5093821351/pulses/${item.id}` } });\n    }\n  }\n\n  // Day-of reminder at 9am Israel\n  if (dueDate === todayStr && hour === 9) {\n    const key = `day-${item.id}-${dueDate}`;\n    if (!staticData.remindedKeys[key]) {\n      staticData.remindedKeys[key] = Date.now();\n      reminders.push({ json: { type: 'today', itemId: item.id, itemName: item.name, dueDate, priority: priority?.text || '', url: `https://alex-it.monday.com/boards/5093821351/pulses/${item.id}` } });\n    }\n  }\n}\nreturn reminders;"
+      },
+      "id": "14b53912-6c55-4a17-ace7-04c3c431e9d9",
+      "name": "Filter Due Reminders",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        32,
+        -16
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0ATBUJS329",
+          "mode": "id"
+        },
+        "text": "={{$json.type === '24h' ? ':alarm_clock: *Due tomorrow:* ' : ':rotating_light: *Due today:* '}}*{{$json.itemName}}*\nDue: `{{$json.dueDate}}`{{$json.priority ? ' · Priority: `' + $json.priority + '`' : ''}}\n<{{$json.url}}|Open in Monday>",
+        "otherOptions": {}
+      },
+      "id": "147b7cc5-dcdc-4c25-985b-d3ede5b1026a",
+      "name": "Slack Reminder",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        256,
+        -16
+      ],
+      "webhookId": "273bd66e-a2c4-47ab-9bf5-d9a65eab6fe2",
+      "credentials": {
+        "slackApi": {
+          "id": "obEYVo8oQOJ22JqX",
+          "name": "AD Admin Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.monday.com/v2",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "API-Version",
+              "value": "2024-10"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: `query { boards(ids: 5093821351) { groups(ids: \"new_group29179\") { items_page(limit: 200) { items { id name column_values(ids: [\"project_status\", \"date\", \"priority\"]) { id text value } } } } } }` }) }}",
+        "options": {}
+      },
+      "id": "3b61db15-d4ee-44ea-8932-b0fb363a573f",
+      "name": "Get To-Do Items1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -176,
+        -16
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "DEEjaXy7pOncZeQ1",
+          "name": "Monday.com"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Hourly": {
+      "main": [
+        [
+          {
+            "node": "Get To-Do Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Due Reminders": {
+      "main": [
+        [
+          {
+            "node": "Slack Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get To-Do Items1": {
+      "main": [
+        [
+          {
+            "node": "Filter Due Reminders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "timezone": "Asia/Jerusalem",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": {
+    "node:Hourly": {
+      "recurrenceRules": []
+    },
+    "global": {
+      "remindedKeys": {}
+    }
+  },
+  "meta": null,
+  "pinData": {},
+  "versionId": "0e15a3d9-8e52-4f68-bc5c-c024495bc319",
+  "activeVersionId": "0e15a3d9-8e52-4f68-bc5c-c024495bc319",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-04-16T18:39:59.465Z",
+      "createdAt": "2026-04-16T18:39:59.465Z",
+      "role": "workflow:owner",
+      "workflowId": "PxRmES2yUcsNLgp3",
+      "projectId": "pWTWmuHnmIHw48U9"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-04-16T18:51:39.000Z",
+    "createdAt": "2026-04-16T18:40:01.210Z",
+    "versionId": "0e15a3d9-8e52-4f68-bc5c-c024495bc319",
+    "workflowId": "PxRmES2yUcsNLgp3",
+    "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "hours"
+              }
+            ]
+          }
+        },
+        "id": "c47bef2e-a93f-4e4a-842c-1294d9c97309",
+        "name": "Hourly",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          -400,
+          -16
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const staticData = $getWorkflowStaticData('global');\nstaticData.remindedKeys = staticData.remindedKeys || {};\n// Purge keys older than 14 days\nconst cutoff = Date.now() - 14 * 86400000;\nfor (const k in staticData.remindedKeys) {\n  if (staticData.remindedKeys[k] < cutoff) delete staticData.remindedKeys[k];\n}\n\nconst now = new Date();\nconst todayStr = now.toISOString().split('T')[0];\nconst tomorrow = new Date(now); tomorrow.setDate(tomorrow.getDate() + 1);\nconst tomorrowStr = tomorrow.toISOString().split('T')[0];\nconst hour = parseInt(new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Jerusalem', hour: '2-digit', hour12: false }).format(now));\n\nconst items = $input.first().json?.data?.boards?.[0]?.groups?.[0]?.items_page?.items || [];\nconst reminders = [];\nfor (const item of items) {\n  const due = (item.column_values || []).find(c => c.id === 'date');\n  const status = (item.column_values || []).find(c => c.id === 'project_status');\n  const priority = (item.column_values || []).find(c => c.id === 'priority');\n  if (!due?.text) continue;\n  if (status?.text === 'Done') continue;\n  const dueDate = due.text.split(' ')[0];\n\n  // 24h-before reminder (fire once when due is tomorrow, any hour)\n  if (dueDate === tomorrowStr) {\n    const key = `24h-${item.id}-${dueDate}`;\n    if (!staticData.remindedKeys[key]) {\n      staticData.remindedKeys[key] = Date.now();\n      reminders.push({ json: { type: '24h', itemId: item.id, itemName: item.name, dueDate, priority: priority?.text || '', url: `https://alex-it.monday.com/boards/5093821351/pulses/${item.id}` } });\n    }\n  }\n\n  // Day-of reminder at 9am Israel\n  if (dueDate === todayStr && hour === 9) {\n    const key = `day-${item.id}-${dueDate}`;\n    if (!staticData.remindedKeys[key]) {\n      staticData.remindedKeys[key] = Date.now();\n      reminders.push({ json: { type: 'today', itemId: item.id, itemName: item.name, dueDate, priority: priority?.text || '', url: `https://alex-it.monday.com/boards/5093821351/pulses/${item.id}` } });\n    }\n  }\n}\nreturn reminders;"
+        },
+        "id": "14b53912-6c55-4a17-ace7-04c3c431e9d9",
+        "name": "Filter Due Reminders",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          32,
+          -16
+        ]
+      },
+      {
+        "parameters": {
+          "select": "channel",
+          "channelId": {
+            "__rl": true,
+            "value": "C0ATBUJS329",
+            "mode": "id"
+          },
+          "text": "={{$json.type === '24h' ? ':alarm_clock: *Due tomorrow:* ' : ':rotating_light: *Due today:* '}}*{{$json.itemName}}*\nDue: `{{$json.dueDate}}`{{$json.priority ? ' · Priority: `' + $json.priority + '`' : ''}}\n<{{$json.url}}|Open in Monday>",
+          "otherOptions": {}
+        },
+        "id": "147b7cc5-dcdc-4c25-985b-d3ede5b1026a",
+        "name": "Slack Reminder",
+        "type": "n8n-nodes-base.slack",
+        "typeVersion": 2.2,
+        "position": [
+          256,
+          -16
+        ],
+        "webhookId": "273bd66e-a2c4-47ab-9bf5-d9a65eab6fe2",
+        "credentials": {
+          "slackApi": {
+            "id": "obEYVo8oQOJ22JqX",
+            "name": "AD Admin Bot"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "https://api.monday.com/v2",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpHeaderAuth",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "name": "API-Version",
+                "value": "2024-10"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({ query: `query { boards(ids: 5093821351) { groups(ids: \"new_group29179\") { items_page(limit: 200) { items { id name column_values(ids: [\"project_status\", \"date\", \"priority\"]) { id text value } } } } } }` }) }}",
+          "options": {}
+        },
+        "id": "3b61db15-d4ee-44ea-8932-b0fb363a573f",
+        "name": "Get To-Do Items1",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          -176,
+          -16
+        ],
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "DEEjaXy7pOncZeQ1",
+            "name": "Monday.com"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Hourly": {
+        "main": [
+          [
+            {
+              "node": "Get To-Do Items1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Filter Due Reminders": {
+        "main": [
+          [
+            {
+              "node": "Slack Reminder",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get To-Do Items1": {
+        "main": [
+          [
+            {
+              "node": "Filter Due Reminders",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Alex Vinokur",
+    "name": "Version 0e15a3d9",
+    "description": "",
+    "autosaved": true
+  },
+  "tags": []
+}
