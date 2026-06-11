@@ -1,0 +1,413 @@
+{
+  "updatedAt": "2025-09-27T21:10:34.000Z",
+  "createdAt": "2025-09-02T14:15:04.260Z",
+  "id": "BDrZHrd9fi8yHrhe",
+  "name": "Create New JC User",
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C099QKJSCTD",
+          "mode": "list",
+          "cachedResultName": "new-user-created"
+        },
+        "text": "=🤖 *New JC User Created Successfully!*\n\n*First Name:* {{$json[\"FirstName\"]}}\n*Last Name:* {{$json[\"LastName\"]}}\n*Employee Number:* {{$json[\"EmployeeNumber\"]}}\n*Job Title:* {{$json[\"JobTitle\"]}}\n*Department:* {{$json[\"Department\"]}}\n*Manager:* {{$json[\"Manager\"]}}\n*Office Location:* {{$json[\"OfficeLocation\"]}}\n*Phone:* {{$json[\"OfficePhone\"]}}\n*Email:* {{$json[\"Email\"]}}\n*Username:* {{$json[\"Username\"]}}\n*Password:* `{{$json[\"Password\"]}}`\n{{$json[\"ConflictMessage\"]}}",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        -16,
+        576
+      ],
+      "id": "2e3a4638-e70d-47b3-9f49-f8e5a236cd7e",
+      "name": "Send a message",
+      "webhookId": "619d4034-0d7d-43f0-9691-ea960aef7115",
+      "credentials": {
+        "slackApi": {
+          "id": "DaNIVrtwfHymDT9P",
+          "name": "New User"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "if (!$json[\"stdout\"] || $json[\"stdout\"].trim() === \"\") {\n  throw new Error(\"No JSON output received from PowerShell script. Stdout was empty.\");\n}\nlet out;\ntry {\n  out = JSON.parse($json[\"stdout\"]);\n} catch (e) {\n  throw new Error(\"Failed to parse JSON from PowerShell script: \" + e.message + \"\\n\\nOutput was:\\n\" + $json[\"stdout\"]);\n}\nif (out.error) {\n  throw new Error(\"PowerShell script error: \" + out.error);\n}\nreturn out;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -464,
+        288
+      ],
+      "id": "06c92221-10f5-4335-83d1-9e2203a4bc2b",
+      "name": "Code"
+    },
+    {
+      "parameters": {
+        "chatId": "426570413",
+        "text": "=🤖 *New JC User Created Successfully!*\n\n*First Name:* {{$json[\"FirstName\"]}}\n*Last Name:* {{$json[\"LastName\"]}}\n*Employee Number:* {{$json[\"EmployeeNumber\"]}}\n*Job Title:* {{$json[\"JobTitle\"]}}\n*Department:* {{$json[\"Department\"]}}\n*Manager:* {{$json[\"Manager\"]}}\n*Office Location:* {{$json[\"OfficeLocation\"]}}\n*Phone:* {{$json[\"OfficePhone\"]}}\n*Email:* {{$json[\"Email\"]}}\n*Username:* {{$json[\"Username\"]}}\n*Password:* `{{$json[\"Password\"]}}`\n{{$json[\"ConflictMessage\"]}}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -16,
+        400
+      ],
+      "id": "cafa0c8c-9570-49d0-b037-f990fcabac2b",
+      "name": "Send a text message",
+      "webhookId": "ae9b49c5-f740-4d7f-b4af-c7ce2935e45f",
+      "executeOnce": false,
+      "credentials": {
+        "telegramApi": {
+          "id": "QH2SVpRQkhmpSDsN",
+          "name": "Users Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1nh_eXCRjrbruYZWqF8_8LvW3TQ_d7EsN3bCQF_6Wfpg",
+          "mode": "list",
+          "cachedResultName": "New AD User Created",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1nh_eXCRjrbruYZWqF8_8LvW3TQ_d7EsN3bCQF_6Wfpg/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1nh_eXCRjrbruYZWqF8_8LvW3TQ_d7EsN3bCQF_6Wfpg/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "First Name": "={{$json[\"FirstName\"]}}",
+            "Last Name": "={{$json[\"LastName\"]}}",
+            "Job Title": "={{$json[\"JobTitle\"]}}\n",
+            "Password": "={{$json[\"Password\"]}}",
+            "Employee Number": "={{$json[\"EmployeeNumber\"]}}",
+            "Department": "={{$json[\"Department\"]}}",
+            "Manager": "={{$json[\"Manager\"]}}",
+            "Office Location": "={{$json[\"OfficeLocation\"]}}",
+            "Office Phone": "={{$json[\"OfficePhone\"]}}",
+            "Username": "={{$json[\"Username\"]}}",
+            "Email": "={{$json[\"Email\"]}}",
+            "DL Groups Copied": "={{$json[\"DLGroupsCopied\"].join(', ')}}",
+            "Security Groups Copied": "={{$json[\"SecurityGroupsCopied\"].join(', ')}}",
+            "Conflict Message": "={{$json[\"ConflictMessage\"]}}",
+            "Timestamp": "={{new Date().toLocaleString(\"en-GB\", { hour12: false, timeZone: \"Asia/Jerusalem\" })}}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "First Name",
+              "displayName": "First Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Last Name",
+              "displayName": "Last Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Employee Number",
+              "displayName": "Employee Number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Job Title",
+              "displayName": "Job Title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Department",
+              "displayName": "Department",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Manager",
+              "displayName": "Manager",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Office Location",
+              "displayName": "Office Location",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Office Phone",
+              "displayName": "Office Phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Username",
+              "displayName": "Username",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "DL Groups Copied",
+              "displayName": "DL Groups Copied",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Security Groups Copied",
+              "displayName": "Security Groups Copied",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Password",
+              "displayName": "Password",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Conflict Message",
+              "displayName": "Conflict Message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.6,
+      "position": [
+        -16,
+        208
+      ],
+      "id": "8574b0dd-cdd0-41ba-a0ca-40930b1dcf5c",
+      "name": "Append row in sheet",
+      "executeOnce": false,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "OtSObLXRdd1pIx61",
+          "name": "Google Sheets New User"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "vinokura@alex-it.net",
+        "subject": "New AD user Created",
+        "message": "=<h1 style=\"color:blue;\">🤖 New JC User Created:</h1>\n\n<p style=\"color:black; font-size:1.1em;\"><b>First Name:</b> {{$json[\"FirstName\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>Last Name:</b> {{$json[\"LastName\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>Employee Number:</b> {{$json[\"EmployeeNumber\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>Department:</b> {{$json[\"Department\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>Job Title:</b> {{$json[\"JobTitle\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>Username:</b> {{$json[\"Username\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>Manager:</b> {{$json[\"Manager\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>Office Location:</b> {{$json[\"OfficeLocation\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>Office Phone:</b> {{$json[\"OfficePhone\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>E-mail:</b> {{$json[\"Email\"]}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>DL Groups Copied:</b> {{$json[\"DLGroupsCopied\"].join(', ')}}</p>\n<p style=\"color:black; font-size:1.1em;\"><b>Security Groups Copied:</b> {{$json[\"SecurityGroupsCopied\"].join(', ')}}</p>\n<p style=\"color:red; font-size:1.3em;\"><b>Initial Password:</b> <code>{{$json[\"Password\"]}}</code></p>\n<p style=\"color:red; font-size:1.1em;\"><b>Make sure to save the initial password in a safe location!</b></p>\n<p style=\"color:green; font-size:1.3em;\"><b>Alex IT</b></p>\n<hr>\n<small>This is an automated message. Do not reply.</small>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "da8cc066-812d-44da-8620-08616f32bea4",
+      "name": "Send Message",
+      "webhookId": "961eced4-af4c-4015-a632-1c5dcecb5a5f",
+      "executeOnce": false,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "Ajg1dWYNadbKjzNX",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "=powershell.exe -NoProfile -Command \"& { C:\\Scripts\\Create-JCUser-From-n8n.ps1 -FirstName '{{$json[\"body\"][\"firstname\"]}}' -LastName '{{$json[\"body\"][\"lastname\"]}}' -EmployeeNumber '{{$json[\"body\"][\"employeenumber\"]}}' -JobTitle '{{$json[\"body\"][\"jobtitle\"]}}' -Department '{{$json[\"body\"][\"department\"]}}' -ManagerSam '{{$json[\"body\"][\"managersam\"]}}' -OfficePhone '{{$json[\"body\"][\"officephone\"]}}' -OfficeLocation '{{$json[\"body\"][\"officelocation\"]}}' }\"",
+        "cwd": "="
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        -672,
+        288
+      ],
+      "id": "3425545f-791a-414b-b3e9-3df9d10abca9",
+      "name": "Create New JC User",
+      "credentials": {
+        "sshPassword": {
+          "id": "79KNHZGwd8w288i9",
+          "name": "SSH Password account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "e6307cca-ad82-4451-9ea9-2d50b6b92d75",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -944,
+        288
+      ],
+      "id": "7a849cc3-0885-4430-af56-931559bf41f7",
+      "name": "Webhook",
+      "webhookId": "e6307cca-ad82-4451-9ea9-2d50b6b92d75"
+    }
+  ],
+  "connections": {
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send Message",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create New JC User": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Create New JC User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "bd100f16-e812-4769-85d5-6dad66ff81b4",
+  "activeVersionId": null,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2025-10-31T09:14:00.824Z",
+      "createdAt": "2025-10-31T09:14:00.824Z",
+      "role": "workflow:owner",
+      "workflowId": "BDrZHrd9fi8yHrhe",
+      "projectId": "pWTWmuHnmIHw48U9"
+    }
+  ],
+  "activeVersion": null,
+  "tags": []
+}
