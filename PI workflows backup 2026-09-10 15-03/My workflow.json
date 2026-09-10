@@ -1,0 +1,47 @@
+{
+  "id": "Td7RegNrgWduA8QG",
+  "name": "My workflow",
+  "active": false,
+  "activeVersionId": null,
+  "createdAt": "2026-08-27T18:29:40.922Z",
+  "updatedAt": "2026-08-29T10:50:27.000Z",
+  "isArchived": true,
+  "versionId": "b9c7438b-fab7-4398-a4b3-1d49c2f04d96",
+  "triggerCount": 0,
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        0,
+        0
+      ],
+      "id": "a9c763fa-5bdc-4d2c-a7db-3c5302ea99f5",
+      "name": "On form submission",
+      "webhookId": "c49380f4-c208-4a9c-ace9-ad7d4d96f7b2"
+    }
+  ],
+  "connections": {},
+  "nodeGroups": [],
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "pinData": {},
+  "meta": null,
+  "tags": [],
+  "shared": [
+    {
+      "role": "workflow:owner",
+      "workflowId": "Td7RegNrgWduA8QG",
+      "projectId": "pWTWmuHnmIHw48U9",
+      "createdAt": "2026-08-27T18:29:40.925Z",
+      "updatedAt": "2026-08-27T18:29:40.925Z"
+    }
+  ],
+  "activeVersion": null
+}
