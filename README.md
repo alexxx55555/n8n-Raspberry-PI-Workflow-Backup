@@ -1,11 +1,11 @@
 # n8n-Raspberry-PI-Workflow-Backup
 
-## Latest Backup: 2026-09-27 21:00
+## Latest Backup: 2026-10-03 21:21
 
 ### Backup URL
-https://github.com/alexxx55555/n8n-Raspberry-PI-Workflow-Backup/tree/main/PI%20workflows%20backup%202026-09-27%2021-00
+https://github.com/alexxx55555/n8n-Raspberry-PI-Workflow-Backup/tree/main/PI%20workflows%20backup%202026-10-03%2021-21
 
-### Workflows Backed Up (47 total)
+### Workflows Backed Up (45 total)
 - AD Unlock & Reset Password
 - Monday - Auto Due Date by Status
 - Daily Digest — Monday.com
@@ -27,10 +27,8 @@ https://github.com/alexxx55555/n8n-Raspberry-PI-Workflow-Backup/tree/main/PI%20w
 - Slack Scheduled Messages
 - DNS Update
 - AD Brute Force Detection
-- My workflow
 - WhatsApp AI Bot
 - Manual Slack Article Summarizer
-- Hello Button Response
 - Auto Update Device Models in Monday.com
 - Groups Alert JC
 - Slack Subnet Calculator
