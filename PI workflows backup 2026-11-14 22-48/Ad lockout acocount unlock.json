@@ -1,0 +1,655 @@
+{
+  "id": "ikrXNqTIUCe1CXB6",
+  "name": "Ad lockout acocount unlock",
+  "active": false,
+  "activeVersionId": null,
+  "createdAt": "2026-11-14T20:32:38.212Z",
+  "updatedAt": "2026-11-14T20:41:07.000Z",
+  "isArchived": true,
+  "versionId": "33582304-47d0-404d-bcb6-eefb133b82b1",
+  "triggerCount": 0,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "slack/interactive",
+        "options": {
+          "rawBody": true
+        }
+      },
+      "id": "93b306e6-046b-46dd-91f0-a8f7ca3cadd3",
+      "name": "Slack Button Handler",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -352,
+        352
+      ],
+      "webhookId": "95df20d8-f2b4-48f5-adab-5f3e0675d0ce"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first();\nconst headers = item.json.headers || {};\nconst sig = headers['x-slack-signature'] || '';\nconst ts = headers['x-slack-request-timestamp'] || '';\n\nlet raw = '';\ntry {\n  const buf = await this.helpers.getBinaryDataBuffer(0, 'data');\n  raw = buf.toString('utf8');\n} catch (e) {\n  raw = '';\n}\n\n// Slack signs: v0:<timestamp>:<raw body>\nconst base = (sig && ts && raw) ? `v0:${ts}:${raw}` : 'invalid';\n\nreturn [{ json: { body: item.json.body, sig, ts, base } }];"
+      },
+      "id": "341dba1c-5fab-401f-bbe3-91076e779245",
+      "name": "Prepare Signature Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -112,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "action": "hmac",
+        "type": "SHA256",
+        "value": "={{ $json.base }}",
+        "dataPropertyName": "hmac",
+        "secret": "63e9efeb3f654fedf16bb0fbc9d02ab0"
+      },
+      "id": "0a9f1b6e-4070-4722-9b15-4a43bfe7c837",
+      "name": "Compute HMAC",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [
+        128,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ---- EDIT THIS ----\nconst ALLOWED_USER_IDS = ['U08AYDL2FQD']; // Slack member IDs allowed to click the buttons\n// -------------------\n\nconst item = $input.first().json;\nlet verified = false;\nlet reason = '';\n\ntry {\n  if (!item.sig || !item.ts || item.base === 'invalid') throw new Error('Missing Slack signature headers');\n  if (Math.abs(Date.now() / 1000 - Number(item.ts)) > 300) throw new Error('Request too old');\n\n  const expected = 'v0=' + item.hmac;\n  const given = String(item.sig);\n\n  // constant-time comparison\n  let diff = expected.length ^ given.length;\n  for (let i = 0; i < Math.max(expected.length, given.length); i++) {\n    diff |= (expected.charCodeAt(i) || 0) ^ (given.charCodeAt(i) || 0);\n  }\n  if (diff !== 0) throw new Error('Invalid signature');\n\n  const payload = JSON.parse(item.body.payload);\n  if (!ALLOWED_USER_IDS.includes(payload.user.id)) throw new Error('User not allowed: ' + payload.user.id);\n\n  verified = true;\n} catch (e) {\n  reason = e.message;\n}\n\nreturn [{ json: { body: item.body, verified, reason } }];"
+      },
+      "id": "fa4df37e-c6aa-477b-ac52-5ecc9bf5192d",
+      "name": "Verify Signature",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        368,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "verified-true",
+              "leftValue": "={{ $json.verified }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "7d701391-d7b2-4fda-be70-da66b2e6e566",
+      "name": "Is Verified?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        608,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const payload = JSON.parse($input.first().json.body.payload);\nconst action = payload.actions[0];\nconst id = String(action.action_id);\n// Only allow safe AD username characters\nconst username = String(action.value || '').replace(/[^a-zA-Z0-9._-]/g, '');\n\nreturn {\n  action_id: id.startsWith('btn_unlock') ? 'btn_unlock' : id,\n  username: username,\n  adminUser: payload.user.name,\n  channel: (payload.channel && payload.channel.id) || (payload.container && payload.container.channel_id) || '',\n  ts: (payload.container && payload.container.message_ts) || (payload.message && payload.message.ts) || '',\n  blockId: action.block_id || '',\n  blocksJson: JSON.stringify((payload.message && payload.message.blocks) || [])\n};"
+      },
+      "id": "b8fc9910-a454-43ca-94db-34e772ca7812",
+      "name": "Parse Click",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        848,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const click = $('Parse Click').first().json;\nconst r = $input.first().json;\n\nconst when = new Date().toLocaleString('en-GB', {\n  timeZone: 'Asia/Jerusalem', day: 'numeric', month: 'numeric', year: 'numeric',\n  hour: 'numeric', minute: '2-digit', hour12: true\n});\n\nlet blocks = [];\ntry { blocks = JSON.parse(click.blocksJson || '[]'); } catch (e) { blocks = []; }\n\nconst resultBlock = r.ok\n  ? { type: 'section', text: { type: 'mrkdwn',\n      text: '🔓 *Account unlocked* by *' + click.adminUser + '* • ' + when +\n            (r.already ? '\\n_It was already unlocked._' : '') } }\n  : { type: 'section', text: { type: 'mrkdwn',\n      text: '❌ *Unlock failed* (requested by *' + click.adminUser + '*) • ' + when + '\\n```' + r.detail + '```' } };\n\n// Find the clicked user's button row and put the result right there\nconst idx = blocks.findIndex(b => b.block_id === click.blockId);\nlet updated = null;\nif (idx >= 0) {\n  updated = blocks.slice();\n  if (r.ok) updated.splice(idx, 1, resultBlock);   // replace the button with the result\n  else updated.splice(idx + 1, 0, resultBlock);    // keep the button (retry) and show the error under it\n}\n\nreturn [{\n  json: {\n    ok: r.ok,\n    username: click.username,\n    detail: r.detail || '',\n    already: !!r.already,\n    channel: click.channel,\n    ts: click.ts,\n    blocks: updated ? JSON.stringify(updated) : '',\n    canUpdate: !!(updated && click.channel && click.ts)\n  }\n}];"
+      },
+      "id": "6e5991dc-8afa-44c0-980e-91b6c449d43b",
+      "name": "Build Updated Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1840,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "c414bb8e-5948-4724-9c62-8cb7381095b3",
+              "leftValue": "={{ $json.canUpdate }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c08c87a0-64fd-4dfa-ae89-f75a265f5cdf",
+      "name": "Can Update?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2080,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://slack.com/api/chat.update",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "channel",
+              "value": "={{ $json.channel }}"
+            },
+            {
+              "name": "ts",
+              "value": "={{ $json.ts }}"
+            },
+            {
+              "name": "text",
+              "value": "🚨 AD Lockout Alert"
+            },
+            {
+              "name": "blocks",
+              "value": "={{ $json.blocks }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d0a7a351-9d1a-4416-8932-71654d8fe6ac",
+      "name": "Update Slack Message",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        2320,
+        240
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "IaefNDbjYVvXty35",
+          "name": "Admin Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "7feac6e6-2c18-415a-9677-5907ec977356",
+              "leftValue": "={{ $json.ok === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "2ade198c-cf8c-4d0b-a935-2727ca43dfb4",
+      "name": "Update OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2560,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://slack.com/api/chat.postMessage",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "channel",
+              "value": "={{ $('Parse Click').first().json.channel || 'C0AEJQD4FA6' }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ (() => { const d = $('Build Updated Message').first().json; const admin = $('Parse Click').first().json.adminUser; return d.ok ? (\"🔓 *Account unlocked*: `\" + d.username + \"` by `\" + admin + \"`\") : (\"❌ *Unlock failed* for `\" + d.username + \"` (requested by `\" + admin + \"`)\\n```\" + d.detail + \"```\"); })() }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e940169d-8e27-4383-9802-dad1b091ef00",
+      "name": "Post Fallback",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        2800,
+        352
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "IaefNDbjYVvXty35",
+          "name": "Admin Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.action_id }}",
+              "value2": "btn_unlock"
+            }
+          ]
+        }
+      },
+      "id": "162aa41e-d036-4e8d-ae67-6cb70f03fa11",
+      "name": "Is Unlock?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1088,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "command": "=powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"C:/Scripts/Unlock-ADAccount-n8n.ps1\" -Username \"{{ $json.username }}\"",
+        "cwd": "="
+      },
+      "id": "42cf7716-792e-4976-86ff-822cd1de6ea1",
+      "name": "Run Unlock Script",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        1344,
+        336
+      ],
+      "credentials": {
+        "sshPassword": {
+          "id": "umWU43lA8b3R4GcA",
+          "name": "SSH Password account"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const r = $input.first().json;\nconst out = String(r.stdout || '').trim();\nconst err = String(r.stderr || r.error || '').trim();\n\nlet data = null;\nconst m = out.match(/\\{[\\s\\S]*\\}/);\ntry { data = m ? JSON.parse(m[0]) : null; } catch (e) { data = null; }\n\nif (data && (data.Status === 'Success' || data.Status === 'Already Unlocked')) {\n  return [{ json: { kind: 'unlock', ok: true, already: data.Status === 'Already Unlocked', username: data.Username } }];\n}\n\nconst detail = (data && data.Message) || err || out || 'No output from script';\nreturn [{ json: { kind: 'unlock', ok: false, detail: String(detail).slice(0, 500) } }];"
+      },
+      "id": "df6e8681-35ec-4688-9b4d-6fb6c4597fc2",
+      "name": "Parse Unlock Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "b4c63364-69d0-48e2-bb5a-15bb5ce0ad82",
+      "name": "Every 1 min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        -352,
+        -176
+      ]
+    },
+    {
+      "parameters": {
+        "command": "=powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"C:/Scripts/Get-ADLockedUsers.ps1\"",
+        "cwd": "="
+      },
+      "id": "ab9738ff-f640-489a-b6c3-b300383dc3da",
+      "name": "Run Lockout Script",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -176
+      ],
+      "credentials": {
+        "sshPassword": {
+          "id": "umWU43lA8b3R4GcA",
+          "name": "SSH Password account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = String($input.first().json.stdout || '').trim();\nif (!raw) throw new Error('No output from Get-ADLockedUsers.ps1');\n\nlet parsed;\ntry {\n  parsed = JSON.parse(raw);\n} catch (e) {\n  const m = raw.match(/\\{[\\s\\S]*\\}/);\n  if (!m) throw new Error('No JSON in script output: ' + raw.slice(0, 200));\n  try { parsed = JSON.parse(m[0]); }\n  catch (e2) { throw new Error('Bad JSON from script: ' + raw.slice(0, 200)); }\n}\nif (parsed.Error) throw new Error('Script error: ' + parsed.Error);\n\nlet data = parsed.Data || parsed.data || [];\nif (!Array.isArray(data)) data = [data];\nconst users = data.filter(u => u.Username || u.username);\n\n// Remember who we already alerted, so a user who stays locked is not announced every minute.\n// When a user is no longer locked we forget them, so a NEW lockout alerts again.\nconst staticData = $getWorkflowStaticData('global');\nstaticData.lockedAlerted = staticData.lockedAlerted || {};\nconst stillLocked = new Set(users.map(u => String(u.Username || u.username).toLowerCase()));\nfor (const k of Object.keys(staticData.lockedAlerted)) {\n  if (!stillLocked.has(k)) delete staticData.lockedAlerted[k];\n}\n\nconst fmt = (value) => {\n  const d = new Date(value);\n  if (!value || isNaN(d)) return 'Unknown';\n  const p = Object.fromEntries(\n    new Intl.DateTimeFormat('en-GB', {\n      timeZone: 'Asia/Jerusalem',\n      day: 'numeric', month: 'numeric', year: 'numeric',\n      hour: 'numeric', minute: '2-digit', hour12: true\n    }).formatToParts(d).map(x => [x.type, x.value])\n  );\n  return `${p.day}.${p.month}.${p.year} ${p.hour}:${p.minute} ${String(p.dayPeriod || '').toUpperCase()}`;\n};\n\nconst fresh = users.filter(u => !staticData.lockedAlerted[String(u.Username || u.username).toLowerCase()]);\nfresh.forEach(u => { staticData.lockedAlerted[String(u.Username || u.username).toLowerCase()] = Date.now(); });\n\n// No new lockouts -> no items -> the rest of the flow does not run\nreturn fresh.map(u => ({\n  json: {\n    username: u.Username || u.username,\n    fullname: u.FullName || u.fullname || '',\n    email: u.Email || u.email || '',\n    computer: u.CallerComputer || u.computer || 'UNKNOWN',\n    lockedAt: fmt(u.LockoutTime || u.lockoutTime)\n  }\n}));"
+      },
+      "id": "f4d8c9ee-aaee-418c-bcdc-f99dc89749f5",
+      "name": "Parse Locked Users",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        208,
+        -176
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Runs once for all items: one message per 12 users\nconst locked = $input.all().map(i => i.json).filter(u => u.username);\n\nconst chunkSize = 12;\nconst results = [];\nfor (let i = 0; i < locked.length; i += chunkSize) {\n  const chunk = locked.slice(i, i + chunkSize);\n  const blocks = [];\n  blocks.push({\n    type: \"header\",\n    text: {\n      type: \"plain_text\",\n      text: locked.length <= chunkSize\n        ? `🚨 AD Lockout Detected (${locked.length} User${locked.length === 1 ? '' : 's'})`\n        : `🚨 AD Lockout Detected (${i + 1}-${Math.min(i + chunkSize, locked.length)} of ${locked.length})`,\n      emoji: true\n    }\n  });\n  blocks.push({ type: \"divider\" });\n  chunk.forEach((user) => {\n    blocks.push({\n      type: \"section\",\n      text: {\n        type: \"mrkdwn\",\n        text: `👤 *${user.fullname || 'Unknown'}* (\\`${user.username}\\`)\\n💻 Workstation: \\`${user.computer}\\` | 📅 Locked at: ${user.lockedAt}`\n      }\n    });\n    blocks.push({\n      type: \"actions\",\n      elements: [{\n        type: \"button\",\n        text: { type: \"plain_text\", text: \"Unlock Account\", emoji: true },\n        style: \"primary\",\n        action_id: `btn_unlock_${user.username}`,\n        value: user.username\n      }]\n    });\n    blocks.push({ type: \"divider\" });\n  });\n  blocks.push({\n    type: \"context\",\n    elements: [{ type: \"mrkdwn\", text: \"🤖 Automated with AD Admin Bot\" }]\n  });\n  results.push({ json: { blocks: JSON.stringify(blocks), batchIndex: results.length } });\n}\nreturn results;"
+      },
+      "id": "0d5aae22-f62d-4d81-869c-a630d54b2c40",
+      "name": "Build Lockout Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        -176
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://slack.com/api/chat.postMessage",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "channel",
+              "value": "C0AEJQD4FA6"
+            },
+            {
+              "name": "text",
+              "value": "🚨 AD Lockout Alert"
+            },
+            {
+              "name": "blocks",
+              "value": "={{ $json.blocks }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "03a1c960-33a4-4f5c-abc5-ae31d1b7e641",
+      "name": "Send Lockout Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        768,
+        -176
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "IaefNDbjYVvXty35",
+          "name": "Admin Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Slack Button Handler": {
+      "main": [
+        [
+          {
+            "node": "Prepare Signature Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Signature Check": {
+      "main": [
+        [
+          {
+            "node": "Compute HMAC",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute HMAC": {
+      "main": [
+        [
+          {
+            "node": "Verify Signature",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Signature": {
+      "main": [
+        [
+          {
+            "node": "Is Verified?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Verified?": {
+      "main": [
+        [
+          {
+            "node": "Parse Click",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Click": {
+      "main": [
+        [
+          {
+            "node": "Is Unlock?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Updated Message": {
+      "main": [
+        [
+          {
+            "node": "Can Update?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Can Update?": {
+      "main": [
+        [
+          {
+            "node": "Update Slack Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Post Fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Slack Message": {
+      "main": [
+        [
+          {
+            "node": "Update OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update OK?": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Post Fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Unlock?": {
+      "main": [
+        [
+          {
+            "node": "Run Unlock Script",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Unlock Script": {
+      "main": [
+        [
+          {
+            "node": "Parse Unlock Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Unlock Result": {
+      "main": [
+        [
+          {
+            "node": "Build Updated Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every 1 min": {
+      "main": [
+        [
+          {
+            "node": "Run Lockout Script",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Lockout Script": {
+      "main": [
+        [
+          {
+            "node": "Parse Locked Users",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Locked Users": {
+      "main": [
+        [
+          {
+            "node": "Build Lockout Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Lockout Message": {
+      "main": [
+        [
+          {
+            "node": "Send Lockout Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "nodeGroups": [],
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "pinData": {},
+  "meta": null,
+  "tags": [],
+  "shared": [
+    {
+      "role": "workflow:owner",
+      "workflowId": "ikrXNqTIUCe1CXB6",
+      "projectId": "pWTWmuHnmIHw48U9",
+      "createdAt": "2026-11-14T20:32:38.216Z",
+      "updatedAt": "2026-11-14T20:32:38.216Z"
+    }
+  ],
+  "activeVersion": null
+}
