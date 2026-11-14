@@ -1,0 +1,228 @@
+{
+  "id": "so2zgcxn1XV4tSeg",
+  "name": "Slack Group Mentions",
+  "active": false,
+  "activeVersionId": null,
+  "createdAt": "2026-04-21T15:01:32.906Z",
+  "updatedAt": "2026-11-14T10:04:12.000Z",
+  "isArchived": true,
+  "versionId": "9de34020-448b-4aeb-8a09-8bff9b8ecff7",
+  "triggerCount": 1,
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Slack group mentions (free-plan workaround)\nType @team-all in a channel and the bot tags everyone in that group.\n\n**Edit groups:** open \"Find Groups\" and change the CONFIG block at the top.\n\n**Slack setup:** Event Subscriptions -> Request URL = this Webhook's Production URL; bot events message.channels (+ message.groups for private channels); scopes channels:history, chat:write; invite the app to each channel.\n\nPublish the workflow, or Slack events will not arrive.",
+        "height": 260,
+        "width": 520
+      },
+      "id": "2f990c3c-7bf6-446b-b4cb-af4ab4a59913",
+      "name": "Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -352,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "slack-group-notify",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "3f84653e-44b5-4a6e-a859-b12864a5833e",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -352,
+        272
+      ],
+      "webhookId": "slack-group-notify"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "url-verify",
+              "leftValue": "={{ $json.body.type }}",
+              "rightValue": "url_verification",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "cac88dae-723e-42e9-810d-fe84312a3d22",
+      "name": "Is URL Verify?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -112,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ challenge: $json.body.challenge }) }}",
+        "options": {}
+      },
+      "id": "33f4cfcd-2de8-4f35-b106-ca1306be7e4a",
+      "name": "Return Challenge",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        192,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "noData",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "b6db36c9-27f3-47f9-9615-0b6eb73a51ef",
+      "name": "ACK 200",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        128,
+        416
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ================= CONFIG (edit here) =================\n// Group names must be lowercase. Members are Slack member IDs (start with U).\nconst GROUPS = {\n  'team-all': [\n    'U08AYDL2FQD',  // Alex\n    'U06AE2KHEQ3',  // Alex Vi\n  ],\n  // 'team-it': ['U0000000001', 'U0000000002'],\n};\nconst ALLOWED_CHANNELS = [];   // e.g. ['C0123456789']. Empty = any channel the app is in.\nconst EXPECTED_APP_ID = '';    // optional: Slack app ID (Basic Information page). Empty = skip check.\nconst PING_SENDER = false;     // false = don't tag the person who wrote the message\n// =======================================================\n\nconst input = $input.first().json;\nconst headers = input.headers || {};\nconst body = input.body || {};\nconst event = body.event || {};\n\n// Ignore Slack retries (prevents duplicate pings)\nif (headers['x-slack-retry-num']) return [];\n\n// Optional sanity check that the event came from your app\nif (EXPECTED_APP_ID && body.api_app_id !== EXPECTED_APP_ID) return [];\n\n// Only plain user messages: skip edits, bot messages, joins, etc.\nif (event.type !== 'message' || event.subtype || event.bot_id) return [];\n\nconst channel = event.channel || '';\nif (ALLOWED_CHANNELS.length && !ALLOWED_CHANNELS.includes(channel)) return [];\n\nconst text = event.text || '';\nconst sender = event.user || '';\n\n// Find @group-name in the text, but only for groups that actually exist.\n// Unknown names (typos, normal words) are ignored silently.\nconst names = new Set();\nfor (const m of text.matchAll(/(?:^|[\\s(])@([a-z0-9][a-z0-9_-]*)/gi)) {\n  const name = m[1].toLowerCase();\n  if (GROUPS[name]) names.add(name);\n}\nif (names.size === 0) return [];\n\n// Combine members of all mentioned groups, no duplicates\nconst members = new Set();\nfor (const n of names) for (const id of GROUPS[n]) members.add(id);\nif (!PING_SENDER) members.delete(sender);\nif (members.size === 0) return [];\n\nconst label = [...names].map(n => `@${n}`).join(', ');\nconst mentions = [...members].map(id => `<@${id}>`).join(' ');\nconst count = members.size;\n\nreturn [{\n  json: {\n    channel,\n    sender,\n    threadTs: event.thread_ts || event.ts || '',\n    mentionText: `:mega: *${label}* (${count} ${count === 1 ? 'member' : 'members'})\\n${mentions}\\n\\n> _Requested by <@${sender}> in <#${channel}>_`\n  }\n}];\n"
+      },
+      "id": "d4cd9b81-152f-44f5-988a-64c0389378af",
+      "name": "Find Groups",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        368,
+        416
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "={{ $json.channel }}",
+          "mode": "id"
+        },
+        "text": "={{ $json.mentionText }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false,
+          "thread_ts": {
+            "replyValues": {
+              "thread_ts": "={{ $json.threadTs }}"
+            }
+          }
+        }
+      },
+      "id": "07cfc2a9-6849-48a2-a893-308c737fe9f7",
+      "name": "Notify Group Members",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        608,
+        416
+      ],
+      "webhookId": "bf57ee38-09e0-47b3-8b86-85eb91f592ef",
+      "credentials": {
+        "slackApi": {
+          "id": "obEYVo8oQOJ22JqX",
+          "name": "AD Admin Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Is URL Verify?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is URL Verify?": {
+      "main": [
+        [
+          {
+            "node": "Return Challenge",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "ACK 200",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ACK 200": {
+      "main": [
+        [
+          {
+            "node": "Find Groups",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Groups": {
+      "main": [
+        [
+          {
+            "node": "Notify Group Members",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "nodeGroups": [],
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "pinData": {},
+  "meta": null,
+  "tags": [],
+  "shared": [
+    {
+      "role": "workflow:owner",
+      "workflowId": "so2zgcxn1XV4tSeg",
+      "projectId": "pWTWmuHnmIHw48U9",
+      "createdAt": "2026-04-21T15:01:32.908Z",
+      "updatedAt": "2026-04-21T15:01:32.908Z"
+    }
+  ],
+  "activeVersion": null
+}
