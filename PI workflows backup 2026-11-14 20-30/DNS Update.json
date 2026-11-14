@@ -1,0 +1,1336 @@
+{
+  "id": "RVcNYGSV5IWNx7CO",
+  "name": "DNS Update",
+  "active": true,
+  "activeVersionId": "1e93c5a5-ada2-4f86-975d-525a6cde8b3d",
+  "createdAt": "2025-08-31T13:44:08.878Z",
+  "updatedAt": "2026-04-22T14:02:13.898Z",
+  "isArchived": false,
+  "versionId": "1e93c5a5-ada2-4f86-975d-525a6cde8b3d",
+  "triggerCount": 1,
+  "nodes": [
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond-has-changes",
+              "leftValue": "={{ $json.hasChanges }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "3ade9f43-ef2f-4c10-9e78-c461800e6c40",
+      "name": "Has Changes?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1632,
+        1936
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://api.ipify.org?format=json",
+        "options": {}
+      },
+      "id": "6be78c8f-29e0-4e51-b25c-d2b09f4dbdd9",
+      "name": "Get Current IP1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -2048,
+        1712
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const domain = 'alex-it.net';\nconst zoneID = '3462e9f3ae9f12d67018a49274db3def';\n\n// Get all inputs and log them\nconst allInputs = $input.all();\nconsole.log('=== DEBUG: All inputs received ===');\nconsole.log('Number of inputs:', allInputs.length);\n\nallInputs.forEach((input, index) => {\n  console.log(`Input ${index}:`, JSON.stringify(input.json, null, 2).substring(0, 500));\n});\n\n// Find current IP\nconst ipInput = allInputs.find(item => item.json && item.json.ip);\nconst currentIP = ipInput ? ipInput.json.ip : null;\nconsole.log('Current IP found:', currentIP);\n\n// Find DNS records - with detailed checking\nconst dnsInput = allInputs.find(item => {\n  const hasJson = item.json != null;\n  const hasResult = item.json && item.json.result != null;\n  const isArray = item.json && Array.isArray(item.json.result);\n  console.log('Checking input:', { hasJson, hasResult, isArray });\n  return hasJson && hasResult && isArray;\n});\n\nconsole.log('DNS input found:', !!dnsInput);\n\nif (dnsInput) {\n  console.log('DNS response structure:', {\n    hasSuccess: 'success' in dnsInput.json,\n    successValue: dnsInput.json.success,\n    hasResult: 'result' in dnsInput.json,\n    resultIsArray: Array.isArray(dnsInput.json.result),\n    resultLength: dnsInput.json.result ? dnsInput.json.result.length : 0\n  });\n}\n\nconst dnsResponse = dnsInput ? dnsInput.json : null;\n\nif (!currentIP) {\n  throw new Error('Could not find current IP in inputs');\n}\n\nif (!dnsResponse) {\n  throw new Error('Could not find DNS records input');\n}\n\nif (!dnsResponse.result) {\n  throw new Error('DNS response has no result field');\n}\n\nif (!Array.isArray(dnsResponse.result)) {\n  throw new Error('DNS response result is not an array');\n}\n\n// Extract ALL A records that are NOT proxied\nconst sites = dnsResponse.result\n  .filter(record => {\n    if (record.type !== 'A') return false;\n    \n    if (record.proxied === true) {\n      console.log(`Skipping proxied record: ${record.name}`);\n      return false;\n    }\n    \n    return record.name.endsWith(`.${domain}`) || record.name === domain;\n  })\n  .map(record => {\n    const subdomain = record.name === domain ? '@' : record.name.replace(`.${domain}`, '');\n    return { \n      subdomain,\n      currentIP: record.content\n    };\n  });\n\nconsole.log(`Found ${sites.length} non-proxied A records to manage:`);\nsites.forEach(s => console.log(`  - ${s.subdomain} (current: ${s.currentIP})`));\n\nreturn [{\n  json: {\n    domain,\n    zoneID,\n    newIP: currentIP,\n    sites: sites.map(s => ({ \n      subdomain: s.subdomain,\n      fqdn: s.subdomain === '@' ? domain : `${s.subdomain}.${domain}`\n    }))\n  }\n}];"
+      },
+      "id": "34adfab6-290b-49a4-9441-74b722a64bab",
+      "name": "Prepare Sites1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1376,
+        1936
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Fan out one item per FQDN, attach zoneID\nconst original = $input.first().json;\n\nif (!original || !Array.isArray(original.sites)) throw new Error('sites missing or not an array');\n\nreturn original.sites.map(site => ({\n  json: {\n    subdomain: site.subdomain,\n    fqdn: site.fqdn,\n    domain: original.domain,\n    newIP: original.newIP,\n    zoneID: original.zoneID\n  }\n}));"
+      },
+      "id": "c06758d9-a4b6-46e6-97aa-fc59d8e02dd0",
+      "name": "Expand Sites1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1072,
+        1936
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://api.cloudflare.com/client/v4/zones/' + $json.zoneID + '/dns_records?type=A&name=' + $json.fqdn }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "cloudflareApi",
+        "options": {}
+      },
+      "id": "0075f988-7abd-43ea-b52a-7c9d69706586",
+      "name": "Get DNS Record1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -800,
+        1936
+      ],
+      "credentials": {
+        "cloudflareApi": {
+          "id": "23zTRVy3Y1m8sopZ",
+          "name": "Cloudflare account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge Cloudflare response with original site data using paired items\nconst cfItems = $input.all();\nreturn cfItems.map((item, i) => {\n  const pairedIndex = (item.pairedItem && item.pairedItem.item != null) ? item.pairedItem.item : i;\n  const original = $items('Expand Sites1')[pairedIndex].json;\n  const record = item.json?.result?.[0] || {};\n\n  return {\n    json: {\n      subdomain: original.subdomain,\n      fqdn: original.fqdn,\n      domain: original.domain,\n      newIP: original.newIP,\n      zoneID: original.zoneID,\n      recordId: record.id || '',\n      existingIP: record.content || '',\n      existingTTL: record.ttl != null ? record.ttl : 1,\n      existingProxied: record.proxied != null ? record.proxied : false\n    }\n  };\n});"
+      },
+      "id": "d73d01f0-b224-4737-afae-9e52e9a1eb63",
+      "name": "Prepare Payload1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -528,
+        1936
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Evaluate each incoming item (one per FQDN)\nconst items = $input.all();\n\nconst desiredTTL = 1;         // Cloudflare \"Auto\"\nconst desiredProxied = false; // DNS only\n\nreturn items.map(item => {\n  const j = item.json;\n  const hasRecord = !!j.recordId;\n\n  const needsUpdate =\n    !hasRecord ||\n    j.existingIP !== j.newIP ||\n    j.existingTTL !== desiredTTL ||\n    j.existingProxied !== desiredProxied;\n\n  console.log(\n    `[${j.fqdn}] ${j.existingIP || '<none>'} -> ${j.newIP} | ttl:${j.existingTTL} proxied:${j.existingProxied} | update? ${needsUpdate}`\n  );\n\n  return {\n    json: { ...j, hasRecord, needsUpdate, desiredTTL, desiredProxied }\n  };\n});\n"
+      },
+      "id": "2e7c3da6-878a-4db6-a3e7-7aadffbb7b64",
+      "name": "Check If Update Needed1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -256,
+        1936
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond-needs",
+              "leftValue": "={{ $json.needsUpdate }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "edb184b9-1146-4f35-b09d-62b1bca79c29",
+      "name": "Needs Update?1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        16,
+        1936
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond-hasrec",
+              "leftValue": "={{ $json.hasRecord }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c70db1e7-b943-457f-b5c4-721cf9132458",
+      "name": "Has Record?1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        272,
+        1648
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ 'https://api.cloudflare.com/client/v4/zones/' + $json.zoneID + '/dns_records/' + $json.recordId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "cloudflareApi",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ type: 'A', name: $json.fqdn, content: $json.newIP, ttl: $json.desiredTTL, proxied: $json.desiredProxied }) }}",
+        "options": {}
+      },
+      "id": "b0f95f7a-5cc6-47cb-b6ce-978a7d718153",
+      "name": "Update A Record1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        624,
+        1632
+      ],
+      "credentials": {
+        "cloudflareApi": {
+          "id": "23zTRVy3Y1m8sopZ",
+          "name": "Cloudflare account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://api.cloudflare.com/client/v4/zones/' + $json.zoneID + '/dns_records' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "cloudflareApi",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ type: 'A', name: $json.fqdn, content: $json.newIP, ttl: $json.desiredTTL, proxied: $json.desiredProxied }) }}",
+        "options": {}
+      },
+      "id": "0b694b06-64f7-432a-a26b-fde83dc74c09",
+      "name": "Create A Record1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        384,
+        2336
+      ],
+      "credentials": {
+        "cloudflareApi": {
+          "id": "23zTRVy3Y1m8sopZ",
+          "name": "Cloudflare account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(item => {\n  const res = item.json || {};\n  const fqdn = (res.result && res.result.name) || res.name || 'unknown';\n  const success = res.success === true;\n  const error = success ? undefined : ((res.errors && res.errors[0] && res.errors[0].message) || res.message || 'Unknown error');\n  return { json: { success, action: 'updated', fqdn, error } };\n});"
+      },
+      "id": "83d56f69-f7b5-4b58-b561-2094d6464433",
+      "name": "Validate Update1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1056,
+        1632
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(item => {\n  const res = item.json || {};\n  const fqdn = (res.result && res.result.name) || res.name || 'unknown';\n  const success = res.success === true;\n  const error = success ? undefined : ((res.errors && res.errors[0] && res.errors[0].message) || res.message || 'Unknown error');\n  return { json: { success, action: 'created', fqdn, error } };\n});"
+      },
+      "id": "740abab3-3a33-4319-92b1-4de36a646ccb",
+      "name": "Validate Create1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1056,
+        2336
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// No update needed. Pass a success message to the merge node.\nreturn [{ json: { success: true, action: 'no_change', fqdn: $json.fqdn } }];"
+      },
+      "id": "faf50611-aa57-4510-972c-9c775609b048",
+      "name": "No Update Needed1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        560,
+        1952
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = $input.all();\nconst timestamp = new Date().toISOString();\nlet created = 0, updated = 0, noChange = 0, failed = 0;\n\nconst createdFQDNs = [];\nconst updatedFQDNs = [];\n\nfor (const item of results) {\n  const r = item.json;\n  if (!r || r.success === false) {\n    failed++;\n    continue;\n  }\n\n  if (r.action === 'created') {\n    created++;\n    createdFQDNs.push(r.fqdn);\n  } else if (r.action === 'updated') {\n    updated++;\n    updatedFQDNs.push(r.fqdn);\n  } else if (r.action === 'no_change') {\n    noChange++;\n  }\n}\n\nconsole.log(`DNS Summary ${timestamp} -> created: ${created}, updated: ${updated}, no change: ${noChange}, failed: ${failed}`);\n\nreturn [{\n  json: {\n    timestamp,\n    created,\n    updated,\n    noChange,\n    failed,\n    total: results.length,\n    createdFQDNs,\n    updatedFQDNs,\n    hasChanges: (created + updated + failed) > 0\n  }\n}];\n"
+      },
+      "id": "2825d902-ff38-4496-b5bc-7628a36d5b9f",
+      "name": "Log Summary1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1168,
+        1936
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -2384,
+        1952
+      ],
+      "id": "08ce5429-cb15-402f-8089-da101ed02c83",
+      "name": "Schedule Trigger1"
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C09DL842ZUY",
+          "mode": "list",
+          "cachedResultName": "dns-update"
+        },
+        "text": "={{$json[\"message\"]}}",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        1872,
+        1824
+      ],
+      "id": "5e114df9-6284-4b6a-bafd-d748148c774f",
+      "name": "Send a message1",
+      "webhookId": "715abbee-bf64-4952-9fc1-d1765c1cf218",
+      "credentials": {
+        "slackApi": {
+          "id": "obEYVo8oQOJ22JqX",
+          "name": "AD Admin Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const timestamp = new Date().toLocaleString(\"en-GB\", {\n  timeZone: \"Asia/Jerusalem\",\n  hour12: false\n}).replace(\",\", \"\");\n\n// 📦 Base summary line\nconst summary = '🛰️ DNS Summary ' + timestamp;\n\n// 🔁 Updated domains with IP diff\nconst updatedText = ($json[\"updatedFQDNs\"] && $json[\"updatedFQDNs\"].length > 0)\n  ? \"\\n\\n:repeat: Updated domains with new IPs:\\n\" +\n    $json[\"updatedFQDNs\"]\n      .map(fqdn => {\n        const match = $items('Prepare Payload1').find(i => i.json.fqdn === fqdn);\n        const newIP = match?.json?.newIP || 'unknown';\n        const oldIP = match?.json?.existingIP || 'unknown';\n        return `${fqdn} updated to ${newIP} from old IP ${oldIP}`;\n      }).join(\"\\n\")\n  : \"\";\n\n// 🆕 Created domains\nconst createdText = ($json[\"createdFQDNs\"] && $json[\"createdFQDNs\"].length > 0)\n  ? \"\\n\\n:new: Created domains:\\n\" + $json[\"createdFQDNs\"].join(\"\\n\")\n  : \"\";\n\n// Pass through hasChanges flag\nconst hasChanges = $json[\"hasChanges\"];\n\n// 📩 Final formatted Slack message\nreturn [{\n  json: {\n    hasChanges,\n    message: hasChanges\n      ? summary + updatedText + createdText\n      : `✅ DNS check completed at ${timestamp} — no changes detected.`\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1408,
+        1936
+      ],
+      "id": "652a9ab5-b51a-407a-a32e-32861c2b5cbe",
+      "name": "Item Lists1"
+    },
+    {
+      "parameters": {
+        "url": "https://api.cloudflare.com/client/v4/zones/3462e9f3ae9f12d67018a49274db3def/dns_records?type=A",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "cloudflareApi",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -2048,
+        1952
+      ],
+      "id": "53070264-4e5f-4883-8b13-bfed8f75b540",
+      "name": "Get Existing DNS Records1",
+      "credentials": {
+        "cloudflareApi": {
+          "id": "23zTRVy3Y1m8sopZ",
+          "name": "Cloudflare account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -1728,
+        1936
+      ],
+      "id": "018350d5-bca6-462b-811f-f320f4f9268d",
+      "name": "Merge Inputs1"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        928,
+        1936
+      ],
+      "id": "886f307f-d2b2-42a0-bfb5-a908a86fb5e4",
+      "name": "Merge Results1"
+    }
+  ],
+  "connections": {
+    "Has Changes?": {
+      "main": [
+        [
+          {
+            "node": "Send a message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Current IP1": {
+      "main": [
+        [
+          {
+            "node": "Merge Inputs1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Sites1": {
+      "main": [
+        [
+          {
+            "node": "Expand Sites1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Expand Sites1": {
+      "main": [
+        [
+          {
+            "node": "Get DNS Record1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get DNS Record1": {
+      "main": [
+        [
+          {
+            "node": "Prepare Payload1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Payload1": {
+      "main": [
+        [
+          {
+            "node": "Check If Update Needed1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If Update Needed1": {
+      "main": [
+        [
+          {
+            "node": "Needs Update?1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Needs Update?1": {
+      "main": [
+        [
+          {
+            "node": "Has Record?1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Update Needed1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Record?1": {
+      "main": [
+        [
+          {
+            "node": "Update A Record1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create A Record1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update A Record1": {
+      "main": [
+        [
+          {
+            "node": "Validate Update1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create A Record1": {
+      "main": [
+        [
+          {
+            "node": "Validate Create1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Update1": {
+      "main": [
+        [
+          {
+            "node": "Merge Results1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Create1": {
+      "main": [
+        [
+          {
+            "node": "Merge Results1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "No Update Needed1": {
+      "main": [
+        [
+          {
+            "node": "Merge Results1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Log Summary1": {
+      "main": [
+        [
+          {
+            "node": "Item Lists1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger1": {
+      "main": [
+        [
+          {
+            "node": "Get Existing DNS Records1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Current IP1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Item Lists1": {
+      "main": [
+        [
+          {
+            "node": "Has Changes?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Existing DNS Records1": {
+      "main": [
+        [
+          {
+            "node": "Merge Inputs1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Inputs1": {
+      "main": [
+        [
+          {
+            "node": "Prepare Sites1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Results1": {
+      "main": [
+        [
+          {
+            "node": "Log Summary1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "nodeGroups": [],
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "timezone": "Asia/Jerusalem",
+    "binaryMode": "separate"
+  },
+  "staticData": {
+    "node:Schedule Trigger": {
+      "recurrenceRules": []
+    },
+    "node:Schedule Trigger1": {
+      "recurrenceRules": [
+        null
+      ],
+      "recurrenceRuleSignatures": [
+        null
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": [],
+  "shared": [
+    {
+      "role": "workflow:owner",
+      "workflowId": "RVcNYGSV5IWNx7CO",
+      "projectId": "pWTWmuHnmIHw48U9",
+      "createdAt": "2025-10-31T09:14:00.792Z",
+      "updatedAt": "2025-10-31T09:14:00.792Z"
+    }
+  ],
+  "activeVersion": {
+    "versionId": "1e93c5a5-ada2-4f86-975d-525a6cde8b3d",
+    "workflowId": "RVcNYGSV5IWNx7CO",
+    "nodes": [
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 1
+            },
+            "conditions": [
+              {
+                "id": "cond-has-changes",
+                "leftValue": "={{ $json.hasChanges }}",
+                "rightValue": true,
+                "operator": {
+                  "type": "boolean",
+                  "operation": "equals"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "3ade9f43-ef2f-4c10-9e78-c461800e6c40",
+        "name": "Has Changes?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [
+          1632,
+          1936
+        ]
+      },
+      {
+        "parameters": {
+          "url": "https://api.ipify.org?format=json",
+          "options": {}
+        },
+        "id": "6be78c8f-29e0-4e51-b25c-d2b09f4dbdd9",
+        "name": "Get Current IP1",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          -2048,
+          1712
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const domain = 'alex-it.net';\nconst zoneID = '3462e9f3ae9f12d67018a49274db3def';\n\n// Get all inputs and log them\nconst allInputs = $input.all();\nconsole.log('=== DEBUG: All inputs received ===');\nconsole.log('Number of inputs:', allInputs.length);\n\nallInputs.forEach((input, index) => {\n  console.log(`Input ${index}:`, JSON.stringify(input.json, null, 2).substring(0, 500));\n});\n\n// Find current IP\nconst ipInput = allInputs.find(item => item.json && item.json.ip);\nconst currentIP = ipInput ? ipInput.json.ip : null;\nconsole.log('Current IP found:', currentIP);\n\n// Find DNS records - with detailed checking\nconst dnsInput = allInputs.find(item => {\n  const hasJson = item.json != null;\n  const hasResult = item.json && item.json.result != null;\n  const isArray = item.json && Array.isArray(item.json.result);\n  console.log('Checking input:', { hasJson, hasResult, isArray });\n  return hasJson && hasResult && isArray;\n});\n\nconsole.log('DNS input found:', !!dnsInput);\n\nif (dnsInput) {\n  console.log('DNS response structure:', {\n    hasSuccess: 'success' in dnsInput.json,\n    successValue: dnsInput.json.success,\n    hasResult: 'result' in dnsInput.json,\n    resultIsArray: Array.isArray(dnsInput.json.result),\n    resultLength: dnsInput.json.result ? dnsInput.json.result.length : 0\n  });\n}\n\nconst dnsResponse = dnsInput ? dnsInput.json : null;\n\nif (!currentIP) {\n  throw new Error('Could not find current IP in inputs');\n}\n\nif (!dnsResponse) {\n  throw new Error('Could not find DNS records input');\n}\n\nif (!dnsResponse.result) {\n  throw new Error('DNS response has no result field');\n}\n\nif (!Array.isArray(dnsResponse.result)) {\n  throw new Error('DNS response result is not an array');\n}\n\n// Extract ALL A records that are NOT proxied\nconst sites = dnsResponse.result\n  .filter(record => {\n    if (record.type !== 'A') return false;\n    \n    if (record.proxied === true) {\n      console.log(`Skipping proxied record: ${record.name}`);\n      return false;\n    }\n    \n    return record.name.endsWith(`.${domain}`) || record.name === domain;\n  })\n  .map(record => {\n    const subdomain = record.name === domain ? '@' : record.name.replace(`.${domain}`, '');\n    return { \n      subdomain,\n      currentIP: record.content\n    };\n  });\n\nconsole.log(`Found ${sites.length} non-proxied A records to manage:`);\nsites.forEach(s => console.log(`  - ${s.subdomain} (current: ${s.currentIP})`));\n\nreturn [{\n  json: {\n    domain,\n    zoneID,\n    newIP: currentIP,\n    sites: sites.map(s => ({ \n      subdomain: s.subdomain,\n      fqdn: s.subdomain === '@' ? domain : `${s.subdomain}.${domain}`\n    }))\n  }\n}];"
+        },
+        "id": "34adfab6-290b-49a4-9441-74b722a64bab",
+        "name": "Prepare Sites1",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -1376,
+          1936
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "// Fan out one item per FQDN, attach zoneID\nconst original = $input.first().json;\n\nif (!original || !Array.isArray(original.sites)) throw new Error('sites missing or not an array');\n\nreturn original.sites.map(site => ({\n  json: {\n    subdomain: site.subdomain,\n    fqdn: site.fqdn,\n    domain: original.domain,\n    newIP: original.newIP,\n    zoneID: original.zoneID\n  }\n}));"
+        },
+        "id": "c06758d9-a4b6-46e6-97aa-fc59d8e02dd0",
+        "name": "Expand Sites1",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -1072,
+          1936
+        ]
+      },
+      {
+        "parameters": {
+          "url": "={{ 'https://api.cloudflare.com/client/v4/zones/' + $json.zoneID + '/dns_records?type=A&name=' + $json.fqdn }}",
+          "authentication": "predefinedCredentialType",
+          "nodeCredentialType": "cloudflareApi",
+          "options": {}
+        },
+        "id": "0075f988-7abd-43ea-b52a-7c9d69706586",
+        "name": "Get DNS Record1",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          -800,
+          1936
+        ],
+        "credentials": {
+          "cloudflareApi": {
+            "id": "23zTRVy3Y1m8sopZ",
+            "name": "Cloudflare account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "// Merge Cloudflare response with original site data using paired items\nconst cfItems = $input.all();\nreturn cfItems.map((item, i) => {\n  const pairedIndex = (item.pairedItem && item.pairedItem.item != null) ? item.pairedItem.item : i;\n  const original = $items('Expand Sites1')[pairedIndex].json;\n  const record = item.json?.result?.[0] || {};\n\n  return {\n    json: {\n      subdomain: original.subdomain,\n      fqdn: original.fqdn,\n      domain: original.domain,\n      newIP: original.newIP,\n      zoneID: original.zoneID,\n      recordId: record.id || '',\n      existingIP: record.content || '',\n      existingTTL: record.ttl != null ? record.ttl : 1,\n      existingProxied: record.proxied != null ? record.proxied : false\n    }\n  };\n});"
+        },
+        "id": "d73d01f0-b224-4737-afae-9e52e9a1eb63",
+        "name": "Prepare Payload1",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -528,
+          1936
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "// Evaluate each incoming item (one per FQDN)\nconst items = $input.all();\n\nconst desiredTTL = 1;         // Cloudflare \"Auto\"\nconst desiredProxied = false; // DNS only\n\nreturn items.map(item => {\n  const j = item.json;\n  const hasRecord = !!j.recordId;\n\n  const needsUpdate =\n    !hasRecord ||\n    j.existingIP !== j.newIP ||\n    j.existingTTL !== desiredTTL ||\n    j.existingProxied !== desiredProxied;\n\n  console.log(\n    `[${j.fqdn}] ${j.existingIP || '<none>'} -> ${j.newIP} | ttl:${j.existingTTL} proxied:${j.existingProxied} | update? ${needsUpdate}`\n  );\n\n  return {\n    json: { ...j, hasRecord, needsUpdate, desiredTTL, desiredProxied }\n  };\n});\n"
+        },
+        "id": "2e7c3da6-878a-4db6-a3e7-7aadffbb7b64",
+        "name": "Check If Update Needed1",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -256,
+          1936
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 1
+            },
+            "conditions": [
+              {
+                "id": "cond-needs",
+                "leftValue": "={{ $json.needsUpdate }}",
+                "rightValue": true,
+                "operator": {
+                  "type": "boolean",
+                  "operation": "equals"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "edb184b9-1146-4f35-b09d-62b1bca79c29",
+        "name": "Needs Update?1",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [
+          16,
+          1936
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 1
+            },
+            "conditions": [
+              {
+                "id": "cond-hasrec",
+                "leftValue": "={{ $json.hasRecord }}",
+                "rightValue": true,
+                "operator": {
+                  "type": "boolean",
+                  "operation": "equals"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "c70db1e7-b943-457f-b5c4-721cf9132458",
+        "name": "Has Record?1",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [
+          272,
+          1648
+        ]
+      },
+      {
+        "parameters": {
+          "method": "PUT",
+          "url": "={{ 'https://api.cloudflare.com/client/v4/zones/' + $json.zoneID + '/dns_records/' + $json.recordId }}",
+          "authentication": "predefinedCredentialType",
+          "nodeCredentialType": "cloudflareApi",
+          "sendBody": true,
+          "contentType": "raw",
+          "rawContentType": "application/json",
+          "body": "={{ JSON.stringify({ type: 'A', name: $json.fqdn, content: $json.newIP, ttl: $json.desiredTTL, proxied: $json.desiredProxied }) }}",
+          "options": {}
+        },
+        "id": "b0f95f7a-5cc6-47cb-b6ce-978a7d718153",
+        "name": "Update A Record1",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          624,
+          1632
+        ],
+        "credentials": {
+          "cloudflareApi": {
+            "id": "23zTRVy3Y1m8sopZ",
+            "name": "Cloudflare account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "={{ 'https://api.cloudflare.com/client/v4/zones/' + $json.zoneID + '/dns_records' }}",
+          "authentication": "predefinedCredentialType",
+          "nodeCredentialType": "cloudflareApi",
+          "sendBody": true,
+          "contentType": "raw",
+          "rawContentType": "application/json",
+          "body": "={{ JSON.stringify({ type: 'A', name: $json.fqdn, content: $json.newIP, ttl: $json.desiredTTL, proxied: $json.desiredProxied }) }}",
+          "options": {}
+        },
+        "id": "0b694b06-64f7-432a-a26b-fde83dc74c09",
+        "name": "Create A Record1",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          384,
+          2336
+        ],
+        "credentials": {
+          "cloudflareApi": {
+            "id": "23zTRVy3Y1m8sopZ",
+            "name": "Cloudflare account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "return $input.all().map(item => {\n  const res = item.json || {};\n  const fqdn = (res.result && res.result.name) || res.name || 'unknown';\n  const success = res.success === true;\n  const error = success ? undefined : ((res.errors && res.errors[0] && res.errors[0].message) || res.message || 'Unknown error');\n  return { json: { success, action: 'updated', fqdn, error } };\n});"
+        },
+        "id": "83d56f69-f7b5-4b58-b561-2094d6464433",
+        "name": "Validate Update1",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1056,
+          1632
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "return $input.all().map(item => {\n  const res = item.json || {};\n  const fqdn = (res.result && res.result.name) || res.name || 'unknown';\n  const success = res.success === true;\n  const error = success ? undefined : ((res.errors && res.errors[0] && res.errors[0].message) || res.message || 'Unknown error');\n  return { json: { success, action: 'created', fqdn, error } };\n});"
+        },
+        "id": "740abab3-3a33-4319-92b1-4de36a646ccb",
+        "name": "Validate Create1",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1056,
+          2336
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "// No update needed. Pass a success message to the merge node.\nreturn [{ json: { success: true, action: 'no_change', fqdn: $json.fqdn } }];"
+        },
+        "id": "faf50611-aa57-4510-972c-9c775609b048",
+        "name": "No Update Needed1",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          560,
+          1952
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const results = $input.all();\nconst timestamp = new Date().toISOString();\nlet created = 0, updated = 0, noChange = 0, failed = 0;\n\nconst createdFQDNs = [];\nconst updatedFQDNs = [];\n\nfor (const item of results) {\n  const r = item.json;\n  if (!r || r.success === false) {\n    failed++;\n    continue;\n  }\n\n  if (r.action === 'created') {\n    created++;\n    createdFQDNs.push(r.fqdn);\n  } else if (r.action === 'updated') {\n    updated++;\n    updatedFQDNs.push(r.fqdn);\n  } else if (r.action === 'no_change') {\n    noChange++;\n  }\n}\n\nconsole.log(`DNS Summary ${timestamp} -> created: ${created}, updated: ${updated}, no change: ${noChange}, failed: ${failed}`);\n\nreturn [{\n  json: {\n    timestamp,\n    created,\n    updated,\n    noChange,\n    failed,\n    total: results.length,\n    createdFQDNs,\n    updatedFQDNs,\n    hasChanges: (created + updated + failed) > 0\n  }\n}];\n"
+        },
+        "id": "2825d902-ff38-4496-b5bc-7628a36d5b9f",
+        "name": "Log Summary1",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1168,
+          1936
+        ]
+      },
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "hours"
+              }
+            ]
+          }
+        },
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          -2384,
+          1952
+        ],
+        "id": "08ce5429-cb15-402f-8089-da101ed02c83",
+        "name": "Schedule Trigger1"
+      },
+      {
+        "parameters": {
+          "select": "channel",
+          "channelId": {
+            "__rl": true,
+            "value": "C09DL842ZUY",
+            "mode": "list",
+            "cachedResultName": "dns-update"
+          },
+          "text": "={{$json[\"message\"]}}",
+          "otherOptions": {}
+        },
+        "type": "n8n-nodes-base.slack",
+        "typeVersion": 2.3,
+        "position": [
+          1872,
+          1824
+        ],
+        "id": "5e114df9-6284-4b6a-bafd-d748148c774f",
+        "name": "Send a message1",
+        "webhookId": "715abbee-bf64-4952-9fc1-d1765c1cf218",
+        "credentials": {
+          "slackApi": {
+            "id": "obEYVo8oQOJ22JqX",
+            "name": "AD Admin Bot"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "const timestamp = new Date().toLocaleString(\"en-GB\", {\n  timeZone: \"Asia/Jerusalem\",\n  hour12: false\n}).replace(\",\", \"\");\n\n// 📦 Base summary line\nconst summary = '🛰️ DNS Summary ' + timestamp;\n\n// 🔁 Updated domains with IP diff\nconst updatedText = ($json[\"updatedFQDNs\"] && $json[\"updatedFQDNs\"].length > 0)\n  ? \"\\n\\n:repeat: Updated domains with new IPs:\\n\" +\n    $json[\"updatedFQDNs\"]\n      .map(fqdn => {\n        const match = $items('Prepare Payload1').find(i => i.json.fqdn === fqdn);\n        const newIP = match?.json?.newIP || 'unknown';\n        const oldIP = match?.json?.existingIP || 'unknown';\n        return `${fqdn} updated to ${newIP} from old IP ${oldIP}`;\n      }).join(\"\\n\")\n  : \"\";\n\n// 🆕 Created domains\nconst createdText = ($json[\"createdFQDNs\"] && $json[\"createdFQDNs\"].length > 0)\n  ? \"\\n\\n:new: Created domains:\\n\" + $json[\"createdFQDNs\"].join(\"\\n\")\n  : \"\";\n\n// Pass through hasChanges flag\nconst hasChanges = $json[\"hasChanges\"];\n\n// 📩 Final formatted Slack message\nreturn [{\n  json: {\n    hasChanges,\n    message: hasChanges\n      ? summary + updatedText + createdText\n      : `✅ DNS check completed at ${timestamp} — no changes detected.`\n  }\n}];\n"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1408,
+          1936
+        ],
+        "id": "652a9ab5-b51a-407a-a32e-32861c2b5cbe",
+        "name": "Item Lists1"
+      },
+      {
+        "parameters": {
+          "url": "https://api.cloudflare.com/client/v4/zones/3462e9f3ae9f12d67018a49274db3def/dns_records?type=A",
+          "authentication": "predefinedCredentialType",
+          "nodeCredentialType": "cloudflareApi",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          -2048,
+          1952
+        ],
+        "id": "53070264-4e5f-4883-8b13-bfed8f75b540",
+        "name": "Get Existing DNS Records1",
+        "credentials": {
+          "cloudflareApi": {
+            "id": "23zTRVy3Y1m8sopZ",
+            "name": "Cloudflare account"
+          }
+        }
+      },
+      {
+        "parameters": {},
+        "type": "n8n-nodes-base.merge",
+        "typeVersion": 3.2,
+        "position": [
+          -1728,
+          1936
+        ],
+        "id": "018350d5-bca6-462b-811f-f320f4f9268d",
+        "name": "Merge Inputs1"
+      },
+      {
+        "parameters": {},
+        "type": "n8n-nodes-base.merge",
+        "typeVersion": 3.2,
+        "position": [
+          928,
+          1936
+        ],
+        "id": "886f307f-d2b2-42a0-bfb5-a908a86fb5e4",
+        "name": "Merge Results1"
+      }
+    ],
+    "connections": {
+      "Has Changes?": {
+        "main": [
+          [
+            {
+              "node": "Send a message1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Current IP1": {
+        "main": [
+          [
+            {
+              "node": "Merge Inputs1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Prepare Sites1": {
+        "main": [
+          [
+            {
+              "node": "Expand Sites1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Expand Sites1": {
+        "main": [
+          [
+            {
+              "node": "Get DNS Record1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get DNS Record1": {
+        "main": [
+          [
+            {
+              "node": "Prepare Payload1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Prepare Payload1": {
+        "main": [
+          [
+            {
+              "node": "Check If Update Needed1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Check If Update Needed1": {
+        "main": [
+          [
+            {
+              "node": "Needs Update?1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Needs Update?1": {
+        "main": [
+          [
+            {
+              "node": "Has Record?1",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "No Update Needed1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Has Record?1": {
+        "main": [
+          [
+            {
+              "node": "Update A Record1",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Create A Record1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Update A Record1": {
+        "main": [
+          [
+            {
+              "node": "Validate Update1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Create A Record1": {
+        "main": [
+          [
+            {
+              "node": "Validate Create1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Validate Update1": {
+        "main": [
+          [
+            {
+              "node": "Merge Results1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Validate Create1": {
+        "main": [
+          [
+            {
+              "node": "Merge Results1",
+              "type": "main",
+              "index": 1
+            }
+          ]
+        ]
+      },
+      "No Update Needed1": {
+        "main": [
+          [
+            {
+              "node": "Merge Results1",
+              "type": "main",
+              "index": 1
+            }
+          ]
+        ]
+      },
+      "Log Summary1": {
+        "main": [
+          [
+            {
+              "node": "Item Lists1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Schedule Trigger1": {
+        "main": [
+          [
+            {
+              "node": "Get Existing DNS Records1",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Get Current IP1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Item Lists1": {
+        "main": [
+          [
+            {
+              "node": "Has Changes?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Existing DNS Records1": {
+        "main": [
+          [
+            {
+              "node": "Merge Inputs1",
+              "type": "main",
+              "index": 1
+            }
+          ]
+        ]
+      },
+      "Merge Inputs1": {
+        "main": [
+          [
+            {
+              "node": "Prepare Sites1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Merge Results1": {
+        "main": [
+          [
+            {
+              "node": "Log Summary1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "nodeGroups": [],
+    "authors": "Alex Vinokur",
+    "name": "Version 1e93c5a5",
+    "description": "",
+    "autosaved": true,
+    "createdAt": "2026-04-22T14:02:13.899Z",
+    "updatedAt": "2026-11-14T09:33:50.000Z"
+  }
+}
