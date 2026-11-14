@@ -1,11 +1,11 @@
 # n8n-Raspberry-PI-Workflow-Backup
 
-## Latest Backup: 2026-11-14 22:48
+## Latest Backup: 2026-11-14 23:43
 
 ### Backup URL
-https://github.com/alexxx55555/n8n-Raspberry-PI-Workflow-Backup/tree/main/PI%20workflows%20backup%202026-11-14%2022-48
+https://github.com/alexxx55555/n8n-Raspberry-PI-Workflow-Backup/tree/main/PI%20workflows%20backup%202026-11-14%2023-43
 
-### Workflows Backed Up (47 total)
+### Workflows Backed Up (45 total)
 - AD Reset Password and Unlock
 - Monday - Auto Due Date by Status
 - Daily Digest — Monday.com
@@ -23,7 +23,7 @@ https://github.com/alexxx55555/n8n-Raspberry-PI-Workflow-Backup/tree/main/PI%20w
 - Monday Auto-Archive Completed
 - Get JumpCloud User Info
 - Monday Due Date Alerts to Slack
-- Monday Weekly Snapshot
+- Monday Monthly Snapshot
 - Slack Scheduled Messages
 - DNS Update
 - AD Brute Force Detection
@@ -36,7 +36,6 @@ https://github.com/alexxx55555/n8n-Raspberry-PI-Workflow-Backup/tree/main/PI%20w
 - LG TV C3 Remote
 - Homelab Uptime Monitor
 - AI Translator
-- Ad lockout acocount unlock
 - WAHA Webhook Auto Start
 - PI Workflows Backup
 - Gmail → Monday.com Task Creator
@@ -45,7 +44,6 @@ https://github.com/alexxx55555/n8n-Raspberry-PI-Workflow-Backup/tree/main/PI%20w
 - WhatsApp Send Message
 - Create new AD account
 - Delete Calendar Events by Title
-- Slack Group Mentions
 - AD Device Monitor
 - Privileged AD Group Membership Alerts (Hardened)
 - Users AD/JC Onboarding
