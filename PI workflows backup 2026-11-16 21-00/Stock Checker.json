@@ -1,0 +1,711 @@
+{
+  "id": "nhM4zDn76TSEjNAM",
+  "name": "Stock Checker",
+  "active": true,
+  "activeVersionId": "b2c14b09-78ee-4f5c-818c-d1556dd48e8b",
+  "createdAt": "2026-11-14T08:22:35.502Z",
+  "updatedAt": "2026-11-15T20:22:45.960Z",
+  "isArchived": false,
+  "versionId": "b2c14b09-78ee-4f5c-818c-d1556dd48e8b",
+  "triggerCount": 2,
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "da334561-bc5f-4b92-95ba-0f1f0a1fd524",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -864,
+        -96
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 17 * * 1-5"
+            }
+          ]
+        }
+      },
+      "id": "5c5e1d60-9535-488a-a5ca-307bcf655cd0",
+      "name": "Daily 17:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -880,
+        48
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://query1.finance.yahoo.com/v8/finance/chart/SPY?interval=1d&range=1d",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7fe3bbfe-6b9e-4175-82b1-7a5a99b456d4",
+      "name": "Check Market (SPY)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -624,
+        48
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "market-open-today",
+              "leftValue": "={{ new Date($json.chart.result[0].meta.regularMarketTime * 1000).toLocaleDateString('en-CA', { timeZone: 'America/New_York' }) === new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' }) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "62f222f8-fe0f-4b1c-87e8-2f0527467b0a",
+      "name": "Market Open Today?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -432,
+        48
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "stock",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "a5ddf66c-2ae1-4b65-b50f-1d8fab06a95e",
+      "name": "Slack Command",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -864,
+        224
+      ],
+      "webhookId": "a1f0c1de-1111-4a11-9a11-000000000002"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "📈 Fetching quotes...",
+        "options": {}
+      },
+      "id": "5292a283-f98b-4a85-a75b-9191cfc20221",
+      "name": "Quick Reply",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -512,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "let symbols = ['AAPL', 'VOO', 'NVDA']; // default list\n\ntry {\n  const text = $('Slack Command').first().json.body.text || '';\n  const custom = text\n    .toUpperCase()\n    .split(/[\\s,]+/)\n    .filter(s => /^[A-Z0-9.\\-^=]{1,12}$/.test(s));\n  if (custom.length) symbols = custom;\n} catch (e) {\n  // triggered by schedule/manual, so use defaults\n}\n\nreturn symbols.map(symbol => ({ json: { symbol } }));"
+      },
+      "id": "775937b7-60a9-45a4-b851-f226414b1e32",
+      "name": "Stock Symbols",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -112,
+        -96
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://query1.finance.yahoo.com/v8/finance/chart/' + $json.symbol + '?interval=1d&range=1d' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e6c78b1a-47a9-463a-8800-e2d642d7754f",
+      "name": "Get Quote (Yahoo Finance)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        112,
+        -96
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(item => {\n  const result = item.json?.chart?.result?.[0];\n  if (!result) {\n    return { json: { error: 'No data returned', raw: item.json } };\n  }\n  const m = result.meta;\n  const price = m.regularMarketPrice;\n  const prev = m.chartPreviousClose;\n  const change = price - prev;\n  const pct = prev ? (change / prev) * 100 : null;\n  const arrow = change >= 0 ? '🟢' : '🔴';\n  return {\n    json: {\n      symbol: m.symbol,\n      price: Number(price.toFixed(2)),\n      previousClose: Number(prev.toFixed(2)),\n      change: Number(change.toFixed(2)),\n      changePercent: pct !== null ? Number(pct.toFixed(2)) : null,\n      currency: m.currency,\n      exchange: m.fullExchangeName,\n      summary: `${arrow} ${m.symbol}: ${price.toFixed(2)} ${m.currency} (${change >= 0 ? '+' : ''}${pct.toFixed(2)}%)`\n    }\n  };\n});"
+      },
+      "id": "0fe4982f-a61c-418d-a5a6-45c2ee00df4c",
+      "name": "Format Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        368,
+        -96
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const lines = $input.all().map(i => i.json.summary || i.json.error);\nreturn [{ json: { message: 'Stock update:\\n' + lines.join('\\n') } }];"
+      },
+      "id": "2546c16d-6b95-49ee-815f-90b7dbcc29d6",
+      "name": "Combine Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        624,
+        -96
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0CHMHQ8UG5",
+          "mode": "id"
+        },
+        "text": "={{ $json.message }}",
+        "otherOptions": {}
+      },
+      "id": "ef300654-355f-4e26-ace5-36f699dcf024",
+      "name": "Send Slack DM",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        880,
+        -96
+      ],
+      "webhookId": "3916137a-e907-4385-9b94-891826b661d3",
+      "credentials": {
+        "slackApi": {
+          "id": "IaefNDbjYVvXty35",
+          "name": "Admin Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Stock Symbols",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily 17:00": {
+      "main": [
+        [
+          {
+            "node": "Check Market (SPY)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Market (SPY)": {
+      "main": [
+        [
+          {
+            "node": "Market Open Today?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Market Open Today?": {
+      "main": [
+        [
+          {
+            "node": "Stock Symbols",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack Command": {
+      "main": [
+        [
+          {
+            "node": "Quick Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Quick Reply": {
+      "main": [
+        [
+          {
+            "node": "Stock Symbols",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stock Symbols": {
+      "main": [
+        [
+          {
+            "node": "Get Quote (Yahoo Finance)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Quote (Yahoo Finance)": {
+      "main": [
+        [
+          {
+            "node": "Format Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Results": {
+      "main": [
+        [
+          {
+            "node": "Combine Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Message": {
+      "main": [
+        [
+          {
+            "node": "Send Slack DM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "nodeGroups": [],
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "timezone": "Asia/Jerusalem",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": {
+    "node:Daily 17:30": {
+      "recurrenceRules": [
+        null
+      ],
+      "recurrenceRuleSignatures": [
+        null
+      ]
+    },
+    "node:Daily 17:00": {
+      "recurrenceRules": [
+        null
+      ],
+      "recurrenceRuleSignatures": [
+        null
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": [],
+  "shared": [
+    {
+      "role": "workflow:owner",
+      "workflowId": "nhM4zDn76TSEjNAM",
+      "projectId": "pWTWmuHnmIHw48U9",
+      "createdAt": "2026-11-14T08:22:35.506Z",
+      "updatedAt": "2026-11-14T08:22:35.506Z"
+    }
+  ],
+  "activeVersion": {
+    "versionId": "b2c14b09-78ee-4f5c-818c-d1556dd48e8b",
+    "workflowId": "nhM4zDn76TSEjNAM",
+    "nodes": [
+      {
+        "parameters": {},
+        "id": "da334561-bc5f-4b92-95ba-0f1f0a1fd524",
+        "name": "Manual Trigger",
+        "type": "n8n-nodes-base.manualTrigger",
+        "typeVersion": 1,
+        "position": [
+          -864,
+          -96
+        ]
+      },
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "cronExpression",
+                "expression": "0 17 * * 1-5"
+              }
+            ]
+          }
+        },
+        "id": "5c5e1d60-9535-488a-a5ca-307bcf655cd0",
+        "name": "Daily 17:00",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          -880,
+          48
+        ]
+      },
+      {
+        "parameters": {
+          "url": "https://query1.finance.yahoo.com/v8/finance/chart/SPY?interval=1d&range=1d",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "User-Agent",
+                "value": "Mozilla/5.0"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "7fe3bbfe-6b9e-4175-82b1-7a5a99b456d4",
+        "name": "Check Market (SPY)",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          -624,
+          48
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "id": "market-open-today",
+                "leftValue": "={{ new Date($json.chart.result[0].meta.regularMarketTime * 1000).toLocaleDateString('en-CA', { timeZone: 'America/New_York' }) === new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' }) }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "62f222f8-fe0f-4b1c-87e8-2f0527467b0a",
+        "name": "Market Open Today?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [
+          -432,
+          48
+        ]
+      },
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "stock",
+          "responseMode": "responseNode",
+          "options": {}
+        },
+        "id": "a5ddf66c-2ae1-4b65-b50f-1d8fab06a95e",
+        "name": "Slack Command",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          -864,
+          224
+        ],
+        "webhookId": "a1f0c1de-1111-4a11-9a11-000000000002"
+      },
+      {
+        "parameters": {
+          "respondWith": "text",
+          "responseBody": "📈 Fetching quotes...",
+          "options": {}
+        },
+        "id": "5292a283-f98b-4a85-a75b-9191cfc20221",
+        "name": "Quick Reply",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.1,
+        "position": [
+          -512,
+          224
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "let symbols = ['AAPL', 'VOO', 'NVDA']; // default list\n\ntry {\n  const text = $('Slack Command').first().json.body.text || '';\n  const custom = text\n    .toUpperCase()\n    .split(/[\\s,]+/)\n    .filter(s => /^[A-Z0-9.\\-^=]{1,12}$/.test(s));\n  if (custom.length) symbols = custom;\n} catch (e) {\n  // triggered by schedule/manual, so use defaults\n}\n\nreturn symbols.map(symbol => ({ json: { symbol } }));"
+        },
+        "id": "775937b7-60a9-45a4-b851-f226414b1e32",
+        "name": "Stock Symbols",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -112,
+          -96
+        ]
+      },
+      {
+        "parameters": {
+          "url": "={{ 'https://query1.finance.yahoo.com/v8/finance/chart/' + $json.symbol + '?interval=1d&range=1d' }}",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "User-Agent",
+                "value": "Mozilla/5.0"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "e6c78b1a-47a9-463a-8800-e2d642d7754f",
+        "name": "Get Quote (Yahoo Finance)",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          112,
+          -96
+        ],
+        "onError": "continueRegularOutput"
+      },
+      {
+        "parameters": {
+          "jsCode": "return $input.all().map(item => {\n  const result = item.json?.chart?.result?.[0];\n  if (!result) {\n    return { json: { error: 'No data returned', raw: item.json } };\n  }\n  const m = result.meta;\n  const price = m.regularMarketPrice;\n  const prev = m.chartPreviousClose;\n  const change = price - prev;\n  const pct = prev ? (change / prev) * 100 : null;\n  const arrow = change >= 0 ? '🟢' : '🔴';\n  return {\n    json: {\n      symbol: m.symbol,\n      price: Number(price.toFixed(2)),\n      previousClose: Number(prev.toFixed(2)),\n      change: Number(change.toFixed(2)),\n      changePercent: pct !== null ? Number(pct.toFixed(2)) : null,\n      currency: m.currency,\n      exchange: m.fullExchangeName,\n      summary: `${arrow} ${m.symbol}: ${price.toFixed(2)} ${m.currency} (${change >= 0 ? '+' : ''}${pct.toFixed(2)}%)`\n    }\n  };\n});"
+        },
+        "id": "0fe4982f-a61c-418d-a5a6-45c2ee00df4c",
+        "name": "Format Results",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          368,
+          -96
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const lines = $input.all().map(i => i.json.summary || i.json.error);\nreturn [{ json: { message: 'Stock update:\\n' + lines.join('\\n') } }];"
+        },
+        "id": "2546c16d-6b95-49ee-815f-90b7dbcc29d6",
+        "name": "Combine Message",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          624,
+          -96
+        ]
+      },
+      {
+        "parameters": {
+          "select": "channel",
+          "channelId": {
+            "__rl": true,
+            "value": "C0CHMHQ8UG5",
+            "mode": "id"
+          },
+          "text": "={{ $json.message }}",
+          "otherOptions": {}
+        },
+        "id": "ef300654-355f-4e26-ace5-36f699dcf024",
+        "name": "Send Slack DM",
+        "type": "n8n-nodes-base.slack",
+        "typeVersion": 2.3,
+        "position": [
+          880,
+          -96
+        ],
+        "webhookId": "3916137a-e907-4385-9b94-891826b661d3",
+        "credentials": {
+          "slackApi": {
+            "id": "IaefNDbjYVvXty35",
+            "name": "Admin Bot"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Manual Trigger": {
+        "main": [
+          [
+            {
+              "node": "Stock Symbols",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Daily 17:00": {
+        "main": [
+          [
+            {
+              "node": "Check Market (SPY)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Check Market (SPY)": {
+        "main": [
+          [
+            {
+              "node": "Market Open Today?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Market Open Today?": {
+        "main": [
+          [
+            {
+              "node": "Stock Symbols",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Slack Command": {
+        "main": [
+          [
+            {
+              "node": "Quick Reply",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Quick Reply": {
+        "main": [
+          [
+            {
+              "node": "Stock Symbols",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Stock Symbols": {
+        "main": [
+          [
+            {
+              "node": "Get Quote (Yahoo Finance)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Quote (Yahoo Finance)": {
+        "main": [
+          [
+            {
+              "node": "Format Results",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Format Results": {
+        "main": [
+          [
+            {
+              "node": "Combine Message",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Combine Message": {
+        "main": [
+          [
+            {
+              "node": "Send Slack DM",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "nodeGroups": [],
+    "authors": "Alex Vinokur",
+    "name": "Version b2c14b09",
+    "description": "",
+    "autosaved": false,
+    "createdAt": "2026-11-15T20:22:45.967Z",
+    "updatedAt": "2026-11-15T20:22:46.000Z"
+  }
+}
