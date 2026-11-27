@@ -1,9 +1,9 @@
 # n8n-Raspberry-PI-Workflow-Backup
 
-## Latest Backup: 2026-11-20 21:00
+## Latest Backup: 2026-11-27 07:29
 
 ### Backup URL
-https://github.com/alexxx55555/n8n-Raspberry-PI-Workflow-Backup/tree/main/PI%20workflows%20backup%202026-11-20%2021-00
+https://github.com/alexxx55555/n8n-Raspberry-PI-Workflow-Backup/tree/main/PI%20workflows%20backup%202026-11-27%2007-29
 
 ### Workflows Backed Up (45 total)
 - AD Reset Password and Unlock
@@ -39,7 +39,7 @@ https://github.com/alexxx55555/n8n-Raspberry-PI-Workflow-Backup/tree/main/PI%20w
 - WAHA Webhook Auto Start
 - PI Workflows Backup
 - Gmail → Monday.com Task Creator
-- Stock Checker
+- Stock Open/Close Report + Signals
 - Monday Auto-Assign Owner
 - WhatsApp Send Message
 - Create new AD account
