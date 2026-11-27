@@ -1,0 +1,971 @@
+{
+  "id": "nhM4zDn76TSEjNAM",
+  "name": "Stock Open/Close Report + Signals",
+  "active": true,
+  "activeVersionId": "b7e319aa-eae6-41c5-ac42-2eb787ca0323",
+  "createdAt": "2026-11-14T08:22:35.502Z",
+  "updatedAt": "2026-11-26T08:31:47.884Z",
+  "isArchived": false,
+  "versionId": "b7e319aa-eae6-41c5-ac42-2eb787ca0323",
+  "triggerCount": 2,
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "e7fd4b99-80a4-49c9-ae32-8f69845ec610",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -928,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "35 9 * * 1-5"
+            },
+            {
+              "field": "cronExpression",
+              "expression": "5 16 * * 1-5"
+            }
+          ]
+        }
+      },
+      "id": "c4142f2b-46c6-4c7a-be3d-c8641ed3ecf6",
+      "name": "Schedule: Open 09:35 / Close 16:05 ET",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -928,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://query1.finance.yahoo.com/v8/finance/chart/SPY?interval=1d&range=1d",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a95fe5ad-a84d-4f1a-bfd1-40f85b5bd160",
+      "name": "Market Status (SPY)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -688,
+        176
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "market-open-today",
+              "leftValue": "={{ new Date($json.chart.result[0].meta.regularMarketTime * 1000).toLocaleDateString('en-CA', { timeZone: 'America/New_York' }) === new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' }) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "dcb3454c-c4a2-4194-bf65-29d017633fcd",
+      "name": "Market Open Today?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -480,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "stock",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "5f94a642-9346-47c4-831a-2e450bb5fbcb",
+      "name": "Slack Command",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -928,
+        368
+      ],
+      "webhookId": "98dd3f31-8bd8-4d4c-b59d-c5d59b61513a"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "📈 Fetching quotes & analysing — your report will be posted shortly.",
+        "options": {}
+      },
+      "id": "b11236a8-efed-4642-8b08-5adcb8de971e",
+      "name": "Acknowledge Slack Command",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -688,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "072c1924-108d-499d-9311-ef80d7acbe75",
+              "name": "finnhubKey",
+              "value": "YOUR_FINNHUB_API_KEY",
+              "type": "string"
+            },
+            {
+              "id": "04cd7093-fc40-4736-a3d7-dbae25d0ac8d",
+              "name": "alphaVantageKey",
+              "value": "YOUR_ALPHA_VANTAGE_API_KEY",
+              "type": "string"
+            },
+            {
+              "id": "8b4da2ce-b647-49e1-a23f-23a2b044bfba",
+              "name": "slackChannelId",
+              "value": "C0CHMHQ8UG5",
+              "type": "string"
+            },
+            {
+              "id": "b45c5dbf-c14f-445b-834a-d1a043da3e6e",
+              "name": "watchlist",
+              "value": "AAPL,VOO,NVDA,COST,INTC",
+              "type": "string"
+            },
+            {
+              "id": "c741b7e4-c149-4d87-bd29-24f663b3f0aa",
+              "name": "enableScreener",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "8a6d0b63-7360-40ee-9a2e-af0b909d52ce",
+              "name": "screenerUniverse",
+              "value": "MSFT,GOOGL,AMZN,META,AVGO,LLY,V,JPM,AMD,TSM,ORCL,NFLX,UNH,HD,QQQ,VTI,SCHD,XLK",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "05328654-d154-4311-83af-3df435ccbb9a",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -240,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Config').first().json;\nlet symbols = String(cfg.watchlist || '').split(',').map(s => s.trim().toUpperCase()).filter(Boolean);\nlet source = 'schedule';\n\n// Slack slash command: /stock AAPL TSLA  -> custom list\ntry {\n  const text = $('Slack Command').first().json.body.text || '';\n  const custom = text.toUpperCase().split(/[\\s,]+/).filter(s => /^[A-Z0-9.\\-^=]{1,12}$/.test(s));\n  if (custom.length) symbols = custom;\n  source = 'slack';\n} catch (e) {}\n\nif (source === 'schedule') {\n  try { $('Manual Trigger').first(); source = 'manual'; } catch (e) {}\n}\n\n// Scheduled runs: before noon New York time = market open report, otherwise close report\nconst etHour = Number(new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: 'numeric', hour12: false }).format(new Date())) % 24;\nconst mode = source === 'schedule' ? (etHour < 12 ? 'open' : 'close') : 'ondemand';\n\nreturn [{ json: { symbols: [...new Set(symbols)].slice(0, 15), mode, source } }];\n"
+      },
+      "id": "535ac7af-2357-4fe9-9a31-3011855c7941",
+      "name": "Resolve Watchlist",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Analyze & Score — pulls prices, technicals, analyst ratings, rating changes and news for each ticker,\n// then produces a score from -100 (very weak) to +100 (very strong).\n// Sources: Yahoo Finance (price/history) · Finnhub (quote, analyst consensus, news) · Alpha Vantage (news sentiment) · Google News + Yahoo RSS (analyst actions)\nconst cfg = $('Config').first().json;\nconst inp = $input.first().json;\nconst UA = { 'User-Agent': 'Mozilla/5.0' };\nconst real = k => (k && !String(k).includes('YOUR_')) ? k : null;\nconst fk = real(cfg.finnhubKey);\nconst ak = real(cfg.alphaVantageKey);\n\nconst http = async (url, headers = {}) => {\n  try { return await this.helpers.httpRequest({ method: 'GET', url, headers, json: true, timeout: 15000 }); }\n  catch (e) { return null; }\n};\n\n// ---------- helpers ----------\nconst avg = a => a.reduce((x, y) => x + y, 0) / a.length;\nconst sma = (a, n) => a.length >= n ? avg(a.slice(-n)) : null;\nconst clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));\nconst etDate = ts => new Date(ts * 1000).toLocaleDateString('en-CA', { timeZone: 'America/New_York' });\nconst rsi = (a, n = 14) => {\n  if (a.length < n + 1) return null;\n  let g = 0, l = 0;\n  for (let i = a.length - n; i < a.length; i++) { const d = a[i] - a[i - 1]; if (d >= 0) g += d; else l -= d; }\n  if (l === 0) return 100;\n  return 100 - 100 / (1 + g / l);\n};\n\n// ---------- source 1: Yahoo Finance (price + 6 months history -> technicals) ----------\nasync function yahoo(sym) {\n  const d = await http(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?interval=1d&range=6mo`, UA);\n  const r = d?.chart?.result?.[0];\n  if (!r || !r.timestamp) return null;\n  const q = r.indicators.quote[0];\n  const rows = r.timestamp.map((t, i) => ({ t, o: q.open[i], c: q.close[i], v: q.volume[i] })).filter(x => x.c != null);\n  if (rows.length < 2) return null;\n  const m = r.meta;\n  const last = rows[rows.length - 1];\n  const price = m.regularMarketPrice ?? last.c;\n  const todayBar = etDate(last.t) === etDate(m.regularMarketTime);\n  const prev = todayBar ? rows[rows.length - 2].c : last.c;\n  const closes = rows.map(x => x.c);\n  if (todayBar) closes[closes.length - 1] = price;\n  const vols = (todayBar ? rows.slice(-21, -1) : rows.slice(-20)).map(x => x.v).filter(Boolean);\n  const avgVol = vols.length ? avg(vols) : null;\n  const lr = closes.slice(-21).map((c, i, arr) => i ? Math.log(c / arr[i - 1]) : null).slice(1);\n  let vol20 = null;\n  if (lr.length >= 15) { const mu = avg(lr); vol20 = Math.sqrt(lr.reduce((s, x) => s + (x - mu) ** 2, 0) / (lr.length - 1)) * Math.sqrt(252) * 100; }\n  const change = price - prev;\n  return {\n    name: m.shortName || m.longName || sym,\n    currency: m.currency || 'USD',\n    price, prev, change,\n    pct: prev ? (change / prev) * 100 : null,\n    gapPct: todayBar && last.o && prev ? (last.o / prev - 1) * 100 : null,\n    sma20: sma(closes, 20), sma50: sma(closes, 50), rsi: rsi(closes),\n    ret1m: closes.length > 22 ? (price / closes[closes.length - 22] - 1) * 100 : null,\n    hi52: m.fiftyTwoWeekHigh ?? null, lo52: m.fiftyTwoWeekLow ?? null, vol20,\n    distHi: m.fiftyTwoWeekHigh ? (price / m.fiftyTwoWeekHigh - 1) * 100 : null,\n    volRatio: todayBar && avgVol && last.v ? last.v / avgVol : null\n  };\n}\n\n// ---------- source 2: Finnhub (independent quote, analyst consensus, company news) ----------\nasync function fhQuote(sym) {\n  if (!fk) return null;\n  const d = await http(`https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(sym)}&token=${fk}`);\n  return d && d.c > 0 ? { price: d.c, pct: d.dp } : null;\n}\nasync function analysts(sym) {\n  if (!fk) return null;\n  const d = await http(`https://finnhub.io/api/v1/stock/recommendation?symbol=${encodeURIComponent(sym)}&token=${fk}`);\n  const r = Array.isArray(d) && d[0];\n  if (!r) return null;\n  const total = r.strongBuy + r.buy + r.hold + r.sell + r.strongSell;\n  if (!total) return null;\n  const score = (2 * r.strongBuy + r.buy - r.sell - 2 * r.strongSell) / total; // -2..+2\n  const label = score >= 1.2 ? 'Strong Buy' : score >= 0.4 ? 'Buy' : score > -0.4 ? 'Hold' : score > -1.2 ? 'Sell' : 'Strong Sell';\n  return { score, label, total, buy: r.strongBuy + r.buy, hold: r.hold, sell: r.sell + r.strongSell };\n}\nconst POS = ['beat', 'beats', 'surge', 'soar', 'record', 'upgrade', 'raises', 'growth', 'strong', 'profit', 'jump', 'rally', 'outperform', 'wins', 'expands'];\nconst NEG = ['miss', 'misses', 'plunge', 'fall', 'falls', 'drop', 'downgrade', 'cut', 'lawsuit', 'probe', 'weak', 'loss', 'recall', 'layoff', 'layoffs', 'slump', 'warning', 'investigation', 'fraud'];\nasync function fhNews(sym) {\n  if (!fk) return null;\n  const to = new Date(), from = new Date(Date.now() - 3 * 864e5);\n  const f = x => x.toLocaleDateString('en-CA', { timeZone: 'America/New_York' });\n  const d = await http(`https://finnhub.io/api/v1/company-news?symbol=${encodeURIComponent(sym)}&from=${f(from)}&to=${f(to)}&token=${fk}`);\n  if (!Array.isArray(d) || !d.length) return null;\n  const items = d.slice(0, 20);\n  const scores = items.map(n => {\n    const words = (n.headline || '').toLowerCase().split(/[^a-z\\-]+/);\n    const s = words.filter(w => POS.includes(w)).length - words.filter(w => NEG.includes(w)).length;\n    return Math.sign(s);\n  });\n  return { kw: clamp(avg(scores), -1, 1), top: { headline: items[0].headline, url: items[0].url, source: items[0].source }, count: items.length };\n}\n\n// ---------- source 3: Alpha Vantage (news sentiment scored per ticker) ----------\nasync function alpha(sym) {\n  if (!ak) return null;\n  const d = await http(`https://www.alphavantage.co/query?function=NEWS_SENTIMENT&tickers=${encodeURIComponent(sym)}&limit=50&apikey=${ak}`);\n  if (!d || !Array.isArray(d.feed)) return null; // rate-limited or no coverage\n  const vals = [];\n  for (const art of d.feed) {\n    const t = (art.ticker_sentiment || []).find(x => x.ticker === sym && Number(x.relevance_score) >= 0.3);\n    if (t) vals.push(Number(t.ticker_sentiment_score));\n  }\n  return vals.length ? { score: avg(vals), count: vals.length } : null;\n}\n\n\n// ---------- source 4: analyst actions reported by finance news (upgrades / downgrades / price-target changes) ----------\nconst decode = s => String(s || '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '\"').replace(/&#39;|&apos;/g, \"'\");\nconst parseRss = xml => [...String(xml || '').matchAll(/<item>([\\s\\S]*?)<\\/item>/g)].map(m => {\n  const g = t => { const x = m[1].match(new RegExp(`<${t}[^>]*>([\\\\s\\\\S]*?)</${t}>`)); return x ? decode(x[1].replace(/<!\\[CDATA\\[|\\]\\]>/g, '').trim()) : ''; };\n  return { title: g('title'), link: g('link'), date: Date.parse(g('pubDate')), source: g('source') };\n});\nconst httpText = async url => {\n  try { return await this.helpers.httpRequest({ method: 'GET', url, headers: { ...UA, Accept: 'application/rss+xml, text/xml' }, json: false, timeout: 15000 }); }\n  catch (e) { return null; }\n};\nconst UP = [/upgrad/i, /rais\\w*\\s.*target/i, /(boost|lift|hike)\\w*\\s.*target/i, /initiat\\w+.*\\b(buy|overweight|outperform)\\b/i, /reiterat\\w+.*\\b(buy|overweight|outperform)\\b/i, /top pick/i];\nconst DOWN = [/downgrad/i, /(cut|lower|slash|trim)\\w*\\s.*target/i, /initiat\\w+.*\\b(sell|underweight|underperform)\\b/i];\nconst CREDIT = /credit (rating|outlook)|\\bdebt\\b|\\bbonds?\\b|moody|fitch|s&p global|\\bs&p (weighs|plans|cuts|lowers|downgrades)|sovereign/i;\nconst ROUNDUP = /upgrades\\/downgrades|upgrades and downgrades|analyst (actions|moves)|stocks? (upgraded|downgraded) today/i;\nconst MULTI = /\\b[A-Z]{2,5},\\s*[A-Z]{2,5},\\s*[A-Z]{2,5}/;\nasync function analystActions(sym, name) {\n  const first = String(name || '').split(/[\\s,.]+/)[0];\n  const mentions = t => new RegExp(`\\\\b${sym.replace(/[^A-Z0-9]/g, '')}\\\\b`, 'i').test(t) || (first.length >= 4 && new RegExp(`\\\\b${first}\\\\b`, 'i').test(t));\n  const q = encodeURIComponent(`${sym} stock (upgrade OR downgrade OR \"price target\" OR analyst) when:7d`);\n  const [g, yh, ud] = await Promise.all([\n    httpText(`https://news.google.com/rss/search?q=${q}&hl=en-US&gl=US&ceid=US:en`),\n    httpText(`https://feeds.finance.yahoo.com/rss/2.0/headline?s=${encodeURIComponent(sym)}&region=US&lang=en-US`),\n    fk ? http(`https://finnhub.io/api/v1/stock/upgrade-downgrade?symbol=${encodeURIComponent(sym)}&from=${new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10)}&token=${fk}`) : null // may be premium-only; ignored if unavailable\n  ]);\n  const cutoff = Date.now() - 7 * 864e5;\n  const seen = new Set(); const acts = [];\n  for (const it of [...parseRss(g), ...parseRss(yh).map(x => ({ ...x, source: x.source || 'Yahoo Finance' }))]) {\n    if (!it.title || (it.date && it.date < cutoff) || !mentions(it.title)) continue;\n    const title = it.title.replace(new RegExp(`\\\\s+-\\\\s+${(it.source || '').replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}$`), '');\n    const key = title.toLowerCase().slice(0, 60);\n    if (seen.has(key)) continue;\n    if (CREDIT.test(title) || ROUNDUP.test(title) || MULTI.test(title)) continue;   // credit ratings, roundups, multi-ticker lists\n    const isDown = DOWN.some(r => r.test(title)), isUp = UP.some(r => r.test(title));\n    if (isDown === isUp) continue;                                                     // neither, or mixed\n    const dir = isDown ? -1 : 1;\n    seen.add(key);\n    acts.push({ dir, text: title, url: it.link, source: it.source || 'news', date: it.date || 0 });\n  }\n  if (Array.isArray(ud)) {\n    for (const x of ud) {\n      const dir = x.action === 'up' ? 1 : x.action === 'down' ? -1 : 0;\n      if (dir) acts.push({ dir, text: `${x.company}: ${x.fromGrade || '—'} → ${x.toGrade}`, url: null, source: 'Finnhub', date: Date.parse(x.gradeTime) || 0 });\n    }\n  }\n  if (!acts.length) return null;\n  acts.sort((a, b) => b.date - a.date);\n  const ups = acts.filter(a => a.dir > 0).length, downs = acts.filter(a => a.dir < 0).length;\n  return { ups, downs, net: ups - downs, latest: acts.slice(0, 2) };\n}\n\n// ---------- scoring (-100..+100) ----------\nfunction scoreIt(y, an, av, nw, act) {\n  let s = 0; const why = [];\n  if (y) {\n    if (y.sma50 != null) { if (y.price > y.sma50) { s += 15; why.push('uptrend'); } else { s -= 15; why.push('downtrend'); } }\n    if (y.sma20 != null && y.sma50 != null) s += y.sma20 > y.sma50 ? 10 : -10;\n    if (y.rsi != null) {\n      if (y.rsi < 30) { s += 10; why.push('oversold, may bounce'); }\n      else if (y.rsi > 70) { s -= 10; why.push('overbought'); }\n    }\n    if (y.hi52 && y.price >= y.hi52 * 0.97) why.push('near yearly high');\n    if (y.lo52 && y.price <= y.lo52 * 1.05) why.push('near yearly low');\n  }\n  if (an) { s += an.score * 10; why.push(`analysts say ${an.label}`); }\n  if (act) { s += clamp(act.net, -3, 3) / 3 * 20; if (act.net > 0) why.push('analysts upgrading'); else if (act.net < 0) why.push('analysts cutting'); }\n  let sentiment = null;\n  if (av) { sentiment = av.score; s += clamp(av.score / 0.35, -1, 1) * 25; }\n  else if (nw) { sentiment = nw.kw; s += nw.kw * 12; }\n  if (sentiment != null && Math.abs(sentiment) > 0.1) why.push(sentiment > 0 ? 'positive news' : 'negative news');\n  s = Math.round(clamp(s, -100, 100));\n  const label = s >= 35 ? '🟢 Bullish' : s >= 15 ? '🟡 Leaning bullish' : s > -15 ? '⚪ Neutral' : s > -35 ? '🟠 Leaning bearish' : '🔴 Bearish';\n  return { score: s, label, reasons: why };\n}\n\nasync function analyze(sym, full, idx) {\n  const y = await yahoo(sym);\n  const [fq, an, nw, av, act] = await Promise.all([\n    full ? fhQuote(sym) : null,\n    analysts(sym),\n    full ? fhNews(sym) : null,\n    full && idx < 5 ? alpha(sym) : null,   // Alpha Vantage free tier = 25 calls/day\n    analystActions(sym, y?.name)\n  ]);\n  const base = y || (fq ? { price: fq.price, change: null, pct: fq.pct, currency: 'USD', name: sym } : null);\n  if (!base) return { symbol: sym, price: null, sources: 0, score: -999, reasons: [] };\n  const sc = scoreIt(y, an, av, nw, act);\n  const notes = [...sc.reasons];\n  if (y && fq && Math.abs(y.price - fq.price) / fq.price > 0.01) notes.push('check price');\n  const sources = [y, an, av || nw, act].filter(Boolean).length;   // data coverage, 0-4\n  return { symbol: sym, ...base, change: base.change ?? 0, ...sc, reasons: notes, sources, news: nw?.top || null, acts: act, analyst: an ? { buy: an.buy, hold: an.hold, sell: an.sell, label: an.label } : null };\n}\n\n// ---------- run ----------\nconst watch = await Promise.all(inp.symbols.map((s, i) => analyze(s, true, i)));\n\nlet ideas = [];\nif (cfg.enableScreener && inp.source !== 'slack') {\n  const uni = String(cfg.screenerUniverse || '').split(',').map(s => s.trim().toUpperCase())\n    .filter(s => s && !inp.symbols.includes(s)).slice(0, 25);\n  const res = await Promise.all(uni.map(s => analyze(s, false, 99)));\n  ideas = res.filter(r => r.price != null && r.sources >= 2 && r.score >= 25).sort((a, b) => b.score - a.score).slice(0, 3);\n}\n\nconst [SPY, QQQ, VIX] = await Promise.all(['SPY', 'QQQ', '^VIX'].map(yahoo));\nreturn [{ json: { mode: inp.mode, source: inp.source, pulse: { SPY, QQQ, VIX }, watch, ideas } }];\n"
+      },
+      "id": "a1946b8e-f5e9-4c7a-9ef1-918bbbffa667",
+      "name": "Analyze & Score",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build Slack Report — turns the analysis into a Slack Block Kit message.\nconst d = $input.first().json;\n\n// ---------- helpers ----------\nconst sg = n => (n > 0 ? '+' : n < 0 ? '−' : '') + Math.abs(n);\nconst pc = n => n == null ? '—' : `${n >= 0 ? '+' : '−'}${Math.abs(n).toFixed(1)}%`;\nconst px = r => (!r.currency || r.currency === 'USD') ? `$${r.price.toFixed(2)}` : `${r.price.toFixed(2)} ${r.currency}`;\nconst sigName = s => s >= 35 ? 'Bullish' : s >= 15 ? 'Lean bullish' : s > -15 ? 'Neutral' : s > -35 ? 'Lean bearish' : 'Bearish';\nconst sigIcon = s => s >= 35 ? '🟢' : s >= 15 ? '🟡' : s > -15 ? '⚪' : s > -35 ? '🟠' : '🔴';\nconst PRETTY = {\n  'analysts upgrading': 'Recent analyst upgrades / target raises',\n  'analysts cutting': 'Recent analyst downgrades / target cuts',\n  'uptrend': 'Trading above 50-day average',\n  'downtrend': 'Trading below 50-day average',\n  'overbought': 'Overbought (RSI above 70)',\n  'oversold, may bounce': 'Oversold (RSI below 30)',\n  'near yearly high': 'Near 52-week high',\n  'near yearly low': 'Near 52-week low',\n  'positive news': 'Positive news flow',\n  'negative news': 'Negative news flow',\n  'check price': 'Data sources differ on price'\n};\nconst pretty = t => t.startsWith('analysts say ') ? `Analyst consensus: ${t.slice(13)}` : (PRETTY[t] || t);\nconst drivers = r => [...(r.reasons || [])].filter(Boolean)\n  .sort((a, b) => /analyst|news/.test(b) - /analyst|news/.test(a)).slice(0, 4).map(pretty);\nconst pad = (s, n) => String(s).padEnd(n), rpad = (s, n) => String(s).padStart(n);\nconst chunk = (arr, n) => arr.reduce((o, x, i) => (i % n ? o[o.length - 1].push(x) : o.push([x]), o), []);\n\nconst now = new Date();\nconst dateStr = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'America/New_York' });\nconst timeStr = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' });\nconst title = { open: 'Market Open Report', close: 'Market Close Report' }[d.mode] || 'Stock Check';\n\n// ---------- data ----------\nconst ok = d.watch.filter(r => r.price != null).sort((a, b) => b.score - a.score);\nconst bad = d.watch.filter(r => r.price == null).map(r => r.symbol);\nconst best = ok.filter(r => r.score >= 15);\nconst weak = ok.filter(r => r.score <= -15);\nconst mid = ok.length - best.length - weak.length;\n\n// ---------- change since last report (workflow static data; persists on scheduled runs) ----------\nlet prev = {}, sd = null;\ntry { sd = $getWorkflowStaticData('global'); prev = sd.scores || {}; } catch (e) {}\nconst delta = r => prev[r.symbol] ? r.score - prev[r.symbol].score : null;\nconst dStr = x => x == null ? '—' : x === 0 ? '=' : `${x > 0 ? '▲' : '▼'}${Math.abs(x)}`;\nconst tierChanges = ok.filter(r => prev[r.symbol] && sigName(prev[r.symbol].score) !== sigName(r.score))\n  .map(r => `${r.score > prev[r.symbol].score ? '▲' : '▼'} *${r.symbol}*  ${sigName(prev[r.symbol].score)} → ${sigName(r.score)}`);\n\n// ---------- market tone ----------\nconst p = d.pulse || {};\nconst spy = p.SPY?.pct, qqq = p.QQQ?.pct, vix = p.VIX?.price;\nlet tone = null;\nif (spy != null) {\n  const lead = qqq == null ? '' : qqq > spy + 0.3 ? ' Technology is leading.' : qqq < spy - 0.3 ? ' Technology is lagging.' : '';\n  tone = (spy <= -1 ? 'Broad sell-off.' : spy < -0.2 ? 'Risk-off session.' : spy >= 1 ? 'Broad rally.' : spy > 0.2 ? 'Risk-on session.' : 'Flat, range-bound session.') + lead;\n  if (vix != null) tone += vix > 30 ? ` Volatility is very high (VIX ${vix.toFixed(1)}).` : vix > 20 ? ` Volatility is elevated (VIX ${vix.toFixed(1)}).` : ` Volatility is subdued (VIX ${vix.toFixed(1)}).`;\n}\n\n// ---------- blocks ----------\nconst blocks = [];\nblocks.push({ type: 'header', text: { type: 'plain_text', text: `📈 ${title}`, emoji: true } });\nblocks.push({ type: 'context', elements: [{ type: 'mrkdwn', text: `${dateStr}  •  ${timeStr} ET  •  ${ok.length} tickers analysed` }] });\n\nconst fields = [];\nif (p.SPY) fields.push({ type: 'mrkdwn', text: `*S&P 500*\\n${spy >= 0 ? '▲' : '▼'} ${pc(spy)}` });\nif (p.QQQ) fields.push({ type: 'mrkdwn', text: `*Nasdaq 100*\\n${qqq >= 0 ? '▲' : '▼'} ${pc(qqq)}` });\nif (p.VIX) fields.push({ type: 'mrkdwn', text: `*Volatility (VIX)*\\n${vix.toFixed(1)} · ${vix > 30 ? 'Very high' : vix > 20 ? 'Elevated' : 'Calm'}` });\nif (fields.length) blocks.push({ type: 'section', fields });\nif (tone) blocks.push({ type: 'context', elements: [{ type: 'mrkdwn', text: `*Market tone:* ${tone}` }] });\nblocks.push({ type: 'divider' });\n\n// summary\nif (ok.length) {\n  const hi = ok[0], lo = ok[ok.length - 1];\n  const head = best.length\n    ? `*Highest signal: ${hi.symbol}* — ${sigName(hi.score)} (${sg(hi.score)})`\n    : '*No strong opportunities right now* — nothing on your watchlist scores as favourable.';\n  const low = ok.length > 1 && lo.score <= -15 ? `\\n*Lowest signal: ${lo.symbol}* — ${sigName(lo.score)} (${sg(lo.score)})` : '';\n  blocks.push({ type: 'section', text: { type: 'mrkdwn', text: `${head}${low}\\n_${best.length} favourable  •  ${mid} neutral  •  ${weak.length} weak_` } });\n}\nif (tierChanges.length) blocks.push({ type: 'section', text: { type: 'mrkdwn', text: '*Since last report*\\n' + tierChanges.join('\\n') } });\n\n// table 1: signal ranking\nconst h1 = `${pad('#', 3)}${pad('Symbol', 8)}${rpad('Price', 11)}${rpad('Day', 8)}  ${pad('Signal', 14)}${rpad('Score', 6)}${rpad('Δ', 5)}`;\nconst r1 = ok.map((r, i) => `${pad(i + 1, 3)}${pad(r.symbol, 8)}${rpad(px(r), 11)}${rpad(pc(r.pct), 8)}  ${pad(sigName(r.score), 14)}${rpad(sg(r.score), 6)}${rpad(dStr(delta(r)), 5)}`);\nif (ok.length) blocks.push({ type: 'section', text: { type: 'mrkdwn', text: '*Signal ranking*\\n```' + [h1, '-'.repeat(h1.length), ...r1].join('\\n') + '```' } });\n\n// table 2: momentum & risk\nconst extraH = d.mode === 'open' ? 'Gap' : d.mode === 'close' ? 'Vol×' : null;\nconst h2 = `${pad('Symbol', 8)}${rpad('1M', 8)}${rpad('RSI', 5)}${rpad('vs 52wH', 9)}${rpad('Vol', 6)}${rpad('Buy/Hold/Sell', 15)}${extraH ? rpad(extraH, 7) : ''}`;\nconst r2 = ok.map(r => {\n  const an = r.analyst ? `${r.analyst.buy}/${r.analyst.hold}/${r.analyst.sell}` : '—';\n  const extra = d.mode === 'open' ? rpad(pc(r.gapPct), 7) : d.mode === 'close' ? rpad(r.volRatio != null ? r.volRatio.toFixed(1) + 'x' : '—', 7) : '';\n  return `${pad(r.symbol, 8)}${rpad(pc(r.ret1m), 8)}${rpad(r.rsi != null ? r.rsi.toFixed(0) : '—', 5)}${rpad(pc(r.distHi), 9)}${rpad(r.vol20 != null ? r.vol20.toFixed(0) + '%' : '—', 6)}${rpad(an, 15)}${extra}`;\n});\nif (ok.length) blocks.push({ type: 'section', text: { type: 'mrkdwn', text: '*Momentum & risk*  _(1M return · RSI-14 · distance from 52-wk high · annualised volatility · analyst split)_\\n```' + [h2, '-'.repeat(h2.length), ...r2].join('\\n') + '```' } });\n\n// key drivers (chunked to stay under Slack's per-block text limit)\nchunk(ok, 5).forEach((grp, i) => {\n  const lines = grp.map(r => `${sigIcon(r.score)} *${r.symbol}* — ${r.name || ''}  _(data coverage ${r.sources}/4)_\\n      ${drivers(r).join('  ·  ') || 'Limited data'}`);\n  blocks.push({ type: 'section', text: { type: 'mrkdwn', text: (i === 0 ? '*Key drivers*\\n' : '') + lines.join('\\n') } });\n});\nif (bad.length) blocks.push({ type: 'context', elements: [{ type: 'mrkdwn', text: `⚠️ No data returned for: ${bad.join(', ')}` }] });\n\n// screened ideas\nif (d.ideas && d.ideas.length) {\n  blocks.push({ type: 'divider' });\n  const lines = d.ideas.map(r => `${sigIcon(r.score)} *${r.symbol}* — ${r.name || ''}\\n      ${px(r)} (${pc(r.pct)})  •  ${sigName(r.score)} (${sg(r.score)})  •  ${drivers(r).slice(0, 3).join('  ·  ')}`);\n  blocks.push({ type: 'section', text: { type: 'mrkdwn', text: '*On the radar* _(screened outside your watchlist)_\\n' + lines.join('\\n') } });\n}\n\nblocks.push({ type: 'divider' });\nblocks.push({ type: 'context', elements: [{ type: 'mrkdwn', text: '*Methodology:* score (−100 to +100) = trend ±25 · momentum ±10 · analyst consensus ±20 · rating changes ±20 · news sentiment ±25.  Sources: Yahoo Finance, Finnhub, Alpha Vantage, Google News.  For information only — not investment advice.' }] });\n\n// save today's scores for the next report's \"Δ\" column\ntry { if (sd) { sd.scores = { ...prev }; for (const r of ok) sd.scores[r.symbol] = { score: r.score, ts: Date.now() }; } } catch (e) {}\n\nconst text = `${title}: ${best.length ? 'highest signal ' + ok[0].symbol : 'no strong signals'} (${best.length} favourable, ${mid} neutral, ${weak.length} weak)`;\nreturn [{ json: { text, blocks } }];\n"
+      },
+      "id": "b70f68a1-dbe7-46e7-ab2c-bdb1317895b6",
+      "name": "Build Slack Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://slack.com/api/chat.postMessage",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { channel: $('Config').first().json.slackChannelId, text: $json.text, blocks: $json.blocks, unfurl_links: false, unfurl_media: false } }}",
+        "options": {}
+      },
+      "id": "c8010bac-fd0e-4fd6-9959-78ccdbb6ed19",
+      "name": "Post to Slack",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        176
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "slackApi": {
+          "id": "IaefNDbjYVvXty35",
+          "name": "Admin Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Slack answers HTTP 200 even on failure, so surface its error here.\nconst r = $input.first().json;\nif (!r.ok) throw new Error(`Slack rejected the report: ${r.error || 'unknown error'}${r.needed ? ' (missing scope: ' + r.needed + ')' : ''}`);\nreturn [{ json: { delivered: true, channel: r.channel, ts: r.ts } }];"
+      },
+      "id": "45a718c2-fb0c-4631-914a-50384d9f7cfa",
+      "name": "Verify Delivery",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## ① Triggers\n- **Schedule:** Mon–Fri at **09:35 ET** (open report) and **16:05 ET** (close report). Workflow timezone is America/New_York.\n- **Market Status (SPY):** skips US market holidays.\n- **Slack `/stock [TICKERS]`:** on-demand report for a custom list, e.g. `/stock TSLA AMD`.\n- **Manual Trigger:** test run with your default watchlist.",
+        "height": 200,
+        "width": 560,
+        "color": 4
+      },
+      "id": "c6a50fb7-7550-42ef-bae9-187c885004ab",
+      "name": "Note: Triggers",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -976,
+        -240
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## ② Setup (required)\nOpen **Config** and set:\n- `finnhubKey` — free key at finnhub.io\n- `alphaVantageKey` — free key at alphavantage.co\n- `slackChannelId` — channel to post in\n- `watchlist` — comma-separated tickers (max 15)\n- `screenerUniverse` — tickers scanned for ideas\n\nKeys are optional; without them the report uses Yahoo + news only.",
+        "height": 360,
+        "color": 6
+      },
+      "id": "6d5dbbef-c7fb-4a5b-8f3a-2eaf18d5ea14",
+      "name": "Note: Setup",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -256,
+        -240
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## ③ Analysis\n**Sources:** Yahoo Finance · Finnhub · Alpha Vantage · Google News & Yahoo RSS\n\n**Score −100…+100**\n- Trend (50/20-day averages) ±25\n- Momentum (RSI-14) ±10\n- Analyst consensus ±20\n- Rating changes in the news ±20\n- News sentiment ±25\n\n**Signals:** ≥35 Bullish · ≥15 Lean bullish · −15…15 Neutral · ≤−15 Lean bearish · ≤−35 Bearish\n\nTune the weights in the `scoreIt` function.",
+        "height": 360,
+        "width": 420,
+        "color": 5
+      },
+      "id": "a4d5c09f-fe2c-42d7-b1a1-1cdc47c43418",
+      "name": "Note: Analysis",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -240
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## ④ Delivery\nPosts a Block Kit report through Slack `chat.postMessage` (3 retries). The bot needs the **chat:write** scope and must be a member of the channel.\n\n**Verify Delivery** fails the run with Slack's exact error (e.g. `not_in_channel`) instead of failing silently.\n\n_Informational signals only — not investment advice._",
+        "height": 240,
+        "width": 560,
+        "color": 3
+      },
+      "id": "5b076ae3-630f-49f8-b637-b10d199eed9e",
+      "name": "Note: Delivery",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        464,
+        -240
+      ]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule: Open 09:35 / Close 16:05 ET": {
+      "main": [
+        [
+          {
+            "node": "Market Status (SPY)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Market Status (SPY)": {
+      "main": [
+        [
+          {
+            "node": "Market Open Today?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Market Open Today?": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack Command": {
+      "main": [
+        [
+          {
+            "node": "Acknowledge Slack Command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Acknowledge Slack Command": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Resolve Watchlist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve Watchlist": {
+      "main": [
+        [
+          {
+            "node": "Analyze & Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze & Score": {
+      "main": [
+        [
+          {
+            "node": "Build Slack Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Slack Report": {
+      "main": [
+        [
+          {
+            "node": "Post to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post to Slack": {
+      "main": [
+        [
+          {
+            "node": "Verify Delivery",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "nodeGroups": [],
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "timezone": "Asia/Jerusalem",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": {
+    "node:Daily 17:30": {
+      "recurrenceRules": [
+        null
+      ],
+      "recurrenceRuleSignatures": [
+        null
+      ]
+    },
+    "node:Daily 17:00": {
+      "recurrenceRules": [
+        null
+      ],
+      "recurrenceRuleSignatures": [
+        null
+      ]
+    },
+    "node:Schedule: Open 09:35 / Close 16:05 ET": {
+      "recurrenceRules": [
+        null,
+        null
+      ],
+      "recurrenceRuleSignatures": [
+        null,
+        null
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": [],
+  "shared": [
+    {
+      "role": "workflow:owner",
+      "workflowId": "nhM4zDn76TSEjNAM",
+      "projectId": "pWTWmuHnmIHw48U9",
+      "createdAt": "2026-11-14T08:22:35.506Z",
+      "updatedAt": "2026-11-14T08:22:35.506Z"
+    }
+  ],
+  "activeVersion": {
+    "versionId": "b7e319aa-eae6-41c5-ac42-2eb787ca0323",
+    "workflowId": "nhM4zDn76TSEjNAM",
+    "nodes": [
+      {
+        "parameters": {},
+        "id": "e7fd4b99-80a4-49c9-ae32-8f69845ec610",
+        "name": "Manual Trigger",
+        "type": "n8n-nodes-base.manualTrigger",
+        "typeVersion": 1,
+        "position": [
+          -928,
+          16
+        ]
+      },
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "cronExpression",
+                "expression": "35 9 * * 1-5"
+              },
+              {
+                "field": "cronExpression",
+                "expression": "5 16 * * 1-5"
+              }
+            ]
+          }
+        },
+        "id": "c4142f2b-46c6-4c7a-be3d-c8641ed3ecf6",
+        "name": "Schedule: Open 09:35 / Close 16:05 ET",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          -928,
+          176
+        ]
+      },
+      {
+        "parameters": {
+          "url": "https://query1.finance.yahoo.com/v8/finance/chart/SPY?interval=1d&range=1d",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "User-Agent",
+                "value": "Mozilla/5.0"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "a95fe5ad-a84d-4f1a-bfd1-40f85b5bd160",
+        "name": "Market Status (SPY)",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          -688,
+          176
+        ],
+        "retryOnFail": true,
+        "maxTries": 3,
+        "waitBetweenTries": 3000
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "id": "market-open-today",
+                "leftValue": "={{ new Date($json.chart.result[0].meta.regularMarketTime * 1000).toLocaleDateString('en-CA', { timeZone: 'America/New_York' }) === new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' }) }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "dcb3454c-c4a2-4194-bf65-29d017633fcd",
+        "name": "Market Open Today?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [
+          -480,
+          176
+        ]
+      },
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "stock",
+          "responseMode": "responseNode",
+          "options": {}
+        },
+        "id": "5f94a642-9346-47c4-831a-2e450bb5fbcb",
+        "name": "Slack Command",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          -928,
+          368
+        ],
+        "webhookId": "98dd3f31-8bd8-4d4c-b59d-c5d59b61513a"
+      },
+      {
+        "parameters": {
+          "respondWith": "text",
+          "responseBody": "📈 Fetching quotes & analysing — your report will be posted shortly.",
+          "options": {}
+        },
+        "id": "b11236a8-efed-4642-8b08-5adcb8de971e",
+        "name": "Acknowledge Slack Command",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.1,
+        "position": [
+          -688,
+          368
+        ]
+      },
+      {
+        "parameters": {
+          "assignments": {
+            "assignments": [
+              {
+                "id": "072c1924-108d-499d-9311-ef80d7acbe75",
+                "name": "finnhubKey",
+                "value": "YOUR_FINNHUB_API_KEY",
+                "type": "string"
+              },
+              {
+                "id": "04cd7093-fc40-4736-a3d7-dbae25d0ac8d",
+                "name": "alphaVantageKey",
+                "value": "YOUR_ALPHA_VANTAGE_API_KEY",
+                "type": "string"
+              },
+              {
+                "id": "8b4da2ce-b647-49e1-a23f-23a2b044bfba",
+                "name": "slackChannelId",
+                "value": "C0CHMHQ8UG5",
+                "type": "string"
+              },
+              {
+                "id": "b45c5dbf-c14f-445b-834a-d1a043da3e6e",
+                "name": "watchlist",
+                "value": "AAPL,VOO,NVDA,COST,INTC",
+                "type": "string"
+              },
+              {
+                "id": "c741b7e4-c149-4d87-bd29-24f663b3f0aa",
+                "name": "enableScreener",
+                "value": true,
+                "type": "boolean"
+              },
+              {
+                "id": "8a6d0b63-7360-40ee-9a2e-af0b909d52ce",
+                "name": "screenerUniverse",
+                "value": "MSFT,GOOGL,AMZN,META,AVGO,LLY,V,JPM,AMD,TSM,ORCL,NFLX,UNH,HD,QQQ,VTI,SCHD,XLK",
+                "type": "string"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "05328654-d154-4311-83af-3df435ccbb9a",
+        "name": "Config",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [
+          -240,
+          176
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const cfg = $('Config').first().json;\nlet symbols = String(cfg.watchlist || '').split(',').map(s => s.trim().toUpperCase()).filter(Boolean);\nlet source = 'schedule';\n\n// Slack slash command: /stock AAPL TSLA  -> custom list\ntry {\n  const text = $('Slack Command').first().json.body.text || '';\n  const custom = text.toUpperCase().split(/[\\s,]+/).filter(s => /^[A-Z0-9.\\-^=]{1,12}$/.test(s));\n  if (custom.length) symbols = custom;\n  source = 'slack';\n} catch (e) {}\n\nif (source === 'schedule') {\n  try { $('Manual Trigger').first(); source = 'manual'; } catch (e) {}\n}\n\n// Scheduled runs: before noon New York time = market open report, otherwise close report\nconst etHour = Number(new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: 'numeric', hour12: false }).format(new Date())) % 24;\nconst mode = source === 'schedule' ? (etHour < 12 ? 'open' : 'close') : 'ondemand';\n\nreturn [{ json: { symbols: [...new Set(symbols)].slice(0, 15), mode, source } }];\n"
+        },
+        "id": "535ac7af-2357-4fe9-9a31-3011855c7941",
+        "name": "Resolve Watchlist",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          0,
+          176
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "// Analyze & Score — pulls prices, technicals, analyst ratings, rating changes and news for each ticker,\n// then produces a score from -100 (very weak) to +100 (very strong).\n// Sources: Yahoo Finance (price/history) · Finnhub (quote, analyst consensus, news) · Alpha Vantage (news sentiment) · Google News + Yahoo RSS (analyst actions)\nconst cfg = $('Config').first().json;\nconst inp = $input.first().json;\nconst UA = { 'User-Agent': 'Mozilla/5.0' };\nconst real = k => (k && !String(k).includes('YOUR_')) ? k : null;\nconst fk = real(cfg.finnhubKey);\nconst ak = real(cfg.alphaVantageKey);\n\nconst http = async (url, headers = {}) => {\n  try { return await this.helpers.httpRequest({ method: 'GET', url, headers, json: true, timeout: 15000 }); }\n  catch (e) { return null; }\n};\n\n// ---------- helpers ----------\nconst avg = a => a.reduce((x, y) => x + y, 0) / a.length;\nconst sma = (a, n) => a.length >= n ? avg(a.slice(-n)) : null;\nconst clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));\nconst etDate = ts => new Date(ts * 1000).toLocaleDateString('en-CA', { timeZone: 'America/New_York' });\nconst rsi = (a, n = 14) => {\n  if (a.length < n + 1) return null;\n  let g = 0, l = 0;\n  for (let i = a.length - n; i < a.length; i++) { const d = a[i] - a[i - 1]; if (d >= 0) g += d; else l -= d; }\n  if (l === 0) return 100;\n  return 100 - 100 / (1 + g / l);\n};\n\n// ---------- source 1: Yahoo Finance (price + 6 months history -> technicals) ----------\nasync function yahoo(sym) {\n  const d = await http(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?interval=1d&range=6mo`, UA);\n  const r = d?.chart?.result?.[0];\n  if (!r || !r.timestamp) return null;\n  const q = r.indicators.quote[0];\n  const rows = r.timestamp.map((t, i) => ({ t, o: q.open[i], c: q.close[i], v: q.volume[i] })).filter(x => x.c != null);\n  if (rows.length < 2) return null;\n  const m = r.meta;\n  const last = rows[rows.length - 1];\n  const price = m.regularMarketPrice ?? last.c;\n  const todayBar = etDate(last.t) === etDate(m.regularMarketTime);\n  const prev = todayBar ? rows[rows.length - 2].c : last.c;\n  const closes = rows.map(x => x.c);\n  if (todayBar) closes[closes.length - 1] = price;\n  const vols = (todayBar ? rows.slice(-21, -1) : rows.slice(-20)).map(x => x.v).filter(Boolean);\n  const avgVol = vols.length ? avg(vols) : null;\n  const lr = closes.slice(-21).map((c, i, arr) => i ? Math.log(c / arr[i - 1]) : null).slice(1);\n  let vol20 = null;\n  if (lr.length >= 15) { const mu = avg(lr); vol20 = Math.sqrt(lr.reduce((s, x) => s + (x - mu) ** 2, 0) / (lr.length - 1)) * Math.sqrt(252) * 100; }\n  const change = price - prev;\n  return {\n    name: m.shortName || m.longName || sym,\n    currency: m.currency || 'USD',\n    price, prev, change,\n    pct: prev ? (change / prev) * 100 : null,\n    gapPct: todayBar && last.o && prev ? (last.o / prev - 1) * 100 : null,\n    sma20: sma(closes, 20), sma50: sma(closes, 50), rsi: rsi(closes),\n    ret1m: closes.length > 22 ? (price / closes[closes.length - 22] - 1) * 100 : null,\n    hi52: m.fiftyTwoWeekHigh ?? null, lo52: m.fiftyTwoWeekLow ?? null, vol20,\n    distHi: m.fiftyTwoWeekHigh ? (price / m.fiftyTwoWeekHigh - 1) * 100 : null,\n    volRatio: todayBar && avgVol && last.v ? last.v / avgVol : null\n  };\n}\n\n// ---------- source 2: Finnhub (independent quote, analyst consensus, company news) ----------\nasync function fhQuote(sym) {\n  if (!fk) return null;\n  const d = await http(`https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(sym)}&token=${fk}`);\n  return d && d.c > 0 ? { price: d.c, pct: d.dp } : null;\n}\nasync function analysts(sym) {\n  if (!fk) return null;\n  const d = await http(`https://finnhub.io/api/v1/stock/recommendation?symbol=${encodeURIComponent(sym)}&token=${fk}`);\n  const r = Array.isArray(d) && d[0];\n  if (!r) return null;\n  const total = r.strongBuy + r.buy + r.hold + r.sell + r.strongSell;\n  if (!total) return null;\n  const score = (2 * r.strongBuy + r.buy - r.sell - 2 * r.strongSell) / total; // -2..+2\n  const label = score >= 1.2 ? 'Strong Buy' : score >= 0.4 ? 'Buy' : score > -0.4 ? 'Hold' : score > -1.2 ? 'Sell' : 'Strong Sell';\n  return { score, label, total, buy: r.strongBuy + r.buy, hold: r.hold, sell: r.sell + r.strongSell };\n}\nconst POS = ['beat', 'beats', 'surge', 'soar', 'record', 'upgrade', 'raises', 'growth', 'strong', 'profit', 'jump', 'rally', 'outperform', 'wins', 'expands'];\nconst NEG = ['miss', 'misses', 'plunge', 'fall', 'falls', 'drop', 'downgrade', 'cut', 'lawsuit', 'probe', 'weak', 'loss', 'recall', 'layoff', 'layoffs', 'slump', 'warning', 'investigation', 'fraud'];\nasync function fhNews(sym) {\n  if (!fk) return null;\n  const to = new Date(), from = new Date(Date.now() - 3 * 864e5);\n  const f = x => x.toLocaleDateString('en-CA', { timeZone: 'America/New_York' });\n  const d = await http(`https://finnhub.io/api/v1/company-news?symbol=${encodeURIComponent(sym)}&from=${f(from)}&to=${f(to)}&token=${fk}`);\n  if (!Array.isArray(d) || !d.length) return null;\n  const items = d.slice(0, 20);\n  const scores = items.map(n => {\n    const words = (n.headline || '').toLowerCase().split(/[^a-z\\-]+/);\n    const s = words.filter(w => POS.includes(w)).length - words.filter(w => NEG.includes(w)).length;\n    return Math.sign(s);\n  });\n  return { kw: clamp(avg(scores), -1, 1), top: { headline: items[0].headline, url: items[0].url, source: items[0].source }, count: items.length };\n}\n\n// ---------- source 3: Alpha Vantage (news sentiment scored per ticker) ----------\nasync function alpha(sym) {\n  if (!ak) return null;\n  const d = await http(`https://www.alphavantage.co/query?function=NEWS_SENTIMENT&tickers=${encodeURIComponent(sym)}&limit=50&apikey=${ak}`);\n  if (!d || !Array.isArray(d.feed)) return null; // rate-limited or no coverage\n  const vals = [];\n  for (const art of d.feed) {\n    const t = (art.ticker_sentiment || []).find(x => x.ticker === sym && Number(x.relevance_score) >= 0.3);\n    if (t) vals.push(Number(t.ticker_sentiment_score));\n  }\n  return vals.length ? { score: avg(vals), count: vals.length } : null;\n}\n\n\n// ---------- source 4: analyst actions reported by finance news (upgrades / downgrades / price-target changes) ----------\nconst decode = s => String(s || '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '\"').replace(/&#39;|&apos;/g, \"'\");\nconst parseRss = xml => [...String(xml || '').matchAll(/<item>([\\s\\S]*?)<\\/item>/g)].map(m => {\n  const g = t => { const x = m[1].match(new RegExp(`<${t}[^>]*>([\\\\s\\\\S]*?)</${t}>`)); return x ? decode(x[1].replace(/<!\\[CDATA\\[|\\]\\]>/g, '').trim()) : ''; };\n  return { title: g('title'), link: g('link'), date: Date.parse(g('pubDate')), source: g('source') };\n});\nconst httpText = async url => {\n  try { return await this.helpers.httpRequest({ method: 'GET', url, headers: { ...UA, Accept: 'application/rss+xml, text/xml' }, json: false, timeout: 15000 }); }\n  catch (e) { return null; }\n};\nconst UP = [/upgrad/i, /rais\\w*\\s.*target/i, /(boost|lift|hike)\\w*\\s.*target/i, /initiat\\w+.*\\b(buy|overweight|outperform)\\b/i, /reiterat\\w+.*\\b(buy|overweight|outperform)\\b/i, /top pick/i];\nconst DOWN = [/downgrad/i, /(cut|lower|slash|trim)\\w*\\s.*target/i, /initiat\\w+.*\\b(sell|underweight|underperform)\\b/i];\nconst CREDIT = /credit (rating|outlook)|\\bdebt\\b|\\bbonds?\\b|moody|fitch|s&p global|\\bs&p (weighs|plans|cuts|lowers|downgrades)|sovereign/i;\nconst ROUNDUP = /upgrades\\/downgrades|upgrades and downgrades|analyst (actions|moves)|stocks? (upgraded|downgraded) today/i;\nconst MULTI = /\\b[A-Z]{2,5},\\s*[A-Z]{2,5},\\s*[A-Z]{2,5}/;\nasync function analystActions(sym, name) {\n  const first = String(name || '').split(/[\\s,.]+/)[0];\n  const mentions = t => new RegExp(`\\\\b${sym.replace(/[^A-Z0-9]/g, '')}\\\\b`, 'i').test(t) || (first.length >= 4 && new RegExp(`\\\\b${first}\\\\b`, 'i').test(t));\n  const q = encodeURIComponent(`${sym} stock (upgrade OR downgrade OR \"price target\" OR analyst) when:7d`);\n  const [g, yh, ud] = await Promise.all([\n    httpText(`https://news.google.com/rss/search?q=${q}&hl=en-US&gl=US&ceid=US:en`),\n    httpText(`https://feeds.finance.yahoo.com/rss/2.0/headline?s=${encodeURIComponent(sym)}&region=US&lang=en-US`),\n    fk ? http(`https://finnhub.io/api/v1/stock/upgrade-downgrade?symbol=${encodeURIComponent(sym)}&from=${new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10)}&token=${fk}`) : null // may be premium-only; ignored if unavailable\n  ]);\n  const cutoff = Date.now() - 7 * 864e5;\n  const seen = new Set(); const acts = [];\n  for (const it of [...parseRss(g), ...parseRss(yh).map(x => ({ ...x, source: x.source || 'Yahoo Finance' }))]) {\n    if (!it.title || (it.date && it.date < cutoff) || !mentions(it.title)) continue;\n    const title = it.title.replace(new RegExp(`\\\\s+-\\\\s+${(it.source || '').replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}$`), '');\n    const key = title.toLowerCase().slice(0, 60);\n    if (seen.has(key)) continue;\n    if (CREDIT.test(title) || ROUNDUP.test(title) || MULTI.test(title)) continue;   // credit ratings, roundups, multi-ticker lists\n    const isDown = DOWN.some(r => r.test(title)), isUp = UP.some(r => r.test(title));\n    if (isDown === isUp) continue;                                                     // neither, or mixed\n    const dir = isDown ? -1 : 1;\n    seen.add(key);\n    acts.push({ dir, text: title, url: it.link, source: it.source || 'news', date: it.date || 0 });\n  }\n  if (Array.isArray(ud)) {\n    for (const x of ud) {\n      const dir = x.action === 'up' ? 1 : x.action === 'down' ? -1 : 0;\n      if (dir) acts.push({ dir, text: `${x.company}: ${x.fromGrade || '—'} → ${x.toGrade}`, url: null, source: 'Finnhub', date: Date.parse(x.gradeTime) || 0 });\n    }\n  }\n  if (!acts.length) return null;\n  acts.sort((a, b) => b.date - a.date);\n  const ups = acts.filter(a => a.dir > 0).length, downs = acts.filter(a => a.dir < 0).length;\n  return { ups, downs, net: ups - downs, latest: acts.slice(0, 2) };\n}\n\n// ---------- scoring (-100..+100) ----------\nfunction scoreIt(y, an, av, nw, act) {\n  let s = 0; const why = [];\n  if (y) {\n    if (y.sma50 != null) { if (y.price > y.sma50) { s += 15; why.push('uptrend'); } else { s -= 15; why.push('downtrend'); } }\n    if (y.sma20 != null && y.sma50 != null) s += y.sma20 > y.sma50 ? 10 : -10;\n    if (y.rsi != null) {\n      if (y.rsi < 30) { s += 10; why.push('oversold, may bounce'); }\n      else if (y.rsi > 70) { s -= 10; why.push('overbought'); }\n    }\n    if (y.hi52 && y.price >= y.hi52 * 0.97) why.push('near yearly high');\n    if (y.lo52 && y.price <= y.lo52 * 1.05) why.push('near yearly low');\n  }\n  if (an) { s += an.score * 10; why.push(`analysts say ${an.label}`); }\n  if (act) { s += clamp(act.net, -3, 3) / 3 * 20; if (act.net > 0) why.push('analysts upgrading'); else if (act.net < 0) why.push('analysts cutting'); }\n  let sentiment = null;\n  if (av) { sentiment = av.score; s += clamp(av.score / 0.35, -1, 1) * 25; }\n  else if (nw) { sentiment = nw.kw; s += nw.kw * 12; }\n  if (sentiment != null && Math.abs(sentiment) > 0.1) why.push(sentiment > 0 ? 'positive news' : 'negative news');\n  s = Math.round(clamp(s, -100, 100));\n  const label = s >= 35 ? '🟢 Bullish' : s >= 15 ? '🟡 Leaning bullish' : s > -15 ? '⚪ Neutral' : s > -35 ? '🟠 Leaning bearish' : '🔴 Bearish';\n  return { score: s, label, reasons: why };\n}\n\nasync function analyze(sym, full, idx) {\n  const y = await yahoo(sym);\n  const [fq, an, nw, av, act] = await Promise.all([\n    full ? fhQuote(sym) : null,\n    analysts(sym),\n    full ? fhNews(sym) : null,\n    full && idx < 5 ? alpha(sym) : null,   // Alpha Vantage free tier = 25 calls/day\n    analystActions(sym, y?.name)\n  ]);\n  const base = y || (fq ? { price: fq.price, change: null, pct: fq.pct, currency: 'USD', name: sym } : null);\n  if (!base) return { symbol: sym, price: null, sources: 0, score: -999, reasons: [] };\n  const sc = scoreIt(y, an, av, nw, act);\n  const notes = [...sc.reasons];\n  if (y && fq && Math.abs(y.price - fq.price) / fq.price > 0.01) notes.push('check price');\n  const sources = [y, an, av || nw, act].filter(Boolean).length;   // data coverage, 0-4\n  return { symbol: sym, ...base, change: base.change ?? 0, ...sc, reasons: notes, sources, news: nw?.top || null, acts: act, analyst: an ? { buy: an.buy, hold: an.hold, sell: an.sell, label: an.label } : null };\n}\n\n// ---------- run ----------\nconst watch = await Promise.all(inp.symbols.map((s, i) => analyze(s, true, i)));\n\nlet ideas = [];\nif (cfg.enableScreener && inp.source !== 'slack') {\n  const uni = String(cfg.screenerUniverse || '').split(',').map(s => s.trim().toUpperCase())\n    .filter(s => s && !inp.symbols.includes(s)).slice(0, 25);\n  const res = await Promise.all(uni.map(s => analyze(s, false, 99)));\n  ideas = res.filter(r => r.price != null && r.sources >= 2 && r.score >= 25).sort((a, b) => b.score - a.score).slice(0, 3);\n}\n\nconst [SPY, QQQ, VIX] = await Promise.all(['SPY', 'QQQ', '^VIX'].map(yahoo));\nreturn [{ json: { mode: inp.mode, source: inp.source, pulse: { SPY, QQQ, VIX }, watch, ideas } }];\n"
+        },
+        "id": "a1946b8e-f5e9-4c7a-9ef1-918bbbffa667",
+        "name": "Analyze & Score",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          240,
+          176
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "// Build Slack Report — turns the analysis into a Slack Block Kit message.\nconst d = $input.first().json;\n\n// ---------- helpers ----------\nconst sg = n => (n > 0 ? '+' : n < 0 ? '−' : '') + Math.abs(n);\nconst pc = n => n == null ? '—' : `${n >= 0 ? '+' : '−'}${Math.abs(n).toFixed(1)}%`;\nconst px = r => (!r.currency || r.currency === 'USD') ? `$${r.price.toFixed(2)}` : `${r.price.toFixed(2)} ${r.currency}`;\nconst sigName = s => s >= 35 ? 'Bullish' : s >= 15 ? 'Lean bullish' : s > -15 ? 'Neutral' : s > -35 ? 'Lean bearish' : 'Bearish';\nconst sigIcon = s => s >= 35 ? '🟢' : s >= 15 ? '🟡' : s > -15 ? '⚪' : s > -35 ? '🟠' : '🔴';\nconst PRETTY = {\n  'analysts upgrading': 'Recent analyst upgrades / target raises',\n  'analysts cutting': 'Recent analyst downgrades / target cuts',\n  'uptrend': 'Trading above 50-day average',\n  'downtrend': 'Trading below 50-day average',\n  'overbought': 'Overbought (RSI above 70)',\n  'oversold, may bounce': 'Oversold (RSI below 30)',\n  'near yearly high': 'Near 52-week high',\n  'near yearly low': 'Near 52-week low',\n  'positive news': 'Positive news flow',\n  'negative news': 'Negative news flow',\n  'check price': 'Data sources differ on price'\n};\nconst pretty = t => t.startsWith('analysts say ') ? `Analyst consensus: ${t.slice(13)}` : (PRETTY[t] || t);\nconst drivers = r => [...(r.reasons || [])].filter(Boolean)\n  .sort((a, b) => /analyst|news/.test(b) - /analyst|news/.test(a)).slice(0, 4).map(pretty);\nconst pad = (s, n) => String(s).padEnd(n), rpad = (s, n) => String(s).padStart(n);\nconst chunk = (arr, n) => arr.reduce((o, x, i) => (i % n ? o[o.length - 1].push(x) : o.push([x]), o), []);\n\nconst now = new Date();\nconst dateStr = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'America/New_York' });\nconst timeStr = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' });\nconst title = { open: 'Market Open Report', close: 'Market Close Report' }[d.mode] || 'Stock Check';\n\n// ---------- data ----------\nconst ok = d.watch.filter(r => r.price != null).sort((a, b) => b.score - a.score);\nconst bad = d.watch.filter(r => r.price == null).map(r => r.symbol);\nconst best = ok.filter(r => r.score >= 15);\nconst weak = ok.filter(r => r.score <= -15);\nconst mid = ok.length - best.length - weak.length;\n\n// ---------- change since last report (workflow static data; persists on scheduled runs) ----------\nlet prev = {}, sd = null;\ntry { sd = $getWorkflowStaticData('global'); prev = sd.scores || {}; } catch (e) {}\nconst delta = r => prev[r.symbol] ? r.score - prev[r.symbol].score : null;\nconst dStr = x => x == null ? '—' : x === 0 ? '=' : `${x > 0 ? '▲' : '▼'}${Math.abs(x)}`;\nconst tierChanges = ok.filter(r => prev[r.symbol] && sigName(prev[r.symbol].score) !== sigName(r.score))\n  .map(r => `${r.score > prev[r.symbol].score ? '▲' : '▼'} *${r.symbol}*  ${sigName(prev[r.symbol].score)} → ${sigName(r.score)}`);\n\n// ---------- market tone ----------\nconst p = d.pulse || {};\nconst spy = p.SPY?.pct, qqq = p.QQQ?.pct, vix = p.VIX?.price;\nlet tone = null;\nif (spy != null) {\n  const lead = qqq == null ? '' : qqq > spy + 0.3 ? ' Technology is leading.' : qqq < spy - 0.3 ? ' Technology is lagging.' : '';\n  tone = (spy <= -1 ? 'Broad sell-off.' : spy < -0.2 ? 'Risk-off session.' : spy >= 1 ? 'Broad rally.' : spy > 0.2 ? 'Risk-on session.' : 'Flat, range-bound session.') + lead;\n  if (vix != null) tone += vix > 30 ? ` Volatility is very high (VIX ${vix.toFixed(1)}).` : vix > 20 ? ` Volatility is elevated (VIX ${vix.toFixed(1)}).` : ` Volatility is subdued (VIX ${vix.toFixed(1)}).`;\n}\n\n// ---------- blocks ----------\nconst blocks = [];\nblocks.push({ type: 'header', text: { type: 'plain_text', text: `📈 ${title}`, emoji: true } });\nblocks.push({ type: 'context', elements: [{ type: 'mrkdwn', text: `${dateStr}  •  ${timeStr} ET  •  ${ok.length} tickers analysed` }] });\n\nconst fields = [];\nif (p.SPY) fields.push({ type: 'mrkdwn', text: `*S&P 500*\\n${spy >= 0 ? '▲' : '▼'} ${pc(spy)}` });\nif (p.QQQ) fields.push({ type: 'mrkdwn', text: `*Nasdaq 100*\\n${qqq >= 0 ? '▲' : '▼'} ${pc(qqq)}` });\nif (p.VIX) fields.push({ type: 'mrkdwn', text: `*Volatility (VIX)*\\n${vix.toFixed(1)} · ${vix > 30 ? 'Very high' : vix > 20 ? 'Elevated' : 'Calm'}` });\nif (fields.length) blocks.push({ type: 'section', fields });\nif (tone) blocks.push({ type: 'context', elements: [{ type: 'mrkdwn', text: `*Market tone:* ${tone}` }] });\nblocks.push({ type: 'divider' });\n\n// summary\nif (ok.length) {\n  const hi = ok[0], lo = ok[ok.length - 1];\n  const head = best.length\n    ? `*Highest signal: ${hi.symbol}* — ${sigName(hi.score)} (${sg(hi.score)})`\n    : '*No strong opportunities right now* — nothing on your watchlist scores as favourable.';\n  const low = ok.length > 1 && lo.score <= -15 ? `\\n*Lowest signal: ${lo.symbol}* — ${sigName(lo.score)} (${sg(lo.score)})` : '';\n  blocks.push({ type: 'section', text: { type: 'mrkdwn', text: `${head}${low}\\n_${best.length} favourable  •  ${mid} neutral  •  ${weak.length} weak_` } });\n}\nif (tierChanges.length) blocks.push({ type: 'section', text: { type: 'mrkdwn', text: '*Since last report*\\n' + tierChanges.join('\\n') } });\n\n// table 1: signal ranking\nconst h1 = `${pad('#', 3)}${pad('Symbol', 8)}${rpad('Price', 11)}${rpad('Day', 8)}  ${pad('Signal', 14)}${rpad('Score', 6)}${rpad('Δ', 5)}`;\nconst r1 = ok.map((r, i) => `${pad(i + 1, 3)}${pad(r.symbol, 8)}${rpad(px(r), 11)}${rpad(pc(r.pct), 8)}  ${pad(sigName(r.score), 14)}${rpad(sg(r.score), 6)}${rpad(dStr(delta(r)), 5)}`);\nif (ok.length) blocks.push({ type: 'section', text: { type: 'mrkdwn', text: '*Signal ranking*\\n```' + [h1, '-'.repeat(h1.length), ...r1].join('\\n') + '```' } });\n\n// table 2: momentum & risk\nconst extraH = d.mode === 'open' ? 'Gap' : d.mode === 'close' ? 'Vol×' : null;\nconst h2 = `${pad('Symbol', 8)}${rpad('1M', 8)}${rpad('RSI', 5)}${rpad('vs 52wH', 9)}${rpad('Vol', 6)}${rpad('Buy/Hold/Sell', 15)}${extraH ? rpad(extraH, 7) : ''}`;\nconst r2 = ok.map(r => {\n  const an = r.analyst ? `${r.analyst.buy}/${r.analyst.hold}/${r.analyst.sell}` : '—';\n  const extra = d.mode === 'open' ? rpad(pc(r.gapPct), 7) : d.mode === 'close' ? rpad(r.volRatio != null ? r.volRatio.toFixed(1) + 'x' : '—', 7) : '';\n  return `${pad(r.symbol, 8)}${rpad(pc(r.ret1m), 8)}${rpad(r.rsi != null ? r.rsi.toFixed(0) : '—', 5)}${rpad(pc(r.distHi), 9)}${rpad(r.vol20 != null ? r.vol20.toFixed(0) + '%' : '—', 6)}${rpad(an, 15)}${extra}`;\n});\nif (ok.length) blocks.push({ type: 'section', text: { type: 'mrkdwn', text: '*Momentum & risk*  _(1M return · RSI-14 · distance from 52-wk high · annualised volatility · analyst split)_\\n```' + [h2, '-'.repeat(h2.length), ...r2].join('\\n') + '```' } });\n\n// key drivers (chunked to stay under Slack's per-block text limit)\nchunk(ok, 5).forEach((grp, i) => {\n  const lines = grp.map(r => `${sigIcon(r.score)} *${r.symbol}* — ${r.name || ''}  _(data coverage ${r.sources}/4)_\\n      ${drivers(r).join('  ·  ') || 'Limited data'}`);\n  blocks.push({ type: 'section', text: { type: 'mrkdwn', text: (i === 0 ? '*Key drivers*\\n' : '') + lines.join('\\n') } });\n});\nif (bad.length) blocks.push({ type: 'context', elements: [{ type: 'mrkdwn', text: `⚠️ No data returned for: ${bad.join(', ')}` }] });\n\n// screened ideas\nif (d.ideas && d.ideas.length) {\n  blocks.push({ type: 'divider' });\n  const lines = d.ideas.map(r => `${sigIcon(r.score)} *${r.symbol}* — ${r.name || ''}\\n      ${px(r)} (${pc(r.pct)})  •  ${sigName(r.score)} (${sg(r.score)})  •  ${drivers(r).slice(0, 3).join('  ·  ')}`);\n  blocks.push({ type: 'section', text: { type: 'mrkdwn', text: '*On the radar* _(screened outside your watchlist)_\\n' + lines.join('\\n') } });\n}\n\nblocks.push({ type: 'divider' });\nblocks.push({ type: 'context', elements: [{ type: 'mrkdwn', text: '*Methodology:* score (−100 to +100) = trend ±25 · momentum ±10 · analyst consensus ±20 · rating changes ±20 · news sentiment ±25.  Sources: Yahoo Finance, Finnhub, Alpha Vantage, Google News.  For information only — not investment advice.' }] });\n\n// save today's scores for the next report's \"Δ\" column\ntry { if (sd) { sd.scores = { ...prev }; for (const r of ok) sd.scores[r.symbol] = { score: r.score, ts: Date.now() }; } } catch (e) {}\n\nconst text = `${title}: ${best.length ? 'highest signal ' + ok[0].symbol : 'no strong signals'} (${best.length} favourable, ${mid} neutral, ${weak.length} weak)`;\nreturn [{ json: { text, blocks } }];\n"
+        },
+        "id": "b70f68a1-dbe7-46e7-ab2c-bdb1317895b6",
+        "name": "Build Slack Report",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          480,
+          176
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "https://slack.com/api/chat.postMessage",
+          "authentication": "predefinedCredentialType",
+          "nodeCredentialType": "slackApi",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ { channel: $('Config').first().json.slackChannelId, text: $json.text, blocks: $json.blocks, unfurl_links: false, unfurl_media: false } }}",
+          "options": {}
+        },
+        "id": "c8010bac-fd0e-4fd6-9959-78ccdbb6ed19",
+        "name": "Post to Slack",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          720,
+          176
+        ],
+        "retryOnFail": true,
+        "maxTries": 3,
+        "waitBetweenTries": 3000,
+        "credentials": {
+          "slackApi": {
+            "id": "IaefNDbjYVvXty35",
+            "name": "Admin Bot"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "// Slack answers HTTP 200 even on failure, so surface its error here.\nconst r = $input.first().json;\nif (!r.ok) throw new Error(`Slack rejected the report: ${r.error || 'unknown error'}${r.needed ? ' (missing scope: ' + r.needed + ')' : ''}`);\nreturn [{ json: { delivered: true, channel: r.channel, ts: r.ts } }];"
+        },
+        "id": "45a718c2-fb0c-4631-914a-50384d9f7cfa",
+        "name": "Verify Delivery",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          960,
+          176
+        ]
+      },
+      {
+        "parameters": {
+          "content": "## ① Triggers\n- **Schedule:** Mon–Fri at **09:35 ET** (open report) and **16:05 ET** (close report). Workflow timezone is America/New_York.\n- **Market Status (SPY):** skips US market holidays.\n- **Slack `/stock [TICKERS]`:** on-demand report for a custom list, e.g. `/stock TSLA AMD`.\n- **Manual Trigger:** test run with your default watchlist.",
+          "height": 200,
+          "width": 560,
+          "color": 4
+        },
+        "id": "c6a50fb7-7550-42ef-bae9-187c885004ab",
+        "name": "Note: Triggers",
+        "type": "n8n-nodes-base.stickyNote",
+        "typeVersion": 1,
+        "position": [
+          -976,
+          -240
+        ]
+      },
+      {
+        "parameters": {
+          "content": "## ② Setup (required)\nOpen **Config** and set:\n- `finnhubKey` — free key at finnhub.io\n- `alphaVantageKey` — free key at alphavantage.co\n- `slackChannelId` — channel to post in\n- `watchlist` — comma-separated tickers (max 15)\n- `screenerUniverse` — tickers scanned for ideas\n\nKeys are optional; without them the report uses Yahoo + news only.",
+          "height": 360,
+          "color": 6
+        },
+        "id": "6d5dbbef-c7fb-4a5b-8f3a-2eaf18d5ea14",
+        "name": "Note: Setup",
+        "type": "n8n-nodes-base.stickyNote",
+        "typeVersion": 1,
+        "position": [
+          -256,
+          -240
+        ]
+      },
+      {
+        "parameters": {
+          "content": "## ③ Analysis\n**Sources:** Yahoo Finance · Finnhub · Alpha Vantage · Google News & Yahoo RSS\n\n**Score −100…+100**\n- Trend (50/20-day averages) ±25\n- Momentum (RSI-14) ±10\n- Analyst consensus ±20\n- Rating changes in the news ±20\n- News sentiment ±25\n\n**Signals:** ≥35 Bullish · ≥15 Lean bullish · −15…15 Neutral · ≤−15 Lean bearish · ≤−35 Bearish\n\nTune the weights in the `scoreIt` function.",
+          "height": 360,
+          "width": 420,
+          "color": 5
+        },
+        "id": "a4d5c09f-fe2c-42d7-b1a1-1cdc47c43418",
+        "name": "Note: Analysis",
+        "type": "n8n-nodes-base.stickyNote",
+        "typeVersion": 1,
+        "position": [
+          0,
+          -240
+        ]
+      },
+      {
+        "parameters": {
+          "content": "## ④ Delivery\nPosts a Block Kit report through Slack `chat.postMessage` (3 retries). The bot needs the **chat:write** scope and must be a member of the channel.\n\n**Verify Delivery** fails the run with Slack's exact error (e.g. `not_in_channel`) instead of failing silently.\n\n_Informational signals only — not investment advice._",
+          "height": 240,
+          "width": 560,
+          "color": 3
+        },
+        "id": "5b076ae3-630f-49f8-b637-b10d199eed9e",
+        "name": "Note: Delivery",
+        "type": "n8n-nodes-base.stickyNote",
+        "typeVersion": 1,
+        "position": [
+          464,
+          -240
+        ]
+      }
+    ],
+    "connections": {
+      "Manual Trigger": {
+        "main": [
+          [
+            {
+              "node": "Config",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Schedule: Open 09:35 / Close 16:05 ET": {
+        "main": [
+          [
+            {
+              "node": "Market Status (SPY)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Market Status (SPY)": {
+        "main": [
+          [
+            {
+              "node": "Market Open Today?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Market Open Today?": {
+        "main": [
+          [
+            {
+              "node": "Config",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Slack Command": {
+        "main": [
+          [
+            {
+              "node": "Acknowledge Slack Command",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Acknowledge Slack Command": {
+        "main": [
+          [
+            {
+              "node": "Config",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Config": {
+        "main": [
+          [
+            {
+              "node": "Resolve Watchlist",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Resolve Watchlist": {
+        "main": [
+          [
+            {
+              "node": "Analyze & Score",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Analyze & Score": {
+        "main": [
+          [
+            {
+              "node": "Build Slack Report",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build Slack Report": {
+        "main": [
+          [
+            {
+              "node": "Post to Slack",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Post to Slack": {
+        "main": [
+          [
+            {
+              "node": "Verify Delivery",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "nodeGroups": [],
+    "authors": "Alex Vinokur",
+    "name": "Version b7e319aa",
+    "description": "",
+    "autosaved": true,
+    "createdAt": "2026-11-26T08:31:47.903Z",
+    "updatedAt": "2026-11-26T08:32:42.000Z"
+  }
+}
